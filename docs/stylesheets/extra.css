@@ -7,6 +7,43 @@
   --ml-border: color-mix(in srgb, var(--md-default-fg-color) 14%, transparent);
   --ml-shadow: 0 0.55rem 1.6rem rgba(31, 41, 55, 0.08);
   --ml-radius: 0.75rem;
+  --ml-diagram-bg: color-mix(in srgb, var(--md-default-bg-color) 96%, white 4%);
+  --ml-diagram-node-bg: #ffffff;
+  --ml-diagram-node-muted-bg: #eef2f7;
+  --ml-diagram-node-stroke: #4f46e5;
+  --ml-diagram-node-muted-stroke: #94a3b8;
+  --ml-diagram-edge: #475569;
+  --ml-diagram-text: #111827;
+  --ml-diagram-label-bg: color-mix(in srgb, var(--md-default-bg-color) 92%, white 8%);
+  --ml-diagram-cluster-bg: rgba(79, 70, 229, 0.07);
+  --ml-diagram-cluster-stroke: rgba(79, 70, 229, 0.42);
+  --ml-diagram-accent-bg: #5e35b1;
+  --ml-diagram-accent-stroke: #311b92;
+  --ml-roofline-start: #0088a3;
+  --ml-roofline-mid: #5e35b1;
+  --ml-roofline-end: #7c4dff;
+}
+
+[data-md-color-scheme="slate"] {
+  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 86%, var(--md-primary-fg-color) 14%);
+  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 78%, var(--md-primary-fg-color) 22%);
+  --ml-border: color-mix(in srgb, var(--md-default-fg-color) 22%, transparent);
+  --ml-shadow: 0 0.55rem 1.6rem rgba(0, 0, 0, 0.22);
+  --ml-diagram-bg: color-mix(in srgb, var(--md-default-bg-color) 88%, #ffffff 12%);
+  --ml-diagram-node-bg: #182335;
+  --ml-diagram-node-muted-bg: #263244;
+  --ml-diagram-node-stroke: #a78bfa;
+  --ml-diagram-node-muted-stroke: #64748b;
+  --ml-diagram-edge: #cbd5e1;
+  --ml-diagram-text: #f8fafc;
+  --ml-diagram-label-bg: #111827;
+  --ml-diagram-cluster-bg: rgba(167, 139, 250, 0.12);
+  --ml-diagram-cluster-stroke: rgba(196, 181, 253, 0.5);
+  --ml-diagram-accent-bg: #7c3aed;
+  --ml-diagram-accent-stroke: #c4b5fd;
+  --ml-roofline-start: #22d3ee;
+  --ml-roofline-mid: #c4b5fd;
+  --ml-roofline-end: #a78bfa;
 }
 
 /* Slightly wider content column for math + code heavy pages. */
@@ -157,6 +194,18 @@ figure {
   margin: 1.5rem auto;
 }
 
+.md-typeset figure:not(.roofline-figure) > :is(img, svg) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  padding: 0.6rem;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius);
+  background: var(--ml-diagram-bg);
+  box-shadow: var(--ml-shadow);
+}
+
 figure > figcaption {
   font-size: 0.78rem;
   color: var(--md-default-fg-color--light);
@@ -169,8 +218,110 @@ figure > figcaption {
   padding: 0.9rem;
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-radius);
-  background: var(--ml-surface);
+  background: var(--ml-diagram-bg);
+  color: var(--ml-diagram-text);
   box-shadow: var(--ml-shadow);
+  overflow-x: auto;
+}
+
+.md-typeset .mermaid svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.md-typeset .mermaid svg,
+.md-typeset .mermaid svg * {
+  font-family: var(--md-text-font-family, sans-serif) !important;
+}
+
+.md-typeset .mermaid .node rect,
+.md-typeset .mermaid .node circle,
+.md-typeset .mermaid .node ellipse,
+.md-typeset .mermaid .node polygon,
+.md-typeset .mermaid .node path {
+  fill: var(--ml-diagram-node-bg) !important;
+  stroke: var(--ml-diagram-node-stroke) !important;
+  stroke-width: 1.7px !important;
+}
+
+.md-typeset .mermaid .nodeLabel,
+.md-typeset .mermaid .node .label,
+.md-typeset .mermaid .label text,
+.md-typeset .mermaid text {
+  fill: var(--ml-diagram-text) !important;
+  color: var(--ml-diagram-text) !important;
+}
+
+.md-typeset .mermaid .edgePath .path,
+.md-typeset .mermaid .flowchart-link,
+.md-typeset .mermaid path.relation {
+  stroke: var(--ml-diagram-edge) !important;
+  stroke-width: 2px !important;
+}
+
+.md-typeset .mermaid .arrowheadPath,
+.md-typeset .mermaid marker path {
+  fill: var(--ml-diagram-edge) !important;
+  stroke: var(--ml-diagram-edge) !important;
+}
+
+.md-typeset .mermaid .edgeLabel,
+.md-typeset .mermaid .edgeLabel p,
+.md-typeset .mermaid .labelBkg {
+  background-color: var(--ml-diagram-label-bg) !important;
+  color: var(--ml-diagram-text) !important;
+}
+
+.md-typeset .mermaid .edgeLabel rect,
+.md-typeset .mermaid rect.labelBkg {
+  fill: var(--ml-diagram-label-bg) !important;
+}
+
+.md-typeset .mermaid .cluster rect {
+  fill: var(--ml-diagram-cluster-bg) !important;
+  stroke: var(--ml-diagram-cluster-stroke) !important;
+  stroke-width: 1.5px !important;
+}
+
+.md-typeset .mermaid .cluster text,
+.md-typeset .mermaid .cluster .label,
+.md-typeset .mermaid .cluster-label {
+  fill: var(--ml-diagram-text) !important;
+  color: var(--ml-diagram-text) !important;
+}
+
+.md-typeset .mermaid .flagship rect,
+.md-typeset .mermaid .flagship circle,
+.md-typeset .mermaid .flagship ellipse,
+.md-typeset .mermaid .flagship polygon,
+.md-typeset .mermaid .flagship path {
+  fill: var(--ml-diagram-accent-bg) !important;
+  stroke: var(--ml-diagram-accent-stroke) !important;
+}
+
+.md-typeset .mermaid .flagship .nodeLabel,
+.md-typeset .mermaid .flagship .label,
+.md-typeset .mermaid .flagship text {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+
+.md-typeset .mermaid .idle rect,
+.md-typeset .mermaid .idle circle,
+.md-typeset .mermaid .idle ellipse,
+.md-typeset .mermaid .idle polygon,
+.md-typeset .mermaid .idle path {
+  fill: var(--ml-diagram-node-muted-bg) !important;
+  stroke: var(--ml-diagram-node-muted-stroke) !important;
+}
+
+.md-typeset .mermaid .idle .nodeLabel,
+.md-typeset .mermaid .idle .label,
+.md-typeset .mermaid .idle text {
+  fill: var(--md-default-fg-color--light) !important;
+  color: var(--md-default-fg-color--light) !important;
 }
 
 /* Tighten admonition titles a touch. */
@@ -277,6 +428,18 @@ figure > figcaption {
 
 .roofline-slope-label {
   fill: var(--md-accent-fg-color);
+}
+
+.roofline-figure stop[offset="0%"] {
+  stop-color: var(--ml-roofline-start);
+}
+
+.roofline-figure stop[offset="55%"] {
+  stop-color: var(--ml-roofline-mid);
+}
+
+.roofline-figure stop[offset="100%"] {
+  stop-color: var(--ml-roofline-end);
 }
 
 /* Status badges for scaffolded pages. */
