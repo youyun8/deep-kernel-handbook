@@ -56,14 +56,16 @@ tokens, each assigned to $k$ experts. To send them:
    permutation.
 5. **Unpermute + weighted sum** into each token's residual on its home GPU.
 
-```text
-local tokens ─sort by dest GPU─▶ [to G0 | to G1 | to G2 | to G3]
-        │ all-to-all (dispatch)
-        ▼
-received  ─group by expert─▶ grouped GEMM ─▶ expert outputs
-        │ all-to-all (combine, reverse perm)
-        ▼
-unpermute ─weighted sum─▶ residual add
+```mermaid
+flowchart TD
+    A["local tokens"] -->|"sort by dest GPU"| B["buckets: to G0 / G1 / G2 / G3"]
+    B -->|"all-to-all #1 (dispatch)"| C["received tokens"]
+    C -->|"group by expert"| D["grouped GEMM"]
+    D --> E["expert outputs"]
+    E -->|"all-to-all #2 (combine, reverse perm)"| F["unpermute"]
+    F -->|"weighted sum"| G["residual add"]
+    class D flagship;
+    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
 ```
 
 The pattern is **permute → all-to-all → grouped-GEMM → all-to-all → unpermute**.
@@ -87,11 +89,25 @@ comm hides almost entirely behind compute — the single most important EP
 optimization. DeepSeek's **DualPipe** and DeepEP library exist to maximize this
 overlap.
 
-```text
-time ─▶
- comm:  [A2A chunk0][A2A chunk1][A2A chunk2]
- comp:            [GEMM c0 ][GEMM c1 ][GEMM c2]   ← overlapped, not serialized
+```mermaid
+flowchart LR
+    subgraph COMM["comm stream (all-to-all)"]
+      direction LR
+      A0["A2A chunk0"] --> A1["A2A chunk1"] --> A2["A2A chunk2"]
+    end
+    subgraph COMP["compute stream (grouped GEMM)"]
+      direction LR
+      G0["GEMM c0"] --> G1["GEMM c1"] --> G2["GEMM c2"]
+    end
+    A0 -.->|"chunk0 ready"| G0
+    A1 -.->|"chunk1 ready"| G1
+    A2 -.->|"chunk2 ready"| G2
+    class G0,G1,G2 flagship;
+    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
 ```
+
+Each chunk's GEMM runs while the *next* chunk is still in flight (dashed
+hand-offs) — comm and compute overlap rather than serialize.
 
 ### 2. Bound the communication: node-limited routing
 
@@ -192,6 +208,9 @@ dist.all_to_all_single(recv_buf, send_buf,
   quality vs throughput vs memory.
 
 ## Exercises
+
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/moe.md). Try each exercise before expanding.
 
 1. For $T{=}4096$ tokens/GPU, $d{=}4096$, bf16, estimate bytes moved by the two
    all-to-alls per layer. Over 60 layers, compare to expert GEMM FLOP-time on an

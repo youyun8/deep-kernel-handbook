@@ -136,6 +136,9 @@ flowchart TD
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/moe.md). Try each exercise before expanding.
+
 1. Estimate the HBM needed to hold DeepSeek-V3 weights in bf16 vs fp8 vs int4.
    How many 80 GB GPUs each, before KV cache?
 2. With offloading, derive the condition (tokens-per-expert vs PCIe bandwidth vs

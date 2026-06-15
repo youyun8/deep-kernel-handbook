@@ -128,6 +128,9 @@ Distributed bugs are subtle ([training stability](../moe/training-stability.md))
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/capstones.md). Try each exercise before expanding.
+
 1. For your model, compute per-GPU memory and choose a parallel config for 8 and
    64 GPUs; justify each dimension.
 2. Implement EP for the MoE layer (or wire up DeepSpeed-MoE/Megatron) and verify

@@ -195,6 +195,9 @@ standalone, it's pure memory traffic.
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/foundations.md). Try each exercise before expanding.
+
 1. For a 7B-parameter model ($P\approx7\times10^9$), estimate the forward FLOPs
    for one sequence of 4096 tokens. How long should it take on an MI300X at 60%
    MFU?

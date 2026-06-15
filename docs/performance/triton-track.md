@@ -145,6 +145,9 @@ kernels; you now have the vocabulary to read them.
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/performance.md). Try each exercise before expanding.
+
 1. Run the vector-add and softmax kernels; verify against PyTorch and benchmark
    vs the native ops.
 2. Add AMD-oriented autotune configs to the matmul (try `num_warps` 4/8 with

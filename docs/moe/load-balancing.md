@@ -181,6 +181,9 @@ uniform load over a few hundred steps.
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/moe.md). Try each exercise before expanding.
+
 1. Derive that $\sum_e f_e P_e$ is minimized at the uniform distribution subject
    to $\sum f_e = k$, $\sum P_e = 1$.
 2. For $T{=}4096$, $E{=}64$, $k{=}2$, capacity factor 1.25, compute $C$ and the

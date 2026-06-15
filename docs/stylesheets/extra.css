@@ -344,6 +344,26 @@ figure > figcaption {
   border-radius: var(--ml-radius);
 }
 
+/* Keep wide content (code, tables, math, diagrams) inside the viewport:
+   scroll horizontally within the block instead of widening the page. */
+.md-typeset pre,
+.md-typeset .highlighttable,
+.md-typeset .highlight pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.md-typeset :not(pre) > code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.md-typeset .md-typeset__scrollwrap,
+.md-typeset .arithmatex,
+.md-typeset .mermaid {
+  max-width: 100%;
+}
+
 .roofline-figure {
   max-width: 48rem;
 }
@@ -473,6 +493,15 @@ figure > figcaption {
   .md-typeset p,
   .md-typeset li {
     max-width: none;
+  }
+
+  /* Let the prereq chips wrap and their links break instead of overflowing. */
+  .page-meta .chip {
+    white-space: normal;
+  }
+  .page-meta .chip,
+  .page-meta .chip a {
+    overflow-wrap: anywhere;
   }
 
   .roofline-label {

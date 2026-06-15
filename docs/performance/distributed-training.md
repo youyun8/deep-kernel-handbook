@@ -51,12 +51,18 @@ ZeRO-3 cuts per-GPU memory ~$G$× at the cost of extra all-gather/reduce-scatter
 traffic (which overlaps with compute). It's the default way to train large dense
 models without model-surgery.
 
-```text
-optimizer state (fp32 moments + master) ── ZeRO-1
-gradients                                ── ZeRO-2
-parameters                               ── ZeRO-3 / FSDP
-   (each progressively shards more, trading comm for memory)
+```mermaid
+flowchart LR
+    O[optimizer state<br/>fp32 moments + master] --> Z1[ZeRO-1<br/>shard optimizer]
+    Z1 --> G[+ gradients]
+    G --> Z2[ZeRO-2<br/>also shard grads]
+    Z2 --> P[+ parameters]
+    P --> Z3[ZeRO-3 / FSDP<br/>also shard params]
+    class Z3 flagship;
+    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
 ```
+
+Each stage shards progressively more, trading communication for memory.
 
 ## Tensor parallelism (TP)
 
@@ -102,15 +108,22 @@ all-to-all (not all-reduce), and it composes with the others.
 Real training stacks combine dimensions, mapped onto the network topology so the
 chattiest collectives ride the fastest links:
 
-```text
-   ┌─────────────── data parallel (+ ZeRO) ───────────────┐   slow links OK
-   │   ┌──────── pipeline parallel (stages) ────────┐      │
-   │   │   ┌──── tensor parallel (intra-node) ────┐ │      │   fast NVLink
-   │   │   │   experts: expert parallel (A2A)     │ │      │
-   │   │   └──────────────────────────────────────┘ │      │
-   │   └────────────────────────────────────────────┘      │
-   └───────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph DP["data parallel (+ ZeRO) — slow links OK"]
+      subgraph PP["pipeline parallel (stages) — cross-node"]
+        subgraph TP["tensor parallel (intra-node) — fast NVLink"]
+          EP["experts: expert parallel (all-to-all)"]
+        end
+      end
+    end
+    class EP flagship;
+    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
 ```
+
+Read outermost-to-innermost: DP/ZeRO wraps everything (tolerates slow links),
+then PP across nodes, then TP confined to a node's fast NVLink, with expert
+parallelism's all-to-all at the core.
 
 Rules of thumb: **TP intra-node** (needs the most bandwidth), **PP and EP across
 nodes**, **DP/ZeRO on the outside**. SP/CP added for long context. The MFU you
@@ -148,6 +161,9 @@ Megatron-LM / DeepSpeed.
   collectives use the fastest links, with comm overlapped behind compute.
 
 ## Exercises
+
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/performance.md). Try each exercise before expanding.
 
 1. Show all-reduce = reduce-scatter + all-gather and use it to explain ZeRO-2's
    communication volume vs plain DDP.

@@ -142,6 +142,9 @@ forms to show the (small) differences explicitly.
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/performance.md). Try each exercise before expanding.
+
 1. Port the tiled matmul to HIP, build with `hipcc` (or via PyTorch on ROCm), and
    verify against cuBLAS/hipBLAS.
 2. Find the largest first-offset bug: take a 32-lane reduction and demonstrate it

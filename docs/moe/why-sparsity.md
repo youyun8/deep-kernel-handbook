@@ -105,6 +105,9 @@ is how small you can make those overheads.
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/moe.md). Try each exercise before expanding.
+
 1. For $E=128$, $k=2$, $d=4096$, compute total vs active FFN parameters and the
    FLOPs-per-token ratio against the dense $E=1$ baseline.
 2. DeepSeek-V3: 671B total, 37B active. What effective sparsity ratio is that?

@@ -138,6 +138,9 @@ which you'll add — and CUDA graphs).
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/capstones.md). Try each exercise before expanding.
+
 1. Run the reference, then remove balancing and quantify the collapse (entropy,
    load CV, final loss).
 2. Implement the dispatch form and grouped GEMM; produce the before/after table

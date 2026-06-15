@@ -189,6 +189,9 @@ and is the starting point for the [capstone](../capstones/build-moe.md).
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/moe.md). Try each exercise before expanding.
+
 1. Implement sigmoid gating in `MoELayerNaive` and verify against the test.
 2. Set $k{=}1$ (Switch-style) and remove renormalization; what changes in output
    scale and why?

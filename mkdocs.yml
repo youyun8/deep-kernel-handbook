@@ -152,6 +152,12 @@ nav:
       - capstones/index.md
       - Build a small MoE LM: capstones/build-moe.md
       - Scaling it up: capstones/scaling.md
+  - Solutions:
+      - solutions/index.md
+      - "Part I · Foundations": solutions/foundations.md
+      - "Part II · Mixture-of-Experts": solutions/moe.md
+      - "Part III · Performance": solutions/performance.md
+      - "Part IV · Capstones": solutions/capstones.md
   - Reference:
       - Glossary: glossary.md
       - Bibliography: references.md

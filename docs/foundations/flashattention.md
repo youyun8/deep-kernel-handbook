@@ -170,6 +170,9 @@ reappears, just with `tl.load`/`tl.dot` over SRAM tiles.
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/foundations.md). Try each exercise before expanding.
+
 1. Prove the online-softmax combiner is exact: show that folding in chunks gives
    the same $\ell$ and $\tilde O$ as computing softmax over the full row.
 2. Why subtract the running max at all? Construct inputs (e.g. scores of +100)

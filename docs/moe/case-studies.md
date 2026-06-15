@@ -145,6 +145,9 @@ Reading these side by side, the modern MoE consensus is:
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/moe.md). Try each exercise before expanding.
+
 1. For each model, compute the number of expert combinations $\binom{E}{k}$ and
    relate it to the fine-grained quality argument.
 2. Estimate each model's KV-cache size per 1k tokens; quantify how much MLA saves

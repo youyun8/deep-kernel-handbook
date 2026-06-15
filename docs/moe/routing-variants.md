@@ -138,6 +138,9 @@ algorithm is shaped by the network topology it has to run on.
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/moe.md). Try each exercise before expanding.
+
 1. Count expert combinations for (8, top-2), (64, top-8), (256, top-8). Relate to
    the fine-grained quality gains.
 2. Why is expert-choice hard during autoregressive decoding but fine during

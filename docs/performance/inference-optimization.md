@@ -132,6 +132,9 @@ steps) is a common trick to keep TTFT and TPOT both healthy.
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/performance.md). Try each exercise before expanding.
+
 1. Derive the expected speedup of speculative decoding as a function of draft
    acceptance rate $\alpha$ and proposal length $\gamma$.
 2. Estimate throughput gain from continuous vs static batching for a workload with

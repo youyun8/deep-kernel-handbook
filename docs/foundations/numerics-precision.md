@@ -141,6 +141,9 @@ the limit. We cover this more in [quantization](../performance/quantization.md)
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/foundations.md). Try each exercise before expanding.
+
 1. Find the largest logit value for which `exp` is finite in fp16 vs bf16.
    Relate it to the exponent-bit counts.
 2. Show numerically that summing $10^6$ copies of `1e-3` in bf16 loses accuracy,

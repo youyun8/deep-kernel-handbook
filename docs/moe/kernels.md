@@ -191,6 +191,9 @@ The methodology (warmup, CUDA events, fixed clocks) is on the
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/moe.md). Try each exercise before expanding.
+
 1. Extend the Triton gather kernel to also produce the inverse permutation for
    the scatter, and fuse it into a grouped-GEMM epilogue.
 2. Take the CUDA `gather_rows` and make it wavefront-agnostic; benchmark block

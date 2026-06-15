@@ -34,16 +34,14 @@ a hardcoded shuffle reduction) is wrong on AMD; always use `warpSize`.
 This is where the roofline lives. Latency and bandwidth differ by orders of
 magnitude across levels:
 
-```text
-        registers        ~per-thread, fastest, scarce
-            │
-   shared mem / LDS       ~per-block, on-chip SRAM, ~TB/s, KБ-scale
-            │
-        L2 cache          ~per-GPU, MБ-scale
-            │
-        HBM (global)      GБ-scale, ~2-5 TB/s, the roofline's β
-            │
-   host / PCIe / NVMe     huge, slow (offloading lives here)
+```mermaid
+flowchart TD
+    R["registers<br/>per-thread · fastest · scarce"] --> S["shared mem / LDS<br/>per-block · on-chip SRAM · ~TB/s · KB-scale"]
+    S --> L2["L2 cache<br/>per-GPU · MB-scale"]
+    L2 --> H["HBM (global)<br/>GB-scale · ~2–5 TB/s · the roofline's β"]
+    H --> P["host / PCIe / NVMe<br/>huge · slow · offloading lives here"]
+    class H flagship;
+    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
 ```
 
 | Space | NVIDIA | AMD | Scope | Rough role |
@@ -131,6 +129,9 @@ portably — start there.
   MFMA, per-CU occupancy, and tooling — tune accordingly.
 
 ## Exercises
+
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/performance.md). Try each exercise before expanding.
 
 1. Why does a warp/wavefront reduction written for 32 lanes give wrong results on
    CDNA? Rewrite it to use `warpSize`.

@@ -130,6 +130,9 @@ Often combined with the above (distill, then quantize the student).
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/performance.md). Try each exercise before expanding.
+
 1. Derive the int8 affine quantize/dequantize and the max quantization error for
    per-tensor vs per-channel scales on a tensor with one outlier channel.
 2. Implement AWQ's salient-channel scaling on a single linear layer and measure

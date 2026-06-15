@@ -195,3 +195,29 @@ semi-structured) to compress.
 
 **TTFT / TPOT (ITL)**
 : Time To First Token (prefill latency) / Time Per Output Token (decode latency).
+
+## Hardware quick reference
+
+Round numbers for back-of-envelope estimates (the exercises and
+[solutions](solutions/index.md) use these). Peak FLOP/s is dense bf16; real
+kernels hit a fraction (MFU). Bandwidth is HBM. The **ridge** $\pi/\beta$ is the
+arithmetic intensity where a chip flips from memory- to compute-bound.
+
+| GPU | bf16 peak ($\pi$) | HBM BW ($\beta$) | HBM size | Ridge $\pi/\beta$ |
+|---|---|---|---|---|
+| A100 (80 GB) | ~312 TFLOP/s | ~2.0 TB/s | 80 GB | ~156 FLOP/byte |
+| H100 (SXM) | ~990 TFLOP/s | ~3.35 TB/s | 80 GB | ~295 FLOP/byte |
+| H200 | ~990 TFLOP/s | ~4.8 TB/s | 141 GB | ~206 FLOP/byte |
+| MI300X | ~1.3 PFLOP/s | ~5.3 TB/s | 192 GB | ~245 FLOP/byte |
+
+Interconnect (for [distributed training](performance/distributed-training.md)):
+intra-node **NVLink** ~0.9 TB/s/GPU (NVLink 4) or **Infinity Fabric** on MI300;
+cross-node **InfiniBand/RoCE** ~25–50 GB/s/GPU; host **PCIe Gen5** ~64 GB/s. The
+1–2 order-of-magnitude drop from HBM → NVLink → IB → PCIe is why parallelism is
+mapped so the chattiest collectives ride the fastest links.
+
+!!! note "Using these"
+    Numbers vary by SKU, clocks, and sparsity claims (vendors often quote
+    2× with structured sparsity — halve for dense). What should be robust in your
+    estimates is the **regime** and the **order of magnitude**, not the third
+    significant figure.

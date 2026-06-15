@@ -146,6 +146,9 @@ print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=15))
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/performance.md). Try each exercise before expanding.
+
 1. Take the [Triton softmax](triton-track.md), benchmark it wrong (no
    warmup/sync) then right; quantify the difference.
 2. Profile a small transformer's decode step; identify whether attention, the FFN,

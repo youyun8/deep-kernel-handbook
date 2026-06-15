@@ -135,6 +135,9 @@ practice:
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/moe.md). Try each exercise before expanding.
+
 1. Show that minimizing $\mathcal{L}_z$ shrinks $\|x\|$ and bounds the softmax
    away from one-hot. What happens to the entropy of the routing distribution?
 2. Construct router logits where bf16 rounding flips the argmax but fp32 does not.

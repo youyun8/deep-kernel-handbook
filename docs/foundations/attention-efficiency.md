@@ -130,6 +130,9 @@ arithmetic intensity by fusing," straight from the roofline playbook.
 
 ## Exercises
 
+!!! tip "Solutions"
+    Worked answers are on the [Part solutions page](../solutions/foundations.md). Try each exercise before expanding.
+
 1. Compute the KV-cache size for a GQA model with $L=32$, $n_{kv}=8$, $d_h=128$
    at $N=8192$, $B=16$, bf16. Compare to the model weights (~7B params).
 2. Derive the arithmetic intensity of a single decode attention step as a
