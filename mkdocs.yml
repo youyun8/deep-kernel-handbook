@@ -126,6 +126,7 @@ nav:
   - Reading path: reading-path.md
   - "Part I · Foundations":
       - foundations/index.md
+      - The transformer from scratch: foundations/transformer-from-scratch.md
       - Transformer as a system: foundations/transformer-systems.md
       - Attention efficiency: foundations/attention-efficiency.md
       - FlashAttention from scratch: foundations/flashattention.md
@@ -141,6 +142,7 @@ nav:
       - MoE kernels (Triton/CUDA/HIP): moe/kernels.md
       - Inference & serving: moe/inference-serving.md
       - Case studies: moe/case-studies.md
+      - Anatomy of an MoE decode: moe/decode-anatomy.md
   - "Part III · Performance":
       - performance/index.md
       - GPU programming model: performance/gpu-programming.md

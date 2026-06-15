@@ -11,6 +11,55 @@ bf16 / 3.35 TB/s; MI300X ≈ 1.3 PFLOP/s bf16 / 5.3 TB/s); your exact deltas wil
 shift with the chip you assume, but the *regime* (memory- vs compute-bound) is
 what matters.
 
+## The transformer from scratch
+
+??? success "1 — Trace the shapes"
+    Starting from token ids $[N]$:
+
+    | After | Shape |
+    |---|---|
+    | embedding | $[N, d]$ |
+    | $QK^\top$ | $[N, N]$ ← **quadratic in $N$** |
+    | softmax | $[N, N]$ |
+    | $\times V$ | $[N, d_h]$ (per head) |
+    | $W_O$ | $[N, d]$ |
+    | LM head | $[N, V]$ |
+
+    Only the $QK^\top$ score matrix (and its softmax) is quadratic in sequence
+    length — the cost FlashAttention attacks. Everything else is linear in $N$.
+
+??? success "2 — Head dim and GQA cache savings"
+    $d_h = d/h = 4096/32 = 128$. Full multi-head caches K,V for all 32 heads;
+    8-head GQA caches for only 8 → the per-token KV cache shrinks by
+    $32/8 = \mathbf{4\times}$. The query heads stay at 32; only K,V are shared
+    across groups of 4 query heads.
+
+??? success "3 — Why residuals and layer norm"
+    **Residual** ($x+\text{sublayer}(x)$): gives gradients an identity path so they
+    don't vanish through a deep stack, and lets each layer *refine* the
+    representation rather than rebuild it. Without it, deep models barely train
+    (gradients shrink/explode geometrically with depth). **Layer norm**: keeps each
+    sublayer's input at a stable scale so activations don't drift over depth and
+    saturate the nonlinearity. Without it, training is unstable and
+    learning-rate-fragile.
+
+??? success "4 — Why cache K/V but not Q"
+    The causal mask makes attention lower-triangular: token $t$ attends to keys/
+    values $1..t$, and *those vectors never change* as generation proceeds — so
+    they can be cached and reused. The **query**, by contrast, is needed only for
+    the **current** token being generated; past queries have already produced their
+    outputs and are never reused. So K/V accumulate in a cache; Q is computed fresh
+    for the one new token each step.
+
+??? success "5 — FFN vs attention params; MoE"
+    Per layer attention projections ($W_Q,W_K,W_V,W_O$) ≈ $4d^2$; the FFN
+    (up $4d^2$ + down $4d^2$) ≈ $8d^2$. So the **FFN dominates** (~2× attention)
+    — for $d=4096$, ~$1.3\times10^8$ vs ~$6.7\times10^7$ params/layer. An
+    [MoE](../moe/index.md) layer replaces the single FFN with many experts and
+    routes each token to only $k$ of them: total FFN params grow by the expert
+    count while *active* params-per-token stay ~$k$ experts' worth — decoupling
+    capacity from compute.
+
 ## Transformer as a system
 
 ??? success "1 — Forward FLOPs for a 7B model, 4096 tokens"

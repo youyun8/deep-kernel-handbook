@@ -26,15 +26,16 @@ Read the [home page](index.md) and this page. Skim the
 
 The vocabulary of performance. Do these in order; everything later assumes them.
 
-1. [The transformer as a system](foundations/transformer-systems.md) — learn to count FLOPs and bytes and read a roofline.
-2. [Numerics & precision](foundations/numerics-precision.md) — bf16 vs fp16 vs fp8, why training doesn't explode.
-3. [Attention efficiency](foundations/attention-efficiency.md) — the KV cache and why decoding is memory-bound.
-4. [FlashAttention from scratch](foundations/flashattention.md) — your first real "fuse it to save memory traffic" win.
+1. [The transformer from scratch](foundations/transformer-from-scratch.md) — what a transformer *is*, one diagram at a time. **Skip if you already know transformers cold.**
+2. [The transformer as a system](foundations/transformer-systems.md) — learn to count FLOPs and bytes and read a roofline.
+3. [Numerics & precision](foundations/numerics-precision.md) — bf16 vs fp16 vs fp8, why training doesn't explode.
+4. [Attention efficiency](foundations/attention-efficiency.md) — the KV cache and why decoding is memory-bound.
+5. [FlashAttention from scratch](foundations/flashattention.md) — your first real "fuse it to save memory traffic" win.
 
 ??? note "Prerequisites for Stage 1"
-    Python, basic linear algebra (matmul), and a working idea of what attention
-    computes. No GPU required — the math and the numpy/PyTorch reference code
-    run on CPU.
+    Python and basic linear algebra (matrix multiply). No prior transformer
+    knowledge needed — page 1 builds it from scratch. No GPU required; the math
+    and the numpy/PyTorch reference code run on CPU.
 
 ## Stage 2 — The MoE flagship (intermediate)
 

@@ -89,6 +89,28 @@ for each query block Qi:                      # outer (rows of output)
     write Oi to HBM                            # the ONLY N×d write
 ```
 
+```mermaid
+flowchart LR
+    subgraph NAIVE["Naive — materialize full N×N in HBM"]
+      direction TB
+      n1["S = QKᵀ  [N×N]"] -->|"write"| h1["HBM"]
+      h1 -->|"read"| n2["softmax"]
+      n2 -->|"write+read"| h2["HBM"]
+      h2 --> n3["× V → O"]
+    end
+    subgraph FLASH["FlashAttention — stream tiles through SRAM"]
+      direction TB
+      f1["load Q,K,V tiles"] --> f2["S tile in SRAM<br/>online-softmax accumulate"]
+      f2 -->|"next tile, no HBM round-trip"| f2
+      f2 --> f3["write O once  [N×d]"]
+    end
+    class h1 idle;
+    class h2 idle;
+    class f2 flagship;
+    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    classDef idle fill:#eef2f7,stroke:#94a3b8,color:#475569;
+```
+
 Memory traffic to HBM is now $O(N d)$ (read $Q,K,V$ once, write $O$ once) instead
 of $O(N^2)$. The score tiles live and die in SRAM. The FLOPs are unchanged — so
 on the roofline we've moved sharply **right** (higher intensity) and the kernel

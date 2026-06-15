@@ -31,6 +31,17 @@ values of every position we've already seen. Step $t$ then:
 2. Appends $k_t, v_t$ to the cache.
 3. Attends $q_t$ against the *cached* $K_{1:t}, V_{1:t}$.
 
+```mermaid
+flowchart LR
+    NEW["new token t"] --> PROJ["project → q_t, k_t, v_t"]
+    PROJ -->|"append k_t, v_t"| CACHE["KV cache<br/>K_1:t , V_1:t  (grows each step)"]
+    PROJ --> ATTN["attend q_t<br/>against cached K, V"]
+    CACHE --> ATTN
+    ATTN --> OUT["output token t"]
+    class CACHE flagship;
+    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+```
+
 This is the single most important inference optimization. But it moves the
 bottleneck: the cache must be **read in full every single step**.
 
@@ -50,6 +61,38 @@ your memory limit. This single equation motivates:
 - **Multi-Query Attention (MQA)** — one KV head shared by all query heads ($n_{kv}=1$).
 - **Grouped-Query Attention (GQA)** — a few KV heads, each shared by a group (the modern default).
 - **Multi-head Latent Attention (MLA)** — DeepSeek's low-rank compression of the KV cache (see [case studies](../moe/case-studies.md)).
+
+```mermaid
+flowchart TD
+    subgraph MHA["MHA — every Q head has its own KV (largest cache)"]
+      direction LR
+      q1["Q1"] --> k1["KV1"]
+      q2["Q2"] --> k2["KV2"]
+      q3["Q3"] --> k3["KV3"]
+      q4["Q4"] --> k4["KV4"]
+    end
+    subgraph GQA["GQA — groups of Q heads share KV (modern default)"]
+      direction LR
+      g1["Q1"] --> gk1["KV-A"]
+      g2["Q2"] --> gk1
+      g3["Q3"] --> gk2["KV-B"]
+      g4["Q4"] --> gk2
+    end
+    subgraph MQA["MQA — all Q heads share one KV (smallest cache)"]
+      direction LR
+      m1["Q1"] --> mk["KV"]
+      m2["Q2"] --> mk
+      m3["Q3"] --> mk
+      m4["Q4"] --> mk
+    end
+    class gk1 flagship;
+    class gk2 flagship;
+    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+```
+
+Fewer KV heads → smaller cache → less bandwidth per decode step, at some quality
+cost. GQA is the sweet spot most production models pick; MLA pushes further by
+compressing KV to a low-rank latent.
 
 GQA with $n_{kv}=8$ instead of 40 cuts the cache 5× with negligible quality
 loss — a pure systems win baked into the architecture.
