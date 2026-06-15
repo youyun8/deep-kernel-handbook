@@ -505,16 +505,43 @@ figure > figcaption {
   color: var(--md-default-fg-color--light) !important;
 }
 
-/* Tighten admonition titles a touch. */
+/* Tighten admonition / details spacing and align body text with the title.
+   Material indents the title past its icon (~2.5rem) but leaves body content at
+   the container padding, so the body juts left of the title and the title→body
+   gap is loose. These rules hug the content and line the body up under the
+   title text, uniformly across every callout type and collapsible. */
 .md-typeset .admonition,
 .md-typeset details {
   border-width: 0;
   box-shadow: var(--ml-shadow);
   border-left: 0.18rem solid color-mix(in srgb, var(--md-accent-fg-color) 58%, var(--ml-accent-warm));
+  padding: 0 0.75rem 0.6rem;
 }
 
-.md-typeset .admonition-title {
+.md-typeset .admonition-title,
+.md-typeset summary {
+  margin: 0 -0.75rem 0.6rem;
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
   font-weight: 700;
+  line-height: 1.5;
+}
+
+/* Body content: align under the title text and drop the doubled edge gaps. */
+.md-typeset .admonition > :not(.admonition-title):not(style),
+.md-typeset details > :not(summary):not(style) {
+  margin-left: 1rem;
+  line-height: 1.6;
+}
+
+.md-typeset .admonition > :not(.admonition-title):first-of-type,
+.md-typeset details > :not(summary):first-of-type {
+  margin-top: 0;
+}
+
+.md-typeset .admonition > :not(.admonition-title):last-child,
+.md-typeset details > :not(summary):last-child {
+  margin-bottom: 0;
 }
 
 .md-typeset .highlight {
