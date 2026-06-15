@@ -87,7 +87,10 @@ expert compute. Frameworks pipeline it: split the token batch into chunks and,
 while chunk $i$'s tokens are in flight, compute chunk $i-1$'s experts. Done well,
 comm hides almost entirely behind compute — the single most important EP
 optimization. DeepSeek's **DualPipe** and DeepEP library exist to maximize this
-overlap.
+overlap. The same overlap-vs-serial split shows up *within a single GPU's* decode
+too — see the two latency tracks in
+[Anatomy of an MoE decode](decode-anatomy.md), where ~half the cross-stack gap is
+concurrency, not kernel speed.
 
 ```mermaid
 flowchart LR

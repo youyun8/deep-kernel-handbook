@@ -120,6 +120,13 @@ version-dependent and confirm against Moonshot's current model card. The
 *architectural lesson* is stable: extreme sparsity is viable if (and only if) the
 balancing, stability, and serving-memory problems are solved together.
 
+!!! tip "See it run, kernel by kernel"
+    The [Anatomy of an MoE decode](decode-anatomy.md) page profiles a decode step
+    of a model in exactly this class (MLA + fine-grained MoE + shared expert) and
+    shows where the time actually goes — routing, grouped expert GEMMs, the shared
+    expert, and the per-layer all-reduce — plus the fusion and concurrency levers
+    that move it.
+
 ## What to take away
 
 Reading these side by side, the modern MoE consensus is:

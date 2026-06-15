@@ -49,6 +49,7 @@ flowchart TD
 7. [MoE kernels (Triton/CUDA/HIP)](kernels.md) — permutation/scatter-gather, grouped/batched GEMM in all three, fusing routing.
 8. [Inference & serving](inference-serving.md) — expert offloading, batching, expert quantization, memory management.
 9. [Case studies](case-studies.md) — DeepSeek-V3, Mixtral, Qwen-MoE, Kimi K2.5 — what they do and *why*.
+10. [Anatomy of an MoE decode](decode-anatomy.md) — a real per-kernel decode profile: the critical path, fusion, and the two latency tracks.
 
 !!! tip "Prerequisites"
     You need the systems vocabulary from [Part I](../foundations/index.md)

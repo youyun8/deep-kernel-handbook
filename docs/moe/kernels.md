@@ -177,6 +177,12 @@ benchmark in `code/kernels/`*:
 The methodology (warmup, CUDA events, fixed clocks) is on the
 [profiling](../performance/profiling.md) page — don't trust a speedup without it.
 
+!!! tip "Fusion in a real decode"
+    [Anatomy of an MoE decode](decode-anatomy.md) profiles these choices in a
+    production trillion-parameter model: *unfused routing* (top-$k$ + sort split
+    across 3 kernels vs 1) is the single biggest cross-stack gap, and *fusing the
+    shared expert* into the routed grouped GEMM removes ~18% of decode latency.
+
 ## Key takeaways
 
 - MoE's hot ops are the **permutation** (bandwidth-bound gather/scatter) and the

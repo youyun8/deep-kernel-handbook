@@ -337,3 +337,54 @@ method and the expected qualitative result.
     [attention efficiency](../foundations/attention-efficiency.md); fp8 →
     [numerics](../foundations/numerics-precision.md). Every production trick traces
     to a page — that's the handbook's thesis.
+
+## Anatomy of an MoE decode
+
+??? success "1 — Max speedup from a fully-overlapped 12% stage"
+    If the stage's kernels **fully overlap** another stream, they are *not on the
+    critical path* — the wall-clock doesn't include them. Making them infinitely
+    fast saves **~0%** of end-to-end latency (you'd only save the part, if any,
+    that wasn't hidden). This is the Track A vs Track B distinction: that 12% is a
+    Track-A (kernel-efficiency) number, but its *latency* contribution was already
+    paid down by Track B (concurrency). You can't bank the same time twice — only
+    exposed (non-overlapped) kernel time converts to latency when shrunk.
+
+??? success "2 — Halve GEMM1 (15%, ×60) or the LM head (1%, ×1)?"
+    Halving the routed GEMM1 saves $\sim 0.5\times15\% = 7.5\%$ of the decode;
+    halving the LM head saves $\sim 0.5\times1\% = 0.5\%$. **GEMM1 wins by ~15×.**
+    The lesson: optimize by **total** (= calls × per-call) cost, not per-call cost.
+    A per-call-cheap kernel that fires every layer dominates a per-call-expensive
+    one that fires once — call count is the multiplier you must never drop.
+
+??? success "3 — When is shared-experts fusion profitable?"
+    Let fusion remove $n$ redundant kernels (separate shared GEMM, activation,
+    quant, residual — each ×$L$ layers) saving $S = L\sum_i t_i^{\text{removed}}$,
+    while adding $A$ to the routed path (bigger sort + a slightly larger grouped
+    GEMM from the appended shared tokens). Fusion is profitable when
+
+    $$ S > A \quad\Longleftrightarrow\quad L\sum_i t_i^{\text{removed}} \;>\; \Delta t_{\text{sort}} + \Delta t_{\text{GEMM}}. $$
+
+    In the measured trace $S \approx 19.8\%$ and $A \approx 0.7\%$ of decode, so
+    net $\approx 18\%$. It pays because the removed work is *per-layer and
+    redundant* while the added work is a *small marginal* increase to GEMMs that
+    already run — the inequality is very slack here.
+
+??? success "4 — Self-time 111% vs 96% of wall-clock"
+    **Self-time** sums each kernel's duration independently. If two kernels run
+    **concurrently** (different streams), their durations both count but they share
+    wall-clock, so self-time can **exceed** wall-clock — 111% means substantial
+    overlap (the time-hidden = self − busy is positive). A value **below 100%**
+    (96%) means kernels are ~serial *and* there are **idle gaps**: wall-clock =
+    busy + idle, and busy ≈ self when serial, so self/wall < 100% implies the
+    missing ~4% is idle (launch latency, sync stalls) where the GPU ran nothing.
+
+??? success "5 — Is split-K worth it for a per-layer GEMM?"
+    Split-K turns one GEMM into (compute kernel + reduce kernel) = **2 launches**.
+    For a per-layer GEMM at $L=60$ layers that's **+60 reduce launches** per
+    decode; doing it only on the once-per-decode LM head costs **+1**. Split-K buys
+    parallelism (more blocks busy on the K dim) which helps when a single GEMM
+    can't fill the device — but at **batch-1 decode** the GEMMs are already
+    memory-bound and small, so the extra 60 reduce kernels (each an HBM
+    round-trip of the partials) are mostly overhead. **In-kernel K-accumulation is
+    usually better for per-layer decode GEMMs**; reserve split-K for the large,
+    once-per-step projections (LM head) where the parallelism actually pays.
