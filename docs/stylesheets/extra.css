@@ -527,6 +527,14 @@ figure > figcaption {
   line-height: 1.5;
 }
 
+/* The global `p { max-width: 72ch }` cap also hits the title bar (a <p>) and
+   body paragraphs, so the colored title stops short and leaves empty space on
+   the right of wide boxes. Let callout content span the full box width. */
+.md-typeset .admonition :is(p, li),
+.md-typeset details :is(p, li) {
+  max-width: none;
+}
+
 /* Body content: align under the title text and drop the doubled edge gaps. */
 .md-typeset .admonition > :not(.admonition-title):not(style),
 .md-typeset details > :not(summary):not(style) {
