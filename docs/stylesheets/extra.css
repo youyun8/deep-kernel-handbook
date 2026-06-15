@@ -1,0 +1,68 @@
+/* ML Perf Handbook — small visual tweaks on top of Material defaults. */
+
+:root {
+  --md-code-font: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+/* Slightly wider content column for math + code heavy pages. */
+.md-grid {
+  max-width: 64rem;
+}
+
+/* Make display math scroll horizontally instead of overflowing on mobile. */
+.arithmatex {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.1rem 0;
+}
+
+/* "Prerequisites / level" callout used at the top of pages. */
+.page-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.6rem 0 1.2rem 0;
+  font-size: 0.72rem;
+}
+.page-meta .chip {
+  border-radius: 999px;
+  padding: 0.12rem 0.6rem;
+  background: var(--md-default-fg-color--lightest);
+  color: var(--md-default-fg-color--light);
+  white-space: nowrap;
+}
+.page-meta .chip strong {
+  color: var(--md-default-fg-color);
+  font-weight: 600;
+}
+
+/* Roofline / table figures: center captions. */
+figure > figcaption {
+  font-size: 0.78rem;
+  color: var(--md-default-fg-color--light);
+  text-align: center;
+  margin-top: 0.3rem;
+}
+
+/* Tighten admonition titles a touch. */
+.md-typeset .admonition-title {
+  font-weight: 700;
+}
+
+/* Status badges for scaffolded pages. */
+.status-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0.05rem 0.45rem;
+  vertical-align: middle;
+}
+.status-badge.wip {
+  background: #ffb300;
+  color: #1a1a1a;
+}
+.status-badge.done {
+  background: #2e7d32;
+  color: #fff;
+}

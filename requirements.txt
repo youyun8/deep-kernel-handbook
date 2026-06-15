@@ -1,0 +1,9 @@
+# Documentation site toolchain (build + local preview).
+# Install with:  pip install -r requirements.txt
+mkdocs-material==9.7.6
+pymdown-extensions==10.21.3
+mkdocs-minify-plugin==0.8.0
+
+# Note: the runnable ML code under code/ has its own, heavier dependency set
+# (PyTorch, Triton, etc.). See code/requirements.txt. Keeping them separate
+# means the docs build in CI stays fast and does not need a GPU.

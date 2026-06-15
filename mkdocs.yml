@@ -1,0 +1,157 @@
+site_name: ML Perf Handbook
+site_description: >-
+  Learn state-of-the-art ML systems from scratch — from the math and a clean
+  reference implementation to the performance-engineered, multi-GPU version.
+  Flagship deep-dive series: Mixture-of-Experts (MoE).
+site_author: ml-perf-handbook contributors
+site_url: https://youyun8.github.io/ml-perf-handbook/
+
+# Repository
+repo_name: youyun8/ml-perf-handbook
+repo_url: https://github.com/youyun8/ml-perf-handbook
+edit_uri: edit/main/docs/
+
+copyright: >-
+  Content licensed CC BY 4.0 · Code licensed MIT — see the repository LICENSE.
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/youyun8/ml-perf-handbook
+  generator: false
+
+extra_css:
+  - https://unpkg.com/katex@0/dist/katex.min.css
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/katex.js
+  - https://unpkg.com/katex@0/dist/katex.min.js
+  - https://unpkg.com/katex@0/dist/contrib/auto-render.min.js
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      use_pygments: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+nav:
+  - Home: index.md
+  - Reading path: reading-path.md
+  - "Part I · Foundations":
+      - foundations/index.md
+      - Transformer as a system: foundations/transformer-systems.md
+      - Attention efficiency: foundations/attention-efficiency.md
+      - FlashAttention from scratch: foundations/flashattention.md
+      - Numerics & precision: foundations/numerics-precision.md
+  - "Part II · Mixture-of-Experts":
+      - moe/index.md
+      - Why sparsity: moe/why-sparsity.md
+      - MoE layer from scratch: moe/moe-from-scratch.md
+      - Load balancing: moe/load-balancing.md
+      - Routing variants: moe/routing-variants.md
+      - Training stability: moe/training-stability.md
+      - Systems & expert parallelism: moe/systems-ep.md
+      - MoE kernels (Triton/CUDA/HIP): moe/kernels.md
+      - Inference & serving: moe/inference-serving.md
+      - Case studies: moe/case-studies.md
+  - "Part III · Performance":
+      - performance/index.md
+      - GPU programming model: performance/gpu-programming.md
+      - Triton track: performance/triton-track.md
+      - CUDA / HIP track: performance/cuda-hip-track.md
+      - Distributed training: performance/distributed-training.md
+      - Quantization & compression: performance/quantization.md
+      - Inference optimization: performance/inference-optimization.md
+      - Profiling & methodology: performance/profiling.md
+  - "Part IV · Capstones":
+      - capstones/index.md
+      - Build a small MoE LM: capstones/build-moe.md
+      - Scaling it up: capstones/scaling.md
+  - Reference:
+      - Glossary: glossary.md
+      - Bibliography: references.md

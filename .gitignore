@@ -1,0 +1,26 @@
+# MkDocs build output
+/site/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Training artifacts produced by code/ examples
+*.pt
+*.ckpt
+runs/
+checkpoints/
