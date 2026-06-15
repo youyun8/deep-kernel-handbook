@@ -38,6 +38,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Configure GitHub Pages
+        # Enables Pages with the "GitHub Actions" source if it isn't already,
+        # so the deploy step's Pages API call doesn't 404 (HttpError: Not Found).
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Build site (strict)
         run: mkdocs build --strict
 
