@@ -31,8 +31,8 @@ flowchart LR
     M --> P["P(next token)<br/>mat: 0.41<br/>floor: 0.22<br/>roof: 0.08<br/>…"]
     P --> N["pick 'mat'"]
     N -.->|"append, repeat"| T
-    class M flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    class M accViolet;
+    classDef accViolet fill:#6d28d9,stroke:#4c1d95,color:#fff;
 ```
 
 That feedback loop — append the predicted token and run again — is
@@ -52,8 +52,8 @@ dimension $d$ (the **model width**, e.g. 4096).
 flowchart LR
     TXT["'cat'"] -->|tokenizer| ID["id = 2543"]
     ID -->|"row lookup in E [V×d]"| VEC["x ∈ ℝ^d<br/>(one token vector)"]
-    class VEC flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    class VEC accTeal;
+    classDef accTeal fill:#0d9488,stroke:#115e59,color:#fff;
 ```
 
 A sequence of $N$ tokens becomes a matrix $X \in \mathbb{R}^{N \times d}$ — one
@@ -97,9 +97,9 @@ flowchart TD
     DOT --> SM["softmax over j<br/>→ weights a_ij"]
     SM --> WS["output_i = Σ_j a_ij · v_j"]
     V2["values v_j of all tokens"] --> WS
-    class DOT flagship;
-    class SM flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    class DOT accBlue;
+    class SM accBlue;
+    classDef accBlue fill:#1d4ed8,stroke:#1e3a8a,color:#fff;
 ```
 
 Written for the whole sequence at once (the form you'll see everywhere):
@@ -121,8 +121,8 @@ flowchart LR
     Q["Q [N × d_h]"] --> MM["Q · Kᵀ"]
     K["Kᵀ [d_h × N]"] --> MM
     MM --> S["scores S [N × N]<br/>S_ij = how much i attends to j"]
-    class S flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    class S accCyan;
+    classDef accCyan fill:#0e7490,stroke:#155e75,color:#fff;
 ```
 
 The $\sqrt{d_h}$ divisor keeps the dot products from growing with dimension
@@ -168,8 +168,8 @@ flowchart TD
     H2 --> C
     H3 --> C
     C --> O["× W_O → output [N × d]"]
-    class C flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    class C accIndigo;
+    classDef accIndigo fill:#4338ca,stroke:#312e81,color:#fff;
 ```
 
 !!! note "Heads are where MQA / GQA / MLA act"
@@ -193,8 +193,8 @@ flowchart LR
     X["x [d]"] --> U["W_up → [4d]"]
     U --> A["activation σ<br/>(GELU / SwiGLU)"]
     A --> D["W_down → [d]"]
-    class A flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    class A accGreen;
+    classDef accGreen fill:#15803d,stroke:#14532d,color:#fff;
 ```
 
 !!! tip "This is exactly what MoE makes sparse"
@@ -226,9 +226,10 @@ flowchart TD
     FFN --> R2(("＋"))
     R1 --> R2
     R2 --> OUT["x'  [N × d]  (same shape)"]
-    class ATT flagship;
-    class FFN flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    class ATT accBlue;
+    class FFN accGreen;
+    classDef accBlue fill:#1d4ed8,stroke:#1e3a8a,color:#fff;
+    classDef accGreen fill:#15803d,stroke:#14532d,color:#fff;
 ```
 
 The key invariant: **a block takes $[N,d]$ and returns $[N,d]$**. That's what lets
@@ -251,9 +252,9 @@ flowchart TD
     FN --> LMH["LM head [V×d]"]
     LMH --> LOG["logits [N × V]"]
     LOG --> SM["softmax → next-token probs"]
-    class B1 flagship;
-    class BL flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    class B1 accRose;
+    class BL accRose;
+    classDef accRose fill:#be123c,stroke:#881337,color:#fff;
 ```
 
 A model is specified by a handful of numbers: width $d$, number of layers $L$,
@@ -278,9 +279,10 @@ flowchart TD
       D1["one query attends to N cached keys/values"]
       D2["read whole KV cache + weights to make 1 token → MEMORY-bound"]
     end
-    class P2 flagship;
-    class D2 flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    class P2 accAmber;
+    class D2 accTeal;
+    classDef accAmber fill:#b45309,stroke:#7c2d12,color:#fff;
+    classDef accTeal fill:#0d9488,stroke:#115e59,color:#fff;
 ```
 
 - **Prefill / training** processes many tokens together: the matmuls are large and

@@ -505,6 +505,54 @@ figure > figcaption {
   color: var(--md-default-fg-color--light) !important;
 }
 
+/* Named accent schemes for highlighting nodes in different diagrams.
+   Single-word camelCase class names (mirroring the proven `flagship`/`idle`
+   classes) — mermaid attaches these to the node group reliably; hyphenated
+   names do not match, leaving the dark base-text rule to win. Use e.g.
+   `class X accViolet;` + `classDef accViolet fill:#…,color:#fff;` in the
+   source. The rules below win via !important; per-scheme colors come from the
+   `--ml-acc-*` vars, with a light and a slate (dark-mode) value each. */
+.md-typeset .mermaid g.accViolet rect,  .md-typeset .mermaid g.accViolet circle,  .md-typeset .mermaid g.accViolet polygon,  .md-typeset .mermaid g.accViolet path,
+.md-typeset .mermaid g.accTeal rect,    .md-typeset .mermaid g.accTeal circle,    .md-typeset .mermaid g.accTeal polygon,    .md-typeset .mermaid g.accTeal path,
+.md-typeset .mermaid g.accBlue rect,    .md-typeset .mermaid g.accBlue circle,    .md-typeset .mermaid g.accBlue polygon,    .md-typeset .mermaid g.accBlue path,
+.md-typeset .mermaid g.accCyan rect,    .md-typeset .mermaid g.accCyan circle,    .md-typeset .mermaid g.accCyan polygon,    .md-typeset .mermaid g.accCyan path,
+.md-typeset .mermaid g.accAmber rect,   .md-typeset .mermaid g.accAmber circle,   .md-typeset .mermaid g.accAmber polygon,   .md-typeset .mermaid g.accAmber path,
+.md-typeset .mermaid g.accRose rect,    .md-typeset .mermaid g.accRose circle,    .md-typeset .mermaid g.accRose polygon,    .md-typeset .mermaid g.accRose path,
+.md-typeset .mermaid g.accGreen rect,   .md-typeset .mermaid g.accGreen circle,   .md-typeset .mermaid g.accGreen polygon,   .md-typeset .mermaid g.accGreen path,
+.md-typeset .mermaid g.accIndigo rect,  .md-typeset .mermaid g.accIndigo circle,  .md-typeset .mermaid g.accIndigo polygon,  .md-typeset .mermaid g.accIndigo path {
+  fill: var(--ml-acc-bg) !important;
+  stroke: var(--ml-acc-stroke) !important;
+}
+.md-typeset .mermaid g.accViolet .nodeLabel, .md-typeset .mermaid g.accViolet .label, .md-typeset .mermaid g.accViolet text,
+.md-typeset .mermaid g.accTeal .nodeLabel,   .md-typeset .mermaid g.accTeal .label,   .md-typeset .mermaid g.accTeal text,
+.md-typeset .mermaid g.accBlue .nodeLabel,   .md-typeset .mermaid g.accBlue .label,   .md-typeset .mermaid g.accBlue text,
+.md-typeset .mermaid g.accCyan .nodeLabel,   .md-typeset .mermaid g.accCyan .label,   .md-typeset .mermaid g.accCyan text,
+.md-typeset .mermaid g.accAmber .nodeLabel,  .md-typeset .mermaid g.accAmber .label,  .md-typeset .mermaid g.accAmber text,
+.md-typeset .mermaid g.accRose .nodeLabel,   .md-typeset .mermaid g.accRose .label,   .md-typeset .mermaid g.accRose text,
+.md-typeset .mermaid g.accGreen .nodeLabel,  .md-typeset .mermaid g.accGreen .label,  .md-typeset .mermaid g.accGreen text,
+.md-typeset .mermaid g.accIndigo .nodeLabel, .md-typeset .mermaid g.accIndigo .label, .md-typeset .mermaid g.accIndigo text {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+
+.md-typeset .mermaid .accViolet { --ml-acc-bg: #6d28d9; --ml-acc-stroke: #4c1d95; }
+.md-typeset .mermaid .accTeal   { --ml-acc-bg: #0d9488; --ml-acc-stroke: #115e59; }
+.md-typeset .mermaid .accBlue   { --ml-acc-bg: #1d4ed8; --ml-acc-stroke: #1e3a8a; }
+.md-typeset .mermaid .accCyan   { --ml-acc-bg: #0e7490; --ml-acc-stroke: #155e75; }
+.md-typeset .mermaid .accAmber  { --ml-acc-bg: #b45309; --ml-acc-stroke: #7c2d12; }
+.md-typeset .mermaid .accRose   { --ml-acc-bg: #be123c; --ml-acc-stroke: #881337; }
+.md-typeset .mermaid .accGreen  { --ml-acc-bg: #15803d; --ml-acc-stroke: #14532d; }
+.md-typeset .mermaid .accIndigo { --ml-acc-bg: #4338ca; --ml-acc-stroke: #312e81; }
+
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accViolet { --ml-acc-bg: #7c3aed; --ml-acc-stroke: #c4b5fd; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accTeal   { --ml-acc-bg: #14b8a6; --ml-acc-stroke: #99f6e4; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accBlue   { --ml-acc-bg: #3b82f6; --ml-acc-stroke: #bfdbfe; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accCyan   { --ml-acc-bg: #06b6d4; --ml-acc-stroke: #a5f3fc; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accAmber  { --ml-acc-bg: #d97706; --ml-acc-stroke: #fde68a; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accRose   { --ml-acc-bg: #e11d48; --ml-acc-stroke: #fecdd3; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accGreen  { --ml-acc-bg: #16a34a; --ml-acc-stroke: #bbf7d0; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accIndigo { --ml-acc-bg: #6366f1; --ml-acc-stroke: #c7d2fe; }
+
 /* Tighten admonition / details spacing and align body text with the title.
    Material indents the title past its icon (~2.5rem) but leaves body content at
    the container padding, so the body juts left of the title and the title→body
