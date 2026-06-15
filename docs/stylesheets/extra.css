@@ -18,11 +18,13 @@
   --ml-diagram-node-muted-stroke: #94a3b8;
   --ml-diagram-edge: #475569;
   --ml-diagram-text: #111827;
+  --ml-diagram-muted-text: #475569;
   --ml-diagram-label-bg: color-mix(in srgb, var(--md-default-bg-color) 92%, white 8%);
   --ml-diagram-cluster-bg: rgba(15, 118, 110, 0.08);
   --ml-diagram-cluster-stroke: rgba(15, 118, 110, 0.42);
-  --ml-diagram-accent-bg: #1d4ed8;
-  --ml-diagram-accent-stroke: #1e3a8a;
+  --ml-diagram-accent-bg: #5b21b6;
+  --ml-diagram-accent-stroke: #4c1d95;
+  --ml-diagram-accent-text: #ffffff;
   --ml-roofline-start: #0f766e;
   --ml-roofline-mid: #2563eb;
   --ml-roofline-end: #f59e0b;
@@ -44,11 +46,13 @@
   --ml-diagram-node-muted-stroke: #64748b;
   --ml-diagram-edge: #cbd5e1;
   --ml-diagram-text: #f8fafc;
+  --ml-diagram-muted-text: #cbd5e1;
   --ml-diagram-label-bg: #111827;
   --ml-diagram-cluster-bg: rgba(45, 212, 191, 0.12);
   --ml-diagram-cluster-stroke: rgba(94, 234, 212, 0.5);
-  --ml-diagram-accent-bg: #2563eb;
-  --ml-diagram-accent-stroke: #93c5fd;
+  --ml-diagram-accent-bg: #c4b5fd;
+  --ml-diagram-accent-stroke: #ddd6fe;
+  --ml-diagram-accent-text: #111827;
   --ml-roofline-start: #2dd4bf;
   --ml-roofline-mid: #60a5fa;
   --ml-roofline-end: #fbbf24;
@@ -428,7 +432,9 @@ figure > figcaption {
 }
 
 .md-typeset .mermaid .nodeLabel,
+.md-typeset .mermaid .nodeLabel *,
 .md-typeset .mermaid .node .label,
+.md-typeset .mermaid .node .label *,
 .md-typeset .mermaid .label text,
 .md-typeset .mermaid text {
   fill: var(--ml-diagram-text) !important;
@@ -483,10 +489,12 @@ figure > figcaption {
 }
 
 .md-typeset .mermaid .flagship .nodeLabel,
+.md-typeset .mermaid .flagship .nodeLabel *,
 .md-typeset .mermaid .flagship .label,
+.md-typeset .mermaid .flagship .label *,
 .md-typeset .mermaid .flagship text {
-  fill: #ffffff !important;
-  color: #ffffff !important;
+  fill: var(--ml-diagram-accent-text) !important;
+  color: var(--ml-diagram-accent-text) !important;
 }
 
 .md-typeset .mermaid .idle rect,
@@ -499,10 +507,12 @@ figure > figcaption {
 }
 
 .md-typeset .mermaid .idle .nodeLabel,
+.md-typeset .mermaid .idle .nodeLabel *,
 .md-typeset .mermaid .idle .label,
+.md-typeset .mermaid .idle .label *,
 .md-typeset .mermaid .idle text {
-  fill: var(--md-default-fg-color--light) !important;
-  color: var(--md-default-fg-color--light) !important;
+  fill: var(--ml-diagram-muted-text) !important;
+  color: var(--ml-diagram-muted-text) !important;
 }
 
 /* Named accent schemes for highlighting nodes in different diagrams.
@@ -523,35 +533,35 @@ figure > figcaption {
   fill: var(--ml-acc-bg) !important;
   stroke: var(--ml-acc-stroke) !important;
 }
-.md-typeset .mermaid g.accViolet .nodeLabel, .md-typeset .mermaid g.accViolet .label, .md-typeset .mermaid g.accViolet text,
-.md-typeset .mermaid g.accTeal .nodeLabel,   .md-typeset .mermaid g.accTeal .label,   .md-typeset .mermaid g.accTeal text,
-.md-typeset .mermaid g.accBlue .nodeLabel,   .md-typeset .mermaid g.accBlue .label,   .md-typeset .mermaid g.accBlue text,
-.md-typeset .mermaid g.accCyan .nodeLabel,   .md-typeset .mermaid g.accCyan .label,   .md-typeset .mermaid g.accCyan text,
-.md-typeset .mermaid g.accAmber .nodeLabel,  .md-typeset .mermaid g.accAmber .label,  .md-typeset .mermaid g.accAmber text,
-.md-typeset .mermaid g.accRose .nodeLabel,   .md-typeset .mermaid g.accRose .label,   .md-typeset .mermaid g.accRose text,
-.md-typeset .mermaid g.accGreen .nodeLabel,  .md-typeset .mermaid g.accGreen .label,  .md-typeset .mermaid g.accGreen text,
-.md-typeset .mermaid g.accIndigo .nodeLabel, .md-typeset .mermaid g.accIndigo .label, .md-typeset .mermaid g.accIndigo text {
-  fill: #ffffff !important;
-  color: #ffffff !important;
+.md-typeset .mermaid g.accViolet .nodeLabel, .md-typeset .mermaid g.accViolet .nodeLabel *, .md-typeset .mermaid g.accViolet .label, .md-typeset .mermaid g.accViolet .label *, .md-typeset .mermaid g.accViolet text,
+.md-typeset .mermaid g.accTeal .nodeLabel,   .md-typeset .mermaid g.accTeal .nodeLabel *,   .md-typeset .mermaid g.accTeal .label,   .md-typeset .mermaid g.accTeal .label *,   .md-typeset .mermaid g.accTeal text,
+.md-typeset .mermaid g.accBlue .nodeLabel,   .md-typeset .mermaid g.accBlue .nodeLabel *,   .md-typeset .mermaid g.accBlue .label,   .md-typeset .mermaid g.accBlue .label *,   .md-typeset .mermaid g.accBlue text,
+.md-typeset .mermaid g.accCyan .nodeLabel,   .md-typeset .mermaid g.accCyan .nodeLabel *,   .md-typeset .mermaid g.accCyan .label,   .md-typeset .mermaid g.accCyan .label *,   .md-typeset .mermaid g.accCyan text,
+.md-typeset .mermaid g.accAmber .nodeLabel,  .md-typeset .mermaid g.accAmber .nodeLabel *,  .md-typeset .mermaid g.accAmber .label,  .md-typeset .mermaid g.accAmber .label *,  .md-typeset .mermaid g.accAmber text,
+.md-typeset .mermaid g.accRose .nodeLabel,   .md-typeset .mermaid g.accRose .nodeLabel *,   .md-typeset .mermaid g.accRose .label,   .md-typeset .mermaid g.accRose .label *,   .md-typeset .mermaid g.accRose text,
+.md-typeset .mermaid g.accGreen .nodeLabel,  .md-typeset .mermaid g.accGreen .nodeLabel *,  .md-typeset .mermaid g.accGreen .label,  .md-typeset .mermaid g.accGreen .label *,  .md-typeset .mermaid g.accGreen text,
+.md-typeset .mermaid g.accIndigo .nodeLabel, .md-typeset .mermaid g.accIndigo .nodeLabel *, .md-typeset .mermaid g.accIndigo .label, .md-typeset .mermaid g.accIndigo .label *, .md-typeset .mermaid g.accIndigo text {
+  fill: var(--ml-acc-text, var(--ml-diagram-accent-text)) !important;
+  color: var(--ml-acc-text, var(--ml-diagram-accent-text)) !important;
 }
 
-.md-typeset .mermaid .accViolet { --ml-acc-bg: #6d28d9; --ml-acc-stroke: #4c1d95; }
-.md-typeset .mermaid .accTeal   { --ml-acc-bg: #0d9488; --ml-acc-stroke: #115e59; }
-.md-typeset .mermaid .accBlue   { --ml-acc-bg: #1d4ed8; --ml-acc-stroke: #1e3a8a; }
-.md-typeset .mermaid .accCyan   { --ml-acc-bg: #0e7490; --ml-acc-stroke: #155e75; }
-.md-typeset .mermaid .accAmber  { --ml-acc-bg: #b45309; --ml-acc-stroke: #7c2d12; }
-.md-typeset .mermaid .accRose   { --ml-acc-bg: #be123c; --ml-acc-stroke: #881337; }
-.md-typeset .mermaid .accGreen  { --ml-acc-bg: #15803d; --ml-acc-stroke: #14532d; }
-.md-typeset .mermaid .accIndigo { --ml-acc-bg: #4338ca; --ml-acc-stroke: #312e81; }
+.md-typeset .mermaid .accViolet { --ml-acc-bg: #6d28d9; --ml-acc-stroke: #4c1d95; --ml-acc-text: #ffffff; }
+.md-typeset .mermaid .accTeal   { --ml-acc-bg: #0f766e; --ml-acc-stroke: #115e59; --ml-acc-text: #ffffff; }
+.md-typeset .mermaid .accBlue   { --ml-acc-bg: #1d4ed8; --ml-acc-stroke: #1e3a8a; --ml-acc-text: #ffffff; }
+.md-typeset .mermaid .accCyan   { --ml-acc-bg: #0e7490; --ml-acc-stroke: #155e75; --ml-acc-text: #ffffff; }
+.md-typeset .mermaid .accAmber  { --ml-acc-bg: #b45309; --ml-acc-stroke: #7c2d12; --ml-acc-text: #ffffff; }
+.md-typeset .mermaid .accRose   { --ml-acc-bg: #be123c; --ml-acc-stroke: #881337; --ml-acc-text: #ffffff; }
+.md-typeset .mermaid .accGreen  { --ml-acc-bg: #15803d; --ml-acc-stroke: #14532d; --ml-acc-text: #ffffff; }
+.md-typeset .mermaid .accIndigo { --ml-acc-bg: #4338ca; --ml-acc-stroke: #312e81; --ml-acc-text: #ffffff; }
 
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accViolet { --ml-acc-bg: #7c3aed; --ml-acc-stroke: #c4b5fd; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accTeal   { --ml-acc-bg: #14b8a6; --ml-acc-stroke: #99f6e4; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accBlue   { --ml-acc-bg: #3b82f6; --ml-acc-stroke: #bfdbfe; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accCyan   { --ml-acc-bg: #06b6d4; --ml-acc-stroke: #a5f3fc; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accAmber  { --ml-acc-bg: #d97706; --ml-acc-stroke: #fde68a; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accRose   { --ml-acc-bg: #e11d48; --ml-acc-stroke: #fecdd3; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accGreen  { --ml-acc-bg: #16a34a; --ml-acc-stroke: #bbf7d0; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accIndigo { --ml-acc-bg: #6366f1; --ml-acc-stroke: #c7d2fe; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accViolet { --ml-acc-bg: #c4b5fd; --ml-acc-stroke: #ddd6fe; --ml-acc-text: #111827; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accTeal   { --ml-acc-bg: #5eead4; --ml-acc-stroke: #99f6e4; --ml-acc-text: #0f172a; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accBlue   { --ml-acc-bg: #93c5fd; --ml-acc-stroke: #bfdbfe; --ml-acc-text: #0f172a; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accCyan   { --ml-acc-bg: #67e8f9; --ml-acc-stroke: #a5f3fc; --ml-acc-text: #0f172a; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accAmber  { --ml-acc-bg: #fbbf24; --ml-acc-stroke: #fde68a; --ml-acc-text: #111827; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accRose   { --ml-acc-bg: #fda4af; --ml-acc-stroke: #fecdd3; --ml-acc-text: #111827; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accGreen  { --ml-acc-bg: #86efac; --ml-acc-stroke: #bbf7d0; --ml-acc-text: #0f172a; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accIndigo { --ml-acc-bg: #a5b4fc; --ml-acc-stroke: #c7d2fe; --ml-acc-text: #111827; }
 
 /* Tighten admonition / details spacing and align body text with the title.
    Material indents the title past its icon (~2.5rem) but leaves body content at
