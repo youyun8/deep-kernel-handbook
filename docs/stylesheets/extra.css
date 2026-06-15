@@ -2,11 +2,75 @@
 
 :root {
   --md-code-font: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 92%, var(--md-primary-fg-color) 8%);
+  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 84%, var(--md-primary-fg-color) 16%);
+  --ml-border: color-mix(in srgb, var(--md-default-fg-color) 14%, transparent);
+  --ml-shadow: 0 0.55rem 1.6rem rgba(31, 41, 55, 0.08);
+  --ml-radius: 0.75rem;
 }
 
 /* Slightly wider content column for math + code heavy pages. */
 .md-grid {
-  max-width: 64rem;
+  max-width: 68rem;
+}
+
+.md-main {
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--md-primary-fg-color) 12%, transparent) 0, transparent 26rem),
+    radial-gradient(circle at 95% 12%, color-mix(in srgb, var(--md-accent-fg-color) 10%, transparent) 0, transparent 22rem);
+}
+
+.md-main__inner {
+  margin-top: 1.2rem;
+}
+
+.md-content__inner {
+  padding-top: 0.2rem;
+}
+
+.md-typeset {
+  font-size: 0.8rem;
+  line-height: 1.72;
+}
+
+.md-typeset h1 {
+  max-width: 18ch;
+  margin-bottom: 0.4rem;
+  color: var(--md-primary-fg-color);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+
+.md-typeset h2 {
+  margin-top: 2.4em;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--ml-border);
+  letter-spacing: -0.025em;
+}
+
+.md-typeset h3 {
+  color: var(--md-accent-fg-color);
+  letter-spacing: -0.015em;
+}
+
+.md-typeset p,
+.md-typeset li {
+  max-width: 72ch;
+}
+
+.md-typeset a {
+  text-underline-offset: 0.18em;
+}
+
+.md-typeset blockquote {
+  border-left: 0.18rem solid var(--md-accent-fg-color);
+  border-radius: 0 var(--ml-radius) var(--ml-radius) 0;
+  background: var(--ml-surface);
+  padding: 0.6rem 0.9rem;
+}
+
+.md-typeset hr {
+  border-bottom-color: var(--ml-border);
 }
 
 /* Make display math scroll horizontally instead of overflowing on mobile. */
@@ -26,27 +90,193 @@
 }
 .page-meta .chip {
   border-radius: 999px;
-  padding: 0.12rem 0.6rem;
-  background: var(--md-default-fg-color--lightest);
+  padding: 0.16rem 0.65rem;
+  border: 1px solid var(--ml-border);
+  background: var(--ml-surface);
   color: var(--md-default-fg-color--light);
   white-space: nowrap;
+  box-shadow: 0 0.2rem 0.7rem rgba(31, 41, 55, 0.04);
 }
 .page-meta .chip strong {
   color: var(--md-default-fg-color);
   font-weight: 600;
 }
 
-/* Roofline / table figures: center captions. */
+/* Cards, tables, figures, and diagrams. */
+.md-typeset .grid.cards > :is(ul, ol) > li,
+.md-typeset .md-button,
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: var(--ml-radius);
+}
+
+.md-typeset .grid.cards > :is(ul, ol) > li {
+  border-color: var(--ml-border);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--md-default-bg-color) 96%, white 4%), var(--md-default-bg-color));
+  box-shadow: var(--ml-shadow);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.md-typeset .grid.cards > :is(ul, ol) > li:hover {
+  border-color: color-mix(in srgb, var(--md-accent-fg-color) 45%, var(--ml-border));
+  box-shadow: 0 0.7rem 2rem rgba(31, 41, 55, 0.12);
+  transform: translateY(-2px);
+}
+
+.md-typeset .md-button {
+  box-shadow: 0 0.35rem 1rem color-mix(in srgb, var(--md-primary-fg-color) 18%, transparent);
+}
+
+.md-typeset__table {
+  display: block;
+  margin: 1.1rem 0;
+  overflow-x: auto;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius);
+  box-shadow: var(--ml-shadow);
+}
+
+.md-typeset table:not([class]) {
+  display: table;
+  margin: 0;
+}
+
+.md-typeset table:not([class]) th {
+  background: var(--ml-surface-strong);
+  color: var(--md-default-fg-color);
+  font-weight: 700;
+}
+
+.md-typeset table:not([class]) td,
+.md-typeset table:not([class]) th {
+  border-color: var(--ml-border);
+}
+
+figure {
+  margin: 1.5rem auto;
+}
+
 figure > figcaption {
   font-size: 0.78rem;
   color: var(--md-default-fg-color--light);
   text-align: center;
-  margin-top: 0.3rem;
+  margin-top: 0.45rem;
+}
+
+.md-typeset .mermaid {
+  margin: 1.2rem 0;
+  padding: 0.9rem;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius);
+  background: var(--ml-surface);
+  box-shadow: var(--ml-shadow);
 }
 
 /* Tighten admonition titles a touch. */
+.md-typeset .admonition,
+.md-typeset details {
+  border-width: 0;
+  box-shadow: var(--ml-shadow);
+}
+
 .md-typeset .admonition-title {
   font-weight: 700;
+}
+
+.md-typeset .highlight {
+  border-radius: var(--ml-radius);
+  box-shadow: 0 0.45rem 1.35rem rgba(31, 41, 55, 0.09);
+}
+
+.md-typeset pre > code {
+  border-radius: var(--ml-radius);
+}
+
+.roofline-figure {
+  max-width: 48rem;
+}
+
+.roofline-figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.roofline-panel {
+  fill: var(--ml-surface);
+  stroke: var(--ml-border);
+}
+
+.roofline-grid path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--md-default-fg-color) 10%, transparent);
+  stroke-width: 1;
+}
+
+.roofline-axis path {
+  fill: none;
+  stroke: var(--md-default-fg-color);
+  stroke-linecap: round;
+  stroke-width: 2.4;
+}
+
+#axis-arrow path {
+  fill: var(--md-default-fg-color);
+}
+
+.roofline-slope,
+.roofline-cap {
+  fill: none;
+  stroke: url("#roofline-line");
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 7;
+}
+
+.roofline-cap {
+  stroke-width: 7.5;
+}
+
+.roofline-ridge {
+  stroke: var(--md-accent-fg-color);
+  stroke-dasharray: 7 7;
+  stroke-width: 2;
+}
+
+.roofline-ridge-dot {
+  fill: var(--md-accent-fg-color);
+  stroke: var(--md-default-bg-color);
+  stroke-width: 3;
+}
+
+.roofline-label,
+.roofline-tick {
+  fill: var(--md-default-fg-color);
+  font-family: var(--md-text-font-family, sans-serif);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.roofline-label {
+  font-size: 18px;
+}
+
+.roofline-y,
+.roofline-x,
+.roofline-tick {
+  fill: var(--md-default-fg-color--light);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.roofline-y {
+  transform: rotate(-90deg);
+  transform-origin: 44px 62px;
+}
+
+.roofline-slope-label {
+  fill: var(--md-accent-fg-color);
 }
 
 /* Status badges for scaffolded pages. */
@@ -65,4 +295,24 @@ figure > figcaption {
 .status-badge.done {
   background: #2e7d32;
   color: #fff;
+}
+
+@media screen and (max-width: 44.984rem) {
+  .md-main__inner {
+    margin-top: 0.4rem;
+  }
+
+  .md-typeset h1 {
+    max-width: none;
+    font-size: 1.9rem;
+  }
+
+  .md-typeset p,
+  .md-typeset li {
+    max-width: none;
+  }
+
+  .roofline-label {
+    font-size: 20px;
+  }
 }

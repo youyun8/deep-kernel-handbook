@@ -43,24 +43,47 @@ If $I$ is below the **ridge point** $\pi/\beta$, you are **memory-bound** —
 performance is $\beta \cdot I$ and adding FLOPs is free until you hit the ridge.
 Above it, you are **compute-bound** — only fewer FLOPs or faster math help.
 
-```mermaid
-flowchart LR
-    subgraph Roofline
-    direction LR
-    end
-```
-
-<figure markdown>
-```
- performance (FLOP/s, log)
-   π ┤              ________________  compute-bound (P = π)
-     │            /
-     │          /  slope = β
-     │        /   memory-bound (P = β·I)
-     │      /
-     └────┴───────────────────────── arithmetic intensity I (log)
-        ridge = π/β
-```
+<figure class="roofline-figure">
+<svg viewBox="0 0 760 430" role="img" aria-labelledby="roofline-title roofline-desc" xmlns="http://www.w3.org/2000/svg">
+  <title id="roofline-title">Roofline performance model</title>
+  <desc id="roofline-desc">A log-log plot of achievable performance versus arithmetic intensity, rising with memory bandwidth until the ridge point and then flattening at peak compute.</desc>
+  <defs>
+    <linearGradient id="roofline-line" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#00bcd4" />
+      <stop offset="55%" stop-color="#5e35b1" />
+      <stop offset="100%" stop-color="#7c4dff" />
+    </linearGradient>
+    <marker id="axis-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" />
+    </marker>
+  </defs>
+  <rect class="roofline-panel" x="24" y="20" width="712" height="360" rx="24" />
+  <g class="roofline-grid">
+    <path d="M130 320 H650" />
+    <path d="M130 260 H650" />
+    <path d="M130 200 H650" />
+    <path d="M130 140 H650" />
+    <path d="M210 80 V320" />
+    <path d="M330 80 V320" />
+    <path d="M450 80 V320" />
+    <path d="M570 80 V320" />
+  </g>
+  <g class="roofline-axis">
+    <path d="M110 320 H675" marker-end="url(#axis-arrow)" />
+    <path d="M110 320 V64" marker-end="url(#axis-arrow)" />
+  </g>
+  <path class="roofline-slope" d="M135 305 L365 115" />
+  <path class="roofline-cap" d="M365 115 H650" />
+  <line class="roofline-ridge" x1="365" y1="115" x2="365" y2="320" />
+  <circle class="roofline-ridge-dot" cx="365" cy="115" r="5" />
+  <text class="roofline-label roofline-y" x="44" y="62">performance (FLOP/s, log)</text>
+  <text class="roofline-label roofline-x" x="462" y="365">arithmetic intensity I (log)</text>
+  <text class="roofline-tick" x="86" y="121">π</text>
+  <text class="roofline-label" x="424" y="98">compute-bound: P = π</text>
+  <text class="roofline-label" x="198" y="194">memory-bound: P = β · I</text>
+  <text class="roofline-label roofline-slope-label" x="232" y="153">slope = β</text>
+  <text class="roofline-label" x="323" y="350">ridge = π/β</text>
+</svg>
 <figcaption>The roofline. Left of the ridge you are limited by bandwidth; right of it, by the math units.</figcaption>
 </figure>
 
