@@ -5,26 +5,39 @@ hide:
   - toc
 ---
 
-# Learn SOTA ML systems — from scratch
+<section class="home-hero" markdown>
+<div class="home-hero__copy" markdown>
 
-> Modern machine learning is a *systems* discipline. Knowing the math of a
-> transformer is table stakes; the leverage is in understanding **how it runs**
-> on real hardware — the FLOPs, the bytes, the kernels, the collectives — and
-> rebuilding every piece yourself until there is no magic left.
+# Learn SOTA ML systems from scratch
 
-This handbook teaches state-of-the-art ML techniques **together with the
-performance-engineering and systems work** that makes them efficient. Every core
-component is built three times: first the **math and intuition**, then a
-**clean reference implementation** you can read in one sitting, then the
-**performance-optimized version** and how it **scales across many GPUs**.
+Modern machine learning is a *systems* discipline. Knowing the math of a
+transformer is table stakes; the leverage is in understanding **how it runs**
+on real hardware: the FLOPs, bytes, kernels, collectives, and trade-offs that
+decide whether a model is practical.
 
-The flagship, deepest track is **Mixture-of-Experts (MoE)** — the architecture
-behind today's frontier sparse models (Kimi K2.5, DeepSeek-V3, Mixtral,
-Qwen-MoE). We go all the way from "why does sparsity help at all?" to writing
-the all-to-all dispatch and the grouped-GEMM kernels that make it fast.
+This handbook teaches state-of-the-art ML techniques together with the systems
+work that makes them efficient. Each core component moves from **intuition** to
+**math**, then to a **clean reference implementation**, then to the optimized
+version that scales across GPUs.
 
+<div class="home-actions" markdown>
 [Start the reading path :material-arrow-right:](reading-path.md){ .md-button .md-button--primary }
-[Jump to the MoE flagship :material-arrow-right:](moe/index.md){ .md-button }
+[Jump to the MoE flagship](moe/index.md){ .md-button }
+</div>
+
+</div>
+
+<div class="home-hero__panel" aria-label="Course scope" markdown="0">
+<div class="home-kicker">Flagship track</div>
+<div class="home-panel-title">Mixture-of-Experts</div>
+<div class="home-panel-copy">From sparse scaling and router math to all-to-all dispatch, grouped GEMM, inference serving, and case studies.</div>
+<div class="home-metrics">
+<div><strong>4</strong><span>parts</span></div>
+<div><strong>9</strong><span>MoE chapters</span></div>
+<div><strong>3</strong><span>kernel paths</span></div>
+</div>
+</div>
+</section>
 
 ---
 
@@ -60,36 +73,53 @@ the all-to-all dispatch and the grouped-GEMM kernels that make it fast.
 
 ## The curriculum
 
-### :material-cube-outline: Part I — Foundations of modern ML systems
+<div class="curriculum-grid" markdown>
 
-Get fluent in the language of performance before optimizing anything.
+<section class="curriculum-card" markdown>
+<span class="curriculum-card__eyebrow">Part I</span>
 
-- [The transformer as a system](foundations/transformer-systems.md) — FLOPs, memory traffic, arithmetic intensity, and the roofline model.
-- [Attention efficiency](foundations/attention-efficiency.md) — KV cache, memory-bound decoding, paged attention.
-- [FlashAttention from scratch](foundations/flashattention.md) — tiling and online softmax, derived step by step.
-- [Numerics & precision](foundations/numerics-precision.md) — fp32/bf16/fp16/fp8, mixed precision, and stability.
+### :material-cube-outline: Foundations
 
-### :material-star-circle: Part II — Mixture-of-Experts *(flagship)*
+Get fluent in FLOPs, bytes, arithmetic intensity, attention memory traffic, and
+precision before optimizing anything.
 
-The deepest series. Build a production-shaped MoE stack from the ground up.
+[Open foundations](foundations/index.md){ .md-button }
+</section>
 
-- [Why sparsity](moe/why-sparsity.md) · [MoE layer from scratch](moe/moe-from-scratch.md) · [Load balancing](moe/load-balancing.md)
-- [Routing variants](moe/routing-variants.md) · [Training stability](moe/training-stability.md)
-- [Systems & expert parallelism](moe/systems-ep.md) · [MoE kernels (Triton/CUDA/HIP)](moe/kernels.md)
-- [Inference & serving](moe/inference-serving.md) · [Case studies](moe/case-studies.md)
+<section class="curriculum-card curriculum-card--feature" markdown>
+<span class="curriculum-card__eyebrow">Part II · flagship</span>
 
-### :material-speedometer: Part III — Performance & systems engineering
+### :material-star-circle: Mixture-of-Experts
 
-The general toolkit that powers everything above.
+Build a production-shaped MoE stack: sparsity, routing, load balancing, expert
+parallelism, kernels, serving, and case studies.
 
-- [GPU programming model](performance/gpu-programming.md) · [Triton track](performance/triton-track.md) · [CUDA / HIP track](performance/cuda-hip-track.md)
-- [Distributed training](performance/distributed-training.md) · [Quantization & compression](performance/quantization.md)
-- [Inference optimization](performance/inference-optimization.md) · [Profiling & methodology](performance/profiling.md)
+[Open MoE track](moe/index.md){ .md-button .md-button--primary }
+</section>
 
-### :material-trophy: Part IV — Capstones
+<section class="curriculum-card" markdown>
+<span class="curriculum-card__eyebrow">Part III</span>
 
-- [Build a small MoE LM end to end](capstones/build-moe.md), then optimize it and report the speedups.
-- [Scaling it up](capstones/scaling.md) with the parallelism techniques.
+### :material-speedometer: Performance
+
+Work through GPU programming, Triton, CUDA/HIP, distributed training,
+quantization, inference optimization, and profiling.
+
+[Open performance](performance/index.md){ .md-button }
+</section>
+
+<section class="curriculum-card" markdown>
+<span class="curriculum-card__eyebrow">Part IV</span>
+
+### :material-trophy: Capstones
+
+Train a small MoE LM, optimize it, report measured speedups, then apply the
+parallelism techniques that make it scale.
+
+[Open capstones](capstones/index.md){ .md-button }
+</section>
+
+</div>
 
 ---
 

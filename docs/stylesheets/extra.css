@@ -1,49 +1,57 @@
-/* ML Perf Handbook — small visual tweaks on top of Material defaults. */
+/* ML Perf Handbook - visual system on top of Material defaults. */
 
 :root {
   --md-code-font: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
-  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 92%, var(--md-primary-fg-color) 8%);
-  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 84%, var(--md-primary-fg-color) 16%);
-  --ml-border: color-mix(in srgb, var(--md-default-fg-color) 14%, transparent);
-  --ml-shadow: 0 0.55rem 1.6rem rgba(31, 41, 55, 0.08);
-  --ml-radius: 0.75rem;
+  --ml-accent-warm: #f59e0b;
+  --ml-accent-cool: #0f766e;
+  --ml-accent-blue: #2563eb;
+  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 94%, var(--ml-accent-cool) 6%);
+  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 88%, var(--ml-accent-blue) 12%);
+  --ml-border: color-mix(in srgb, var(--md-default-fg-color) 15%, transparent);
+  --ml-shadow: 0 0.5rem 1.35rem rgba(15, 23, 42, 0.08);
+  --ml-shadow-strong: 0 0.8rem 2rem rgba(15, 23, 42, 0.13);
+  --ml-radius: 0.45rem;
   --ml-diagram-bg: color-mix(in srgb, var(--md-default-bg-color) 96%, white 4%);
   --ml-diagram-node-bg: #ffffff;
   --ml-diagram-node-muted-bg: #eef2f7;
-  --ml-diagram-node-stroke: #4f46e5;
+  --ml-diagram-node-stroke: #0f766e;
   --ml-diagram-node-muted-stroke: #94a3b8;
   --ml-diagram-edge: #475569;
   --ml-diagram-text: #111827;
   --ml-diagram-label-bg: color-mix(in srgb, var(--md-default-bg-color) 92%, white 8%);
-  --ml-diagram-cluster-bg: rgba(79, 70, 229, 0.07);
-  --ml-diagram-cluster-stroke: rgba(79, 70, 229, 0.42);
-  --ml-diagram-accent-bg: #5e35b1;
-  --ml-diagram-accent-stroke: #311b92;
-  --ml-roofline-start: #0088a3;
-  --ml-roofline-mid: #5e35b1;
-  --ml-roofline-end: #7c4dff;
+  --ml-diagram-cluster-bg: rgba(15, 118, 110, 0.08);
+  --ml-diagram-cluster-stroke: rgba(15, 118, 110, 0.42);
+  --ml-diagram-accent-bg: #1d4ed8;
+  --ml-diagram-accent-stroke: #1e3a8a;
+  --ml-roofline-start: #0f766e;
+  --ml-roofline-mid: #2563eb;
+  --ml-roofline-end: #f59e0b;
 }
 
 [data-md-color-scheme="slate"] {
-  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 86%, var(--md-primary-fg-color) 14%);
-  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 78%, var(--md-primary-fg-color) 22%);
+  --ml-accent-warm: #fbbf24;
+  --ml-accent-cool: #2dd4bf;
+  --ml-accent-blue: #60a5fa;
+  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 88%, var(--ml-accent-cool) 12%);
+  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 80%, var(--ml-accent-blue) 20%);
   --ml-border: color-mix(in srgb, var(--md-default-fg-color) 22%, transparent);
   --ml-shadow: 0 0.55rem 1.6rem rgba(0, 0, 0, 0.22);
+  --ml-shadow-strong: 0 1rem 2.4rem rgba(0, 0, 0, 0.28);
   --ml-diagram-bg: color-mix(in srgb, var(--md-default-bg-color) 88%, #ffffff 12%);
   --ml-diagram-node-bg: #182335;
   --ml-diagram-node-muted-bg: #263244;
-  --ml-diagram-node-stroke: #a78bfa;
+  --ml-diagram-node-stroke: #2dd4bf;
   --ml-diagram-node-muted-stroke: #64748b;
   --ml-diagram-edge: #cbd5e1;
   --ml-diagram-text: #f8fafc;
   --ml-diagram-label-bg: #111827;
-  --ml-diagram-cluster-bg: rgba(167, 139, 250, 0.12);
-  --ml-diagram-cluster-stroke: rgba(196, 181, 253, 0.5);
-  --ml-diagram-accent-bg: #7c3aed;
-  --ml-diagram-accent-stroke: #c4b5fd;
-  --ml-roofline-start: #22d3ee;
-  --ml-roofline-mid: #c4b5fd;
-  --ml-roofline-end: #a78bfa;
+  --ml-diagram-cluster-bg: rgba(45, 212, 191, 0.12);
+  --ml-diagram-cluster-stroke: rgba(94, 234, 212, 0.5);
+  --ml-diagram-accent-bg: #2563eb;
+  --ml-diagram-accent-stroke: #93c5fd;
+  --ml-roofline-start: #2dd4bf;
+  --ml-roofline-mid: #60a5fa;
+  --ml-roofline-end: #fbbf24;
 }
 
 /* Slightly wider content column for math + code heavy pages. */
@@ -53,8 +61,8 @@
 
 .md-main {
   background:
-    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--md-primary-fg-color) 12%, transparent) 0, transparent 26rem),
-    radial-gradient(circle at 95% 12%, color-mix(in srgb, var(--md-accent-fg-color) 10%, transparent) 0, transparent 22rem);
+    linear-gradient(180deg, color-mix(in srgb, var(--ml-surface) 55%, transparent) 0, transparent 22rem),
+    linear-gradient(90deg, color-mix(in srgb, var(--ml-accent-cool) 8%, transparent), transparent 28%, color-mix(in srgb, var(--ml-accent-warm) 7%, transparent));
 }
 
 .md-main__inner {
@@ -71,23 +79,23 @@
 }
 
 .md-typeset h1 {
-  max-width: 18ch;
+  max-width: 20ch;
   margin-bottom: 0.4rem;
-  color: var(--md-primary-fg-color);
+  color: var(--md-default-fg-color);
   font-weight: 800;
-  letter-spacing: -0.045em;
+  letter-spacing: 0;
 }
 
 .md-typeset h2 {
   margin-top: 2.4em;
   padding-top: 0.75rem;
   border-top: 1px solid var(--ml-border);
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
 }
 
 .md-typeset h3 {
-  color: var(--md-accent-fg-color);
-  letter-spacing: -0.015em;
+  color: var(--ml-accent-cool);
+  letter-spacing: 0;
 }
 
 .md-typeset p,
@@ -97,10 +105,11 @@
 
 .md-typeset a {
   text-underline-offset: 0.18em;
+  text-decoration-thickness: 0.06em;
 }
 
 .md-typeset blockquote {
-  border-left: 0.18rem solid var(--md-accent-fg-color);
+  border-left: 0.18rem solid var(--ml-accent-cool);
   border-radius: 0 var(--ml-radius) var(--ml-radius) 0;
   background: var(--ml-surface);
   padding: 0.6rem 0.9rem;
@@ -126,13 +135,12 @@
   font-size: 0.72rem;
 }
 .page-meta .chip {
-  border-radius: 999px;
+  border-radius: 0.35rem;
   padding: 0.16rem 0.65rem;
   border: 1px solid var(--ml-border);
   background: var(--ml-surface);
   color: var(--md-default-fg-color--light);
   white-space: nowrap;
-  box-shadow: 0 0.2rem 0.7rem rgba(31, 41, 55, 0.04);
 }
 .page-meta .chip strong {
   color: var(--md-default-fg-color);
@@ -150,19 +158,31 @@
 .md-typeset .grid.cards > :is(ul, ol) > li {
   border-color: var(--ml-border);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--md-default-bg-color) 96%, white 4%), var(--md-default-bg-color));
+    linear-gradient(180deg, color-mix(in srgb, var(--md-default-bg-color) 96%, var(--ml-accent-cool) 4%), var(--md-default-bg-color));
   box-shadow: var(--ml-shadow);
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
 
 .md-typeset .grid.cards > :is(ul, ol) > li:hover {
-  border-color: color-mix(in srgb, var(--md-accent-fg-color) 45%, var(--ml-border));
-  box-shadow: 0 0.7rem 2rem rgba(31, 41, 55, 0.12);
+  border-color: color-mix(in srgb, var(--ml-accent-cool) 45%, var(--ml-border));
+  box-shadow: var(--ml-shadow-strong);
   transform: translateY(-2px);
 }
 
 .md-typeset .md-button {
-  box-shadow: 0 0.35rem 1rem color-mix(in srgb, var(--md-primary-fg-color) 18%, transparent);
+  border-radius: 0.4rem;
+  box-shadow: none;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.md-typeset .md-button:hover {
+  transform: translateY(-1px);
+}
+
+.md-typeset .md-button--primary {
+  background-color: var(--ml-accent-cool);
+  border-color: var(--ml-accent-cool);
+  color: #fff;
 }
 
 .md-typeset__table {
@@ -222,6 +242,167 @@ figure > figcaption {
   color: var(--ml-diagram-text);
   box-shadow: var(--ml-shadow);
   overflow-x: auto;
+}
+
+/* Homepage. */
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(16rem, 0.85fr);
+  gap: clamp(1rem, 4vw, 2.4rem);
+  align-items: stretch;
+  margin: 0.4rem 0 2.2rem;
+  padding: clamp(1rem, 3vw, 1.6rem) 0 0.6rem;
+}
+
+.home-hero__copy {
+  min-width: 0;
+}
+
+.home-hero .md-typeset h1,
+.home-hero h1 {
+  max-width: 13ch;
+  margin: 0 0 0.75rem;
+  font-size: clamp(2.15rem, 5.6vw, 4.1rem);
+  line-height: 0.98;
+}
+
+.home-hero p {
+  max-width: 62ch;
+  margin-bottom: 0.85rem;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.9rem;
+}
+
+.home-actions {
+  margin-top: 1.15rem;
+}
+
+.home-actions p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.home-hero__panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 17rem;
+  padding: 1rem;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--md-default-bg-color) 72%, var(--ml-accent-cool) 28%), color-mix(in srgb, var(--md-default-bg-color) 86%, var(--ml-accent-blue) 14%)),
+    repeating-linear-gradient(90deg, transparent 0, transparent 1.4rem, color-mix(in srgb, var(--md-default-fg-color) 7%, transparent) 1.4rem, color-mix(in srgb, var(--md-default-fg-color) 7%, transparent) 1.45rem);
+  background-blend-mode: normal;
+  box-shadow: var(--ml-shadow);
+}
+
+.home-kicker,
+.curriculum-card__eyebrow {
+  color: var(--ml-accent-cool);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-panel-title {
+  max-width: 12ch;
+  margin-top: 0.35rem;
+  color: var(--md-default-fg-color);
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.home-panel-copy {
+  max-width: 28ch;
+  margin: 0.75rem 0 1.1rem;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.home-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.home-metrics div {
+  min-width: 0;
+  padding: 0.55rem;
+  border: 1px solid var(--ml-border);
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--md-default-bg-color) 82%, transparent);
+}
+
+.home-metrics strong {
+  display: block;
+  color: var(--md-default-fg-color);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.home-metrics span {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.58rem;
+  line-height: 1.2;
+}
+
+.curriculum-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 1.2rem;
+}
+
+.curriculum-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 13rem;
+  padding: 0.9rem;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius);
+  background: var(--md-default-bg-color);
+  box-shadow: var(--ml-shadow);
+}
+
+.curriculum-card--feature {
+  border-color: color-mix(in srgb, var(--ml-accent-cool) 48%, var(--ml-border));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--md-default-bg-color) 90%, var(--ml-accent-cool) 10%), var(--md-default-bg-color));
+}
+
+.curriculum-card h3 {
+  margin: 0.35rem 0 0.35rem;
+  color: var(--md-default-fg-color);
+}
+
+.curriculum-card > p {
+  margin: 0;
+}
+
+.curriculum-card > p:first-child {
+  margin-bottom: 0.35rem;
+}
+
+.curriculum-card h3 + p {
+  flex: 1;
+  margin: 0 0 0.85rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.curriculum-card > p:last-child {
+  margin-top: auto;
+}
+
+.curriculum-card .md-button {
+  align-self: flex-start;
 }
 
 .md-typeset .mermaid svg {
@@ -329,6 +510,7 @@ figure > figcaption {
 .md-typeset details {
   border-width: 0;
   box-shadow: var(--ml-shadow);
+  border-left: 0.18rem solid color-mix(in srgb, var(--md-accent-fg-color) 58%, var(--ml-accent-warm));
 }
 
 .md-typeset .admonition-title {
@@ -337,7 +519,7 @@ figure > figcaption {
 
 .md-typeset .highlight {
   border-radius: var(--ml-radius);
-  box-shadow: 0 0.45rem 1.35rem rgba(31, 41, 55, 0.09);
+  box-shadow: var(--ml-shadow);
 }
 
 .md-typeset pre > code {
@@ -488,6 +670,34 @@ figure > figcaption {
   .md-typeset h1 {
     max-width: none;
     font-size: 1.9rem;
+  }
+
+  .home-hero {
+    grid-template-columns: 1fr;
+    margin-top: 0;
+  }
+
+  .home-hero .md-typeset h1,
+  .home-hero h1 {
+    max-width: 12ch;
+    font-size: 2.45rem;
+  }
+
+  .home-hero__panel {
+    min-height: 14rem;
+  }
+
+  .home-actions p,
+  .home-actions .md-button {
+    width: 100%;
+  }
+
+  .home-actions .md-button {
+    text-align: center;
+  }
+
+  .curriculum-grid {
+    grid-template-columns: 1fr;
   }
 
   .md-typeset p,
