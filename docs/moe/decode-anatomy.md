@@ -56,7 +56,7 @@ flowchart TD
     MOE --> LM["final norm + LM head<br/>(once)"]
     class M2 flagship;
     class M4 flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 Where the time goes (single-stream profile, the two big GEMM-heavy stages
@@ -113,7 +113,7 @@ flowchart LR
     TA --> FIX1["fuse + tune individual kernels"]
     TB --> FIX2["dual-stream / programmatic launch"]
     class TB flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 The identity holds exactly: `wall gap = TrackA(net) + TrackB + idle`. The
@@ -166,7 +166,7 @@ flowchart LR
       S2 -->|"HBM"| S3["quant for sort"]
     end
     class F1 flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 !!! note "Split-K is the same trick on both stacks"
@@ -200,7 +200,7 @@ flowchart TD
     end
     OFF -->|"−18% decode latency"| ON
     class N1 flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 The measured result is unambiguous because (on this stack) the kernels run

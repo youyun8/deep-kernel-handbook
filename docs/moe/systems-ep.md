@@ -65,7 +65,7 @@ flowchart TD
     E -->|"all-to-all #2 (combine, reverse perm)"| F["unpermute"]
     F -->|"weighted sum"| G["residual add"]
     class D flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 The pattern is **permute → all-to-all → grouped-GEMM → all-to-all → unpermute**.
@@ -106,7 +106,7 @@ flowchart LR
     A1 -.->|"chunk1 ready"| G1
     A2 -.->|"chunk2 ready"| G2
     class G0,G1,G2 flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 Each chunk's GEMM runs while the *next* chunk is still in flight (dashed

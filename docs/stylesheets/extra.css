@@ -22,9 +22,9 @@
   --ml-diagram-label-bg: color-mix(in srgb, var(--md-default-bg-color) 92%, white 8%);
   --ml-diagram-cluster-bg: rgba(15, 118, 110, 0.08);
   --ml-diagram-cluster-stroke: rgba(15, 118, 110, 0.42);
-  --ml-diagram-accent-bg: #5b21b6;
-  --ml-diagram-accent-stroke: #4c1d95;
-  --ml-diagram-accent-text: #ffffff;
+  --ml-diagram-accent-bg: #ede9fe;
+  --ml-diagram-accent-stroke: #7c3aed;
+  --ml-diagram-accent-text: #111827;
   --ml-roofline-start: #0f766e;
   --ml-roofline-mid: #2563eb;
   --ml-roofline-end: #f59e0b;
@@ -50,9 +50,9 @@
   --ml-diagram-label-bg: #111827;
   --ml-diagram-cluster-bg: rgba(45, 212, 191, 0.12);
   --ml-diagram-cluster-stroke: rgba(94, 234, 212, 0.5);
-  --ml-diagram-accent-bg: #c4b5fd;
-  --ml-diagram-accent-stroke: #ddd6fe;
-  --ml-diagram-accent-text: #111827;
+  --ml-diagram-accent-bg: #6d28d9;
+  --ml-diagram-accent-stroke: #c4b5fd;
+  --ml-diagram-accent-text: #ffffff;
   --ml-roofline-start: #2dd4bf;
   --ml-roofline-mid: #60a5fa;
   --ml-roofline-end: #fbbf24;
@@ -437,8 +437,8 @@ figure > figcaption {
 .md-typeset .mermaid .node .label *,
 .md-typeset .mermaid .label text,
 .md-typeset .mermaid text {
-  fill: var(--ml-diagram-text) !important;
-  color: var(--ml-diagram-text) !important;
+  fill: var(--ml-diagram-text);
+  color: var(--ml-diagram-text);
 }
 
 .md-typeset .mermaid .edgePath .path,
@@ -518,10 +518,10 @@ figure > figcaption {
 /* Named accent schemes for highlighting nodes in different diagrams.
    Single-word camelCase class names (mirroring the proven `flagship`/`idle`
    classes) — mermaid attaches these to the node group reliably; hyphenated
-   names do not match, leaving the dark base-text rule to win. Use e.g.
-   `class X accViolet;` + `classDef accViolet fill:#…,color:#fff;` in the
+   names do not match, leaving the base-text rule to win. Use e.g.
+   `class X accViolet;` + `classDef accViolet fill:#…,color:#111827;` in the
    source. The rules below win via !important; per-scheme colors come from the
-   `--ml-acc-*` vars, with a light and a slate (dark-mode) value each. */
+   `--ml-acc-*` vars. */
 .md-typeset .mermaid g.accViolet rect,  .md-typeset .mermaid g.accViolet circle,  .md-typeset .mermaid g.accViolet polygon,  .md-typeset .mermaid g.accViolet path,
 .md-typeset .mermaid g.accTeal rect,    .md-typeset .mermaid g.accTeal circle,    .md-typeset .mermaid g.accTeal polygon,    .md-typeset .mermaid g.accTeal path,
 .md-typeset .mermaid g.accBlue rect,    .md-typeset .mermaid g.accBlue circle,    .md-typeset .mermaid g.accBlue polygon,    .md-typeset .mermaid g.accBlue path,
@@ -545,23 +545,23 @@ figure > figcaption {
   color: var(--ml-acc-text, var(--ml-diagram-accent-text)) !important;
 }
 
-.md-typeset .mermaid .accViolet { --ml-acc-bg: #6d28d9; --ml-acc-stroke: #4c1d95; --ml-acc-text: #ffffff; }
-.md-typeset .mermaid .accTeal   { --ml-acc-bg: #0f766e; --ml-acc-stroke: #115e59; --ml-acc-text: #ffffff; }
-.md-typeset .mermaid .accBlue   { --ml-acc-bg: #1d4ed8; --ml-acc-stroke: #1e3a8a; --ml-acc-text: #ffffff; }
-.md-typeset .mermaid .accCyan   { --ml-acc-bg: #0e7490; --ml-acc-stroke: #155e75; --ml-acc-text: #ffffff; }
-.md-typeset .mermaid .accAmber  { --ml-acc-bg: #b45309; --ml-acc-stroke: #7c2d12; --ml-acc-text: #ffffff; }
-.md-typeset .mermaid .accRose   { --ml-acc-bg: #be123c; --ml-acc-stroke: #881337; --ml-acc-text: #ffffff; }
-.md-typeset .mermaid .accGreen  { --ml-acc-bg: #15803d; --ml-acc-stroke: #14532d; --ml-acc-text: #ffffff; }
-.md-typeset .mermaid .accIndigo { --ml-acc-bg: #4338ca; --ml-acc-stroke: #312e81; --ml-acc-text: #ffffff; }
+.md-typeset .mermaid .accViolet { --ml-acc-bg: #ede9fe; --ml-acc-stroke: #7c3aed; --ml-acc-text: #111827; }
+.md-typeset .mermaid .accTeal   { --ml-acc-bg: #ccfbf1; --ml-acc-stroke: #0f766e; --ml-acc-text: #111827; }
+.md-typeset .mermaid .accBlue   { --ml-acc-bg: #dbeafe; --ml-acc-stroke: #2563eb; --ml-acc-text: #111827; }
+.md-typeset .mermaid .accCyan   { --ml-acc-bg: #cffafe; --ml-acc-stroke: #0891b2; --ml-acc-text: #111827; }
+.md-typeset .mermaid .accAmber  { --ml-acc-bg: #fef3c7; --ml-acc-stroke: #d97706; --ml-acc-text: #111827; }
+.md-typeset .mermaid .accRose   { --ml-acc-bg: #ffe4e6; --ml-acc-stroke: #e11d48; --ml-acc-text: #111827; }
+.md-typeset .mermaid .accGreen  { --ml-acc-bg: #dcfce7; --ml-acc-stroke: #16a34a; --ml-acc-text: #111827; }
+.md-typeset .mermaid .accIndigo { --ml-acc-bg: #e0e7ff; --ml-acc-stroke: #4f46e5; --ml-acc-text: #111827; }
 
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accViolet { --ml-acc-bg: #c4b5fd; --ml-acc-stroke: #ddd6fe; --ml-acc-text: #111827; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accTeal   { --ml-acc-bg: #5eead4; --ml-acc-stroke: #99f6e4; --ml-acc-text: #0f172a; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accBlue   { --ml-acc-bg: #93c5fd; --ml-acc-stroke: #bfdbfe; --ml-acc-text: #0f172a; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accCyan   { --ml-acc-bg: #67e8f9; --ml-acc-stroke: #a5f3fc; --ml-acc-text: #0f172a; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accAmber  { --ml-acc-bg: #fbbf24; --ml-acc-stroke: #fde68a; --ml-acc-text: #111827; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accRose   { --ml-acc-bg: #fda4af; --ml-acc-stroke: #fecdd3; --ml-acc-text: #111827; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accGreen  { --ml-acc-bg: #86efac; --ml-acc-stroke: #bbf7d0; --ml-acc-text: #0f172a; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accIndigo { --ml-acc-bg: #a5b4fc; --ml-acc-stroke: #c7d2fe; --ml-acc-text: #111827; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accViolet { --ml-acc-bg: #6d28d9; --ml-acc-stroke: #c4b5fd; --ml-acc-text: #ffffff; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accTeal   { --ml-acc-bg: #0f766e; --ml-acc-stroke: #5eead4; --ml-acc-text: #ffffff; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accBlue   { --ml-acc-bg: #1d4ed8; --ml-acc-stroke: #93c5fd; --ml-acc-text: #ffffff; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accCyan   { --ml-acc-bg: #0e7490; --ml-acc-stroke: #67e8f9; --ml-acc-text: #ffffff; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accAmber  { --ml-acc-bg: #b45309; --ml-acc-stroke: #fbbf24; --ml-acc-text: #ffffff; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accRose   { --ml-acc-bg: #be123c; --ml-acc-stroke: #fda4af; --ml-acc-text: #ffffff; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accGreen  { --ml-acc-bg: #15803d; --ml-acc-stroke: #86efac; --ml-acc-text: #ffffff; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accIndigo { --ml-acc-bg: #4338ca; --ml-acc-stroke: #a5b4fc; --ml-acc-text: #ffffff; }
 
 /* Mermaid emits per-diagram classDef rules inside the SVG with an ID selector.
    The inert ID in :is() gives these theme overrides enough specificity to keep
@@ -583,8 +583,8 @@ figure > figcaption {
 :is(#ml-diagram-theme, .md-typeset) .mermaid .node foreignObject *,
 :is(#ml-diagram-theme, .md-typeset) .mermaid .label text,
 :is(#ml-diagram-theme, .md-typeset) .mermaid text {
-  fill: var(--ml-diagram-text) !important;
-  color: var(--ml-diagram-text) !important;
+  fill: var(--ml-diagram-text);
+  color: var(--ml-diagram-text);
 }
 
 :is(#ml-diagram-theme, .md-typeset) .mermaid .flagship rect,
@@ -649,6 +649,76 @@ figure > figcaption {
 :is(#ml-diagram-theme, .md-typeset) .mermaid g.accIndigo .nodeLabel, :is(#ml-diagram-theme, .md-typeset) .mermaid g.accIndigo .nodeLabel *, :is(#ml-diagram-theme, .md-typeset) .mermaid g.accIndigo .label, :is(#ml-diagram-theme, .md-typeset) .mermaid g.accIndigo .label *, :is(#ml-diagram-theme, .md-typeset) .mermaid g.accIndigo foreignObject, :is(#ml-diagram-theme, .md-typeset) .mermaid g.accIndigo foreignObject *, :is(#ml-diagram-theme, .md-typeset) .mermaid g.accIndigo text {
   fill: var(--ml-acc-text, var(--ml-diagram-accent-text)) !important;
   color: var(--ml-acc-text, var(--ml-diagram-accent-text)) !important;
+}
+
+/* Some Mermaid renderers attach classDef classes to the shape, not the node
+   group. In that case the fill changes but label selectors like g.accViolet
+   never match, so provide explicit label contrast keyed off the child shape. */
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.flagship):has(:is(.flagship)) .nodeLabel,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.flagship):has(:is(.flagship)) .nodeLabel *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.flagship):has(:is(.flagship)) .label,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.flagship):has(:is(.flagship)) .label *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.flagship):has(:is(.flagship)) foreignObject,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.flagship):has(:is(.flagship)) foreignObject *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.flagship):has(:is(.flagship)) text,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accViolet):has(:is(.accViolet)) .nodeLabel,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accViolet):has(:is(.accViolet)) .nodeLabel *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accViolet):has(:is(.accViolet)) .label,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accViolet):has(:is(.accViolet)) .label *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accViolet):has(:is(.accViolet)) foreignObject,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accViolet):has(:is(.accViolet)) foreignObject *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accViolet):has(:is(.accViolet)) text,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accTeal):has(:is(.accTeal)) .nodeLabel,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accTeal):has(:is(.accTeal)) .nodeLabel *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accTeal):has(:is(.accTeal)) .label,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accTeal):has(:is(.accTeal)) .label *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accTeal):has(:is(.accTeal)) foreignObject,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accTeal):has(:is(.accTeal)) foreignObject *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accTeal):has(:is(.accTeal)) text,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accBlue):has(:is(.accBlue)) .nodeLabel,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accBlue):has(:is(.accBlue)) .nodeLabel *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accBlue):has(:is(.accBlue)) .label,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accBlue):has(:is(.accBlue)) .label *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accBlue):has(:is(.accBlue)) foreignObject,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accBlue):has(:is(.accBlue)) foreignObject *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accBlue):has(:is(.accBlue)) text,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accCyan):has(:is(.accCyan)) .nodeLabel,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accCyan):has(:is(.accCyan)) .nodeLabel *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accCyan):has(:is(.accCyan)) .label,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accCyan):has(:is(.accCyan)) .label *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accCyan):has(:is(.accCyan)) foreignObject,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accCyan):has(:is(.accCyan)) foreignObject *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accCyan):has(:is(.accCyan)) text,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accAmber):has(:is(.accAmber)) .nodeLabel,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accAmber):has(:is(.accAmber)) .nodeLabel *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accAmber):has(:is(.accAmber)) .label,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accAmber):has(:is(.accAmber)) .label *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accAmber):has(:is(.accAmber)) foreignObject,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accAmber):has(:is(.accAmber)) foreignObject *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accAmber):has(:is(.accAmber)) text,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accRose):has(:is(.accRose)) .nodeLabel,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accRose):has(:is(.accRose)) .nodeLabel *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accRose):has(:is(.accRose)) .label,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accRose):has(:is(.accRose)) .label *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accRose):has(:is(.accRose)) foreignObject,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accRose):has(:is(.accRose)) foreignObject *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accRose):has(:is(.accRose)) text,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accGreen):has(:is(.accGreen)) .nodeLabel,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accGreen):has(:is(.accGreen)) .nodeLabel *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accGreen):has(:is(.accGreen)) .label,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accGreen):has(:is(.accGreen)) .label *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accGreen):has(:is(.accGreen)) foreignObject,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accGreen):has(:is(.accGreen)) foreignObject *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accGreen):has(:is(.accGreen)) text,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accIndigo):has(:is(.accIndigo)) .nodeLabel,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accIndigo):has(:is(.accIndigo)) .nodeLabel *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accIndigo):has(:is(.accIndigo)) .label,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accIndigo):has(:is(.accIndigo)) .label *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accIndigo):has(:is(.accIndigo)) foreignObject,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accIndigo):has(:is(.accIndigo)) foreignObject *,
+:is(#ml-diagram-theme, .md-typeset) .mermaid g.node:not(.accIndigo):has(:is(.accIndigo)) text {
+  fill: #111827 !important;
+  color: #111827 !important;
 }
 
 /* Tighten admonition / details spacing and align body text with the title.

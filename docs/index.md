@@ -1,5 +1,4 @@
 ---
-title: ML Perf Handbook
 hide:
   - navigation
   - toc

@@ -12,7 +12,7 @@ flowchart TD
     C -.kernels & parallelism.-> B
     B --> D[Part IV: Capstones]
     C --> D
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
     class B flagship;
 ```
 

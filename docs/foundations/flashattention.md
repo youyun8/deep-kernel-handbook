@@ -107,7 +107,7 @@ flowchart LR
     class h1 idle;
     class h2 idle;
     class f2 flagship;
-    classDef flagship fill:#5e35b1,stroke:#311b92,color:#fff;
+    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
     classDef idle fill:#eef2f7,stroke:#94a3b8,color:#475569;
 ```
 
