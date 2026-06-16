@@ -41,7 +41,6 @@ flowchart TD
     L2 --> H["HBM (global)<br/>GB-scale · ~2–5 TB/s · the roofline's β"]
     H --> P["host / PCIe / NVMe<br/>huge · slow · offloading lives here"]
     class H flagship;
-    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 | Space | NVIDIA | AMD | Scope | Rough role |

@@ -107,8 +107,6 @@ flowchart LR
     class h1 idle;
     class h2 idle;
     class f2 flagship;
-    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
-    classDef idle fill:#eef2f7,stroke:#94a3b8,color:#475569;
 ```
 
 Memory traffic to HBM is now $O(N d)$ (read $Q,K,V$ once, write $O$ once) instead

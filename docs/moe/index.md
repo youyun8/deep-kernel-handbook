@@ -30,7 +30,6 @@ flowchart TD
     S --> y[output]
     E2[Expert 2 FFN]:::idle
     E4[Expert 4 FFN]:::idle
-    classDef idle fill:#eef2f7,stroke:#94a3b8,color:#475569;
 ```
 
 ## Pages, in order

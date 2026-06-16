@@ -59,7 +59,6 @@ flowchart LR
     Z2 --> P[+ parameters]
     P --> Z3[ZeRO-3 / FSDP<br/>also shard params]
     class Z3 flagship;
-    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 Each stage shards progressively more, trading communication for memory.
@@ -118,7 +117,6 @@ flowchart TD
       end
     end
     class EP flagship;
-    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 Read outermost-to-innermost: DP/ZeRO wraps everything (tolerates slow links),

@@ -39,7 +39,6 @@ flowchart LR
     CACHE --> ATTN
     ATTN --> OUT["output token t"]
     class CACHE flagship;
-    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 This is the single most important inference optimization. But it moves the
@@ -87,7 +86,6 @@ flowchart TD
     end
     class gk1 flagship;
     class gk2 flagship;
-    classDef flagship fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 Fewer KV heads → smaller cache → less bandwidth per decode step, at some quality

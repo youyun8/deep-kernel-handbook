@@ -32,7 +32,6 @@ flowchart LR
     P --> N["pick 'mat'"]
     N -.->|"append, repeat"| T
     class M accViolet;
-    classDef accViolet fill:#ede9fe,stroke:#7c3aed,color:#111827;
 ```
 
 That feedback loop — append the predicted token and run again — is
@@ -53,7 +52,6 @@ flowchart LR
     TXT["'cat'"] -->|tokenizer| ID["id = 2543"]
     ID -->|"row lookup in E [V×d]"| VEC["x ∈ ℝ^d<br/>(one token vector)"]
     class VEC accTeal;
-    classDef accTeal fill:#ccfbf1,stroke:#0f766e,color:#111827;
 ```
 
 A sequence of $N$ tokens becomes a matrix $X \in \mathbb{R}^{N \times d}$ — one
@@ -99,7 +97,6 @@ flowchart TD
     V2["values v_j of all tokens"] --> WS
     class DOT accBlue;
     class SM accBlue;
-    classDef accBlue fill:#dbeafe,stroke:#2563eb,color:#111827;
 ```
 
 Written for the whole sequence at once (the form you'll see everywhere):
@@ -122,7 +119,6 @@ flowchart LR
     K["Kᵀ [d_h × N]"] --> MM
     MM --> S["scores S [N × N]<br/>S_ij = how much i attends to j"]
     class S accCyan;
-    classDef accCyan fill:#cffafe,stroke:#0891b2,color:#111827;
 ```
 
 The $\sqrt{d_h}$ divisor keeps the dot products from growing with dimension
@@ -169,7 +165,6 @@ flowchart TD
     H3 --> C
     C --> O["× W_O → output [N × d]"]
     class C accIndigo;
-    classDef accIndigo fill:#e0e7ff,stroke:#4f46e5,color:#111827;
 ```
 
 !!! note "Heads are where MQA / GQA / MLA act"
@@ -194,7 +189,6 @@ flowchart LR
     U --> A["activation σ<br/>(GELU / SwiGLU)"]
     A --> D["W_down → [d]"]
     class A accGreen;
-    classDef accGreen fill:#dcfce7,stroke:#16a34a,color:#111827;
 ```
 
 !!! tip "This is exactly what MoE makes sparse"
@@ -228,8 +222,6 @@ flowchart TD
     R2 --> OUT["x'  [N × d]  (same shape)"]
     class ATT accBlue;
     class FFN accGreen;
-    classDef accBlue fill:#dbeafe,stroke:#2563eb,color:#111827;
-    classDef accGreen fill:#dcfce7,stroke:#16a34a,color:#111827;
 ```
 
 The key invariant: **a block takes $[N,d]$ and returns $[N,d]$**. That's what lets
@@ -254,7 +246,6 @@ flowchart TD
     LOG --> SM["softmax → next-token probs"]
     class B1 accRose;
     class BL accRose;
-    classDef accRose fill:#ffe4e6,stroke:#e11d48,color:#111827;
 ```
 
 A model is specified by a handful of numbers: width $d$, number of layers $L$,
@@ -281,8 +272,6 @@ flowchart TD
     end
     class P2 accAmber;
     class D2 accTeal;
-    classDef accAmber fill:#fef3c7,stroke:#d97706,color:#111827;
-    classDef accTeal fill:#ccfbf1,stroke:#0f766e,color:#111827;
 ```
 
 - **Prefill / training** processes many tokens together: the matmuls are large and
