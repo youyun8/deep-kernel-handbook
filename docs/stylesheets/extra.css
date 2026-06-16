@@ -58,6 +58,24 @@
   --ml-roofline-end: #fbbf24;
 }
 
+/* Keep Mermaid figures on the same palette in light and dark page themes. */
+[data-md-color-scheme="slate"] .md-typeset .mermaid {
+  --ml-diagram-bg: #ffffff;
+  --ml-diagram-node-bg: #ffffff;
+  --ml-diagram-node-muted-bg: #eef2f7;
+  --ml-diagram-node-stroke: #0f766e;
+  --ml-diagram-node-muted-stroke: #94a3b8;
+  --ml-diagram-edge: #475569;
+  --ml-diagram-text: #111827;
+  --ml-diagram-muted-text: #475569;
+  --ml-diagram-label-bg: #ffffff;
+  --ml-diagram-cluster-bg: rgba(15, 118, 110, 0.08);
+  --ml-diagram-cluster-stroke: rgba(15, 118, 110, 0.42);
+  --ml-diagram-accent-bg: #ede9fe;
+  --ml-diagram-accent-stroke: #7c3aed;
+  --ml-diagram-accent-text: #111827;
+}
+
 /* Slightly wider content column for math + code heavy pages. */
 .md-grid {
   max-width: 68rem;
@@ -238,6 +256,34 @@ figure > figcaption {
 }
 
 .md-typeset .mermaid {
+  /* Material renders Mermaid SVGs in a shadow root; these variables are what
+     its injected Mermaid themeCSS can inherit from the host element. */
+  --md-mermaid-edge-color: var(--ml-diagram-edge);
+  --md-mermaid-font-family: var(--md-text-font-family, sans-serif);
+  --md-mermaid-label-bg-color: var(--ml-diagram-label-bg);
+  --md-mermaid-label-fg-color: var(--ml-diagram-text);
+  --md-mermaid-node-bg-color: var(--ml-diagram-node-bg);
+  --md-mermaid-node-fg-color: var(--ml-diagram-node-stroke);
+  --md-mermaid-sequence-actor-bg-color: var(--ml-diagram-node-bg);
+  --md-mermaid-sequence-actor-border-color: var(--ml-diagram-node-stroke);
+  --md-mermaid-sequence-actor-fg-color: var(--ml-diagram-text);
+  --md-mermaid-sequence-actor-line-color: var(--ml-diagram-edge);
+  --md-mermaid-sequence-actorman-bg-color: var(--ml-diagram-node-bg);
+  --md-mermaid-sequence-actorman-line-color: var(--ml-diagram-node-stroke);
+  --md-mermaid-sequence-box-bg-color: var(--ml-diagram-cluster-bg);
+  --md-mermaid-sequence-box-fg-color: var(--ml-diagram-text);
+  --md-mermaid-sequence-label-bg-color: var(--ml-diagram-accent-bg);
+  --md-mermaid-sequence-label-fg-color: var(--ml-diagram-accent-text);
+  --md-mermaid-sequence-loop-bg-color: var(--ml-diagram-cluster-bg);
+  --md-mermaid-sequence-loop-border-color: var(--ml-diagram-cluster-stroke);
+  --md-mermaid-sequence-loop-fg-color: var(--ml-diagram-text);
+  --md-mermaid-sequence-message-fg-color: var(--ml-diagram-text);
+  --md-mermaid-sequence-message-line-color: var(--ml-diagram-edge);
+  --md-mermaid-sequence-note-bg-color: var(--ml-diagram-label-bg);
+  --md-mermaid-sequence-note-border-color: var(--ml-diagram-node-muted-stroke);
+  --md-mermaid-sequence-note-fg-color: var(--ml-diagram-text);
+  --md-mermaid-sequence-number-bg-color: var(--ml-diagram-accent-stroke);
+  --md-mermaid-sequence-number-fg-color: var(--ml-diagram-label-bg);
   margin: 1.2rem 0;
   padding: 0.9rem;
   border: 1px solid var(--ml-border);
@@ -435,10 +481,13 @@ figure > figcaption {
 .md-typeset .mermaid .nodeLabel *,
 .md-typeset .mermaid .node .label,
 .md-typeset .mermaid .node .label *,
+.md-typeset .mermaid .node foreignObject,
+.md-typeset .mermaid .node foreignObject *,
 .md-typeset .mermaid .label text,
+.md-typeset .mermaid tspan,
 .md-typeset .mermaid text {
-  fill: var(--ml-diagram-text);
-  color: var(--ml-diagram-text);
+  fill: var(--ml-diagram-text) !important;
+  color: var(--ml-diagram-text) !important;
 }
 
 .md-typeset .mermaid .edgePath .path,
@@ -554,15 +603,6 @@ figure > figcaption {
 .md-typeset .mermaid .accGreen  { --ml-acc-bg: #dcfce7; --ml-acc-stroke: #16a34a; --ml-acc-text: #111827; }
 .md-typeset .mermaid .accIndigo { --ml-acc-bg: #e0e7ff; --ml-acc-stroke: #4f46e5; --ml-acc-text: #111827; }
 
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accViolet { --ml-acc-bg: #6d28d9; --ml-acc-stroke: #c4b5fd; --ml-acc-text: #ffffff; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accTeal   { --ml-acc-bg: #0f766e; --ml-acc-stroke: #5eead4; --ml-acc-text: #ffffff; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accBlue   { --ml-acc-bg: #1d4ed8; --ml-acc-stroke: #93c5fd; --ml-acc-text: #ffffff; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accCyan   { --ml-acc-bg: #0e7490; --ml-acc-stroke: #67e8f9; --ml-acc-text: #ffffff; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accAmber  { --ml-acc-bg: #b45309; --ml-acc-stroke: #fbbf24; --ml-acc-text: #ffffff; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accRose   { --ml-acc-bg: #be123c; --ml-acc-stroke: #fda4af; --ml-acc-text: #ffffff; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accGreen  { --ml-acc-bg: #15803d; --ml-acc-stroke: #86efac; --ml-acc-text: #ffffff; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accIndigo { --ml-acc-bg: #4338ca; --ml-acc-stroke: #a5b4fc; --ml-acc-text: #ffffff; }
-
 /* Mermaid emits per-diagram classDef rules inside the SVG with an ID selector.
    The inert ID in :is() gives these theme overrides enough specificity to keep
    text readable when those generated rules also use !important. */
@@ -582,9 +622,10 @@ figure > figcaption {
 :is(#ml-diagram-theme, .md-typeset) .mermaid .node foreignObject,
 :is(#ml-diagram-theme, .md-typeset) .mermaid .node foreignObject *,
 :is(#ml-diagram-theme, .md-typeset) .mermaid .label text,
+:is(#ml-diagram-theme, .md-typeset) .mermaid tspan,
 :is(#ml-diagram-theme, .md-typeset) .mermaid text {
-  fill: var(--ml-diagram-text);
-  color: var(--ml-diagram-text);
+  fill: var(--ml-diagram-text) !important;
+  color: var(--ml-diagram-text) !important;
 }
 
 :is(#ml-diagram-theme, .md-typeset) .mermaid .flagship rect,
