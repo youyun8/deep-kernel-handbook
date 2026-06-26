@@ -53,7 +53,7 @@ including where warp/wavefront width (32 vs 64), occupancy, and API names differ
 This repo is built to be **usable on first deploy**: the Foundations and the
 Mixture-of-Experts flagship pages are written in depth with runnable code.
 Some Part III/IV pages are intentionally shipped as clearly-labeled scaffolds
-(they carry a "部分實作 — 歡迎貢獻" banner). Nothing unfinished
+(they carry a "部分實作" banner). Nothing unfinished
 is dressed up as finished.
 
 ---
