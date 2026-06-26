@@ -158,7 +158,7 @@
 }
 
 .md-typeset h1 {
-  max-width: 26ch;
+  max-width: 42ch;
   margin-bottom: 0.5rem;
   color: var(--md-default-fg-color);
   font-family: var(--ml-serif);
@@ -266,22 +266,30 @@
 
 /* Sidebar: roomier, rounded active pills, clearer hierarchy. */
 .md-nav {
-  font-size: 0.72rem;
+  font-size: 0.73rem;
+  line-height: 1.5;
+}
+
+.md-sidebar {
+  padding-top: 1.4rem;
 }
 
 .md-nav__title {
   color: var(--md-default-fg-color--light);
   font-size: 0.66rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
+/* Every clickable row: comfortable padding, rounded hit area, smooth states. */
 .md-nav__item .md-nav__link {
-  border-radius: 0.5rem;
-  padding: 0.32rem 0.6rem;
-  margin: 0.06rem 0;
-  transition: background-color 130ms ease, color 130ms ease;
+  border-radius: 0.55rem;
+  padding: 0.34rem 0.62rem;
+  margin: 0.08rem 0;
+  color: var(--md-default-fg-color--light);
+  transition: background-color 140ms ease, color 140ms ease,
+    padding-left 140ms ease;
 }
 
 .md-nav__link:hover {
@@ -289,17 +297,64 @@
   color: var(--md-default-fg-color);
 }
 
+/* Active page: a soft tinted pill with an accent rail on the leading edge. */
 .md-nav__link--active,
 .md-nav__link[aria-current="page"] {
-  background: color-mix(in srgb, var(--ml-accent-cool) 14%, transparent);
+  position: relative;
+  background: color-mix(in srgb, var(--ml-accent-cool) 12%, transparent);
   color: var(--ml-accent-cool) !important;
   font-weight: 700;
 }
 
-/* Top-level section labels in the sidebar read as quiet group headers. */
-.md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link {
-  font-weight: 400;
+.md-nav--primary
+  .md-nav__item
+  .md-nav__link--active::before,
+.md-nav--primary
+  .md-nav__item
+  .md-nav__link[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: 0.18rem;
+  top: 0.42rem;
+  bottom: 0.42rem;
+  width: 3px;
+  border-radius: 999rem;
+  background: var(--ml-accent-cool);
+}
+
+/* Top-level part labels ("第一部 · …") read as quiet, confident group headers. */
+.md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link,
+.md-nav--primary
+  > .md-nav__list
+  > .md-nav__item
+  > .md-nav__container
+  > .md-nav__link {
+  margin-top: 0.7rem;
+  padding-left: 0.62rem;
+  font-family: var(--ml-serif);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   color: var(--md-default-fg-color);
+}
+
+.md-nav--primary
+  > .md-nav__list
+  > .md-nav__item:first-child
+  > .md-nav__link {
+  margin-top: 0;
+}
+
+/* Nested children: a faint guide rail so hierarchy is legible at a glance. */
+.md-nav--primary .md-nav__item .md-nav__list {
+  margin-left: 0.62rem;
+  padding-left: 0.55rem;
+  border-left: 1px solid var(--ml-border);
+}
+
+/* Expand/collapse chevrons inherit the muted ink and animate gently. */
+.md-nav__icon {
+  transition: transform 160ms ease;
 }
 
 .md-sidebar__scrollwrap::-webkit-scrollbar {
@@ -309,11 +364,29 @@
   background: var(--ml-border-strong);
   border-radius: 999rem;
 }
+.md-sidebar__scrollwrap {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ml-border-strong) transparent;
+}
 
-/* TOC active marker */
+/* Right-hand TOC: tighter, with a clear active marker and no heavy pill. */
+.md-nav--secondary .md-nav__title {
+  color: var(--md-default-fg-color--light);
+}
+
+.md-nav--secondary .md-nav__link {
+  color: var(--md-default-fg-color--light);
+}
+
+.md-nav--secondary .md-nav__link:hover {
+  background: transparent;
+  color: var(--md-default-fg-color);
+}
+
 .md-nav--secondary .md-nav__link--active {
   background: transparent;
   color: var(--ml-accent-cool) !important;
+  font-weight: 700;
 }
 
 /* ---------- 5. Cards, buttons, tables, figures --------------------------- */

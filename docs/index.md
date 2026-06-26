@@ -45,17 +45,17 @@ hide:
 
 <div class="grid cards" markdown>
 
-- :material-book-open-variant:**讀手冊**
+- :material-book-open-variant: **讀手冊**
 
   先建立共同語彙：FLOPs、bytes、roofline、attention memory traffic、
   MoE routing、expert parallelism 與 all-reduce。
 
-- :material-speedometer:**看 profiling**
+- :material-speedometer: **看 profiling**
 
   每個效能結論都要能回到 trace、kernel 名稱、shape 與測量方法。
   不只記住「哪裡慢」，也要知道為什麼慢。
 
-- :material-code-braces:**對原始碼**
+- :material-code-braces: **對原始碼**
 
   章節會標出 AITER / SGLang / kernel wrapper 的實際檔案位置，讓你能
   從 profiling bucket 直接跳到需要修改或 tune 的路徑。
@@ -81,7 +81,7 @@ roofline 與資料搬移。
 </section>
 
 <section class="curriculum-card curriculum-card--feature" markdown>
-<span class="curriculum-card__eyebrow">第二部 · flagship</span>
+<span class="curriculum-card__eyebrow">第二部</span>
 
 ### :material-expansion-card: Mixture-of-Experts
 

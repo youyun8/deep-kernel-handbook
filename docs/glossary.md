@@ -74,7 +74,7 @@ KV 頭）。
 **PagedAttention**
 ：以區塊為單位配置 KV cache（如虛擬記憶體分頁），消除碎片並支援共享。
 
-## Experts 的混合物
+## Mixture-of-Experts
 
 **MoE（Mixture-of-Experts）**
 ：含許多 expert FFN 與一個 router 的層，每個 token 只啟動其中幾個，把總參數和每 token FLOP 解耦。

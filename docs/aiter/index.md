@@ -68,7 +68,7 @@ Kimi-K2.5 走 DeepSeek-V3 語言模型實作（runtime log：
 
 ---
 
-## 2. decode 一層在做什麼
+## 2. Decode 一層在做什麼
 
 在 decode 階段，每一步每個 sequence 只進一個新 token，但每一層仍要走完整的
 attention、MoE 與 tensor-parallel communication。`analyze_decode_trace.py` 把一層
