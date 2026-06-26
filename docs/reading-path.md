@@ -56,7 +56,21 @@ flowchart TD
 3. 部署：[量化](performance/quantization.md) → [推論最佳化](performance/inference-optimization.md)
 4. 永遠：[Profiling 與方法論](performance/profiling.md)——趁早讀、常常回頭重讀。
 
-## 第 4 階段 — 實戰專案（進階）
+## 第 4 階段 — AITER（進階）
+
+把前三部的觀念對到一條*具名、可量測*的真實執行路徑上。**建議先讀完第 2、3 階段再進來。**
+
+1. [AITER decode 深入解析](aiter/index.md)——以 Kimi-K2.5 MXFP4 的 decode trace 為例，
+   把 Chrome/Kineto bucket 一路對回 SGLang→AITER 呼叫、Python dispatcher 與底層 HIP / CK /
+   FlyDSL kernel，並用 roofline 解釋為何 MoE expert GEMM 是 decode 的主瓶頸。
+
+??? note "第 4 階段的先備知識"
+    第 1 階段的 roofline 與 KV cache（[作為系統的 Transformer](foundations/transformer-systems.md)、
+    [Attention 效率](foundations/attention-efficiency.md)）、第 2 階段的
+    [MoE kernels](moe/kernels.md) 與 [MoE decode 剖析](moe/decode-anatomy.md)，以及第 3 階段的
+    [Profiling 與方法論](performance/profiling.md)。不需要 AMD GPU 就能讀懂分析；要重現量測才需要 MI355X 等硬體。
+
+## 第 5 階段 — 實戰專案（進階）
 
 把整套首尾接起來。
 
@@ -91,3 +105,12 @@ flowchart TD
     [分散式訓練](performance/distributed-training.md) →
     [系統與 EP](moe/systems-ep.md) →
     [擴展到更大規模](capstones/scaling.md)。
+
+=== "我想讀真實 trace / 調 AITER kernel"
+
+    [作為系統的 Transformer](foundations/transformer-systems.md)（roofline）→
+    [Attention 效率](foundations/attention-efficiency.md)（MLA/KV cache）→
+    [MoE kernels](moe/kernels.md) →
+    [MoE decode 剖析](moe/decode-anatomy.md) →
+    [Profiling 與方法論](performance/profiling.md) →
+    [AITER decode 深入解析](aiter/index.md)。

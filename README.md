@@ -43,7 +43,8 @@ genuinely runnable and verified.
 | **I · Foundations** | Transformer as a *system* (FLOPs, memory, arithmetic intensity, roofline); attention efficiency (KV cache, FlashAttention from scratch, paged attention); numerics & precision (fp32/bf16/fp16/fp8). |
 | **II · Mixture-of-Experts (flagship)** | Why sparsity; MoE layer from scratch; load balancing (aux loss, capacity, aux-loss-free bias); routing variants; training stability; expert parallelism & all-to-all; MoE kernels in Triton/CUDA/HIP; inference & serving; case studies (DeepSeek-V3, Mixtral, Qwen, Kimi). |
 | **III · Performance** | GPU programming model (CUDA & ROCm/HIP side by side); Triton and CUDA/HIP kernel tracks; distributed training (DP/TP/PP/SP/EP, ZeRO, collectives); quantization, pruning, distillation; inference optimization; profiling methodology. |
-| **IV · Capstones** | Build a small MoE LM end-to-end, then optimize it and report measured speedups; a guide to scaling it with the parallelism techniques. |
+| **IV · AITER** | A named, measurable decode execution path on AMD: mapping Kimi-K2.5 MXFP4 profiler traces back through the SGLang→AITER call path, Python dispatchers, and the underlying HIP/CK/FlyDSL kernels — with a roofline explanation of why MoE expert GEMM dominates decode. |
+| **V · Capstones** | Build a small MoE LM end-to-end, then optimize it and report measured speedups; a guide to scaling it with the parallelism techniques. |
 
 ROCm/HIP is treated as a **first-class target** alongside CUDA throughout —
 including where warp/wavefront width (32 vs 64), occupancy, and API names differ.
