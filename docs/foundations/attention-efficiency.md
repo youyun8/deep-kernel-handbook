@@ -1,35 +1,35 @@
-# Attention efficiency
+# attention 效率
 
 <div class="page-meta">
-  <span class="chip"><strong>Level:</strong> beginner → intermediate</span>
-  <span class="chip"><strong>Prereqs:</strong> <a href="../transformer-systems/">transformer as a system</a>, attention</span>
-  <span class="chip"><strong>Hardware:</strong> none</span>
+  <span class="chip"><strong>等級：</strong>初級→中階</span>
+  <span class="chip"><strong>先備知識：</strong> <a href="../transformer-systems/">Transformer作為系統</a>、attention</span>
+  <span class="chip"><strong>硬體：</strong> 無</span>
 </div>
 
-Attention is where the systems story gets interesting, because **the same op is
-compute-bound in training and memory-bound at inference**. This page covers the
-KV cache (why it exists and what it costs), why decoding hits a memory wall, and
-how paged attention manages the cache without wasting memory.
+attention 是系統故事變得有趣的地方，因為**相同的操作是
+training 中受計算限制，inference**中受記憶體限制。此頁面涵蓋
+KV 快取（為什麼存在以及它的成本），為什麼 decoding 會遇到記憶體牆，以及
+分頁 attention 如何在不浪費記憶體的情況下管理快取。
 
-## Recap: scaled dot-product attention
+## 回顧：縮放點積 attention
 
-For queries $Q\in\mathbb{R}^{N\times d}$, keys $K$, values $V$:
+對於查詢 $Q\in\mathbb{R}^{N\times d}$、鍵 $K$、值 $V$：
 
 $$ \text{Attn}(Q,K,V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d}} + M\right) V $$
 
-with causal mask $M$ (upper triangle $=-\infty$). Two matmuls and a row-softmax.
-In training we compute this for all $N$ query positions at once.
+帶有因果掩碼 $M$（上三角形 $=-\infty$）。兩個 matmul 和一個 row-softmax。
+在 training 中，我們一次計算所有 $N$ 查詢位置的值。
 
-## The KV cache: trading memory for FLOPs
+## KV 快取：用記憶體換取 FLOP
 
-At inference we generate one token at a time. Naively, to produce token $t$ we'd
-recompute attention over the whole prefix — re-projecting all previous tokens'
-keys and values every step, an $O(N^2)$ waste. Instead we **cache** the keys and
-values of every position we've already seen. Step $t$ then:
+在 inference，我們一次產生一個 token。天真地，要生產 token $t$，我們會
+在整個前綴上重新計算 attention — 重新投影所有先前的 tokens'
+每一步的鍵和值，都是 $O(N^2)$ 的浪費。相反，我們**緩存**密鑰並且
+我們已經看到的每個職位的價值觀。步驟 $t$ 然後：
 
-1. Projects only the *new* token to get $q_t, k_t, v_t$.
-2. Appends $k_t, v_t$ to the cache.
-3. Attends $q_t$ against the *cached* $K_{1:t}, V_{1:t}$.
+1. 僅投影*新* token 以獲得 $q_t, k_t, v_t$。
+2. 將 $k_t, v_t$ 附加到快取。
+3. 針對*快取的*$K_{1:t}, V_{1:t}$ 參加 $q_t$。
 
 ```mermaid
 flowchart LR
@@ -41,25 +41,23 @@ flowchart LR
     class CACHE flagship;
 ```
 
-This is the single most important inference optimization. But it moves the
-bottleneck: the cache must be **read in full every single step**.
+這是 inference 最重要的一項最佳化。但它移動了
+瓶頸：必須**每一步都完整讀取快取**。
 
-### What the cache costs
+### 快取的成本是多少
 
-Per token, per layer, the cache stores $K$ and $V$: $2 \cdot n_{kv} \cdot d_h$
-values, where $n_{kv}$ is the number of **KV heads** and $d_h$ the head dim. In
-bytes (2 for bf16):
+每個 token，每層，快取儲存 $K$ 和 $V$：$2 \cdot n_{kv} \cdot d_h$
+值，其中 $n_{kv}$ 是**KV 磁頭**的數量，$d_h$ 是磁頭暗度。在
+位元組（bf16 為 2）：
 
-$$ \text{cache bytes} = 2 \cdot L \cdot n_{kv} \cdot d_h \cdot 2 \cdot N \cdot B. $$
+$$ \text{cache bytes} = 2 \cdot L \cdot n\_{kv} \cdot d_h \cdot 2 \cdot N \cdot B. $$
 
-For a Llama-2-13B-shaped model ($L=40$, $n_{kv}=40$ heads, $d_h=128$) at
-$N=4096$, $B=1$: $2\cdot40\cdot40\cdot128\cdot2\cdot4096 \approx 3.4$ GB — for a
-*single sequence*. Push $B$ or $N$ and the KV cache, not the weights, becomes
-your memory limit. This single equation motivates:
+對於 Llama-2-13B 型模型（$L=40$、$n_{kv}=40$ 頭、$d_h=128$），位於
+$N=4096$、$B=1$：$2\cdot40\cdot40\cdot128\cdot2\cdot4096 \approx 3.4$ GB — 用於
+_單一序列_。推送 $B$ 或 $N$ 並且 KV 快取（而不是權重）變成
+你的記憶體限制。這個單一方程式激發了：
 
-- **Multi-Query Attention (MQA)** — one KV head shared by all query heads ($n_{kv}=1$).
-- **Grouped-Query Attention (GQA)** — a few KV heads, each shared by a group (the modern default).
-- **Multi-head Latent Attention (MLA)** — DeepSeek's low-rank compression of the KV cache (see [case studies](../moe/case-studies.md)).
+-**多重查詢 attention (MQA)**— 所有查詢頭共用一個 KV 頭 ($n_{kv}=1$)。 -**分組查詢 attention (GQA)**— 幾個 KV 頭，每個頭由一個群組共用（現代預設設定）。 -**多頭潛在 attention (MLA)**— DeepSeek 的 KV 快取低階壓縮（請參閱 [case studies](../moe/case-studies.md)）。
 
 ```mermaid
 flowchart TD
@@ -88,51 +86,49 @@ flowchart TD
     class gk2 flagship;
 ```
 
-Fewer KV heads → smaller cache → less bandwidth per decode step, at some quality
-cost. GQA is the sweet spot most production models pick; MLA pushes further by
-compressing KV to a low-rank latent.
+更少的 KV 頭 → 更小的快取 → 每個 decode 步驟的頻寬更少，在一定品質下
+成本。 GQA 是大多數量產車型的最佳選擇； MLA 進一步推動
+將 KV 壓縮到低秩潛在變數。
 
-GQA with $n_{kv}=8$ instead of 40 cuts the cache 5× with negligible quality
-loss — a pure systems win baked into the architecture.
+GQA 使用 $n_{kv}=8$ 而不是 40 將快取削減 5 倍，品質可以忽略不計
+損失——架構中的純粹系統勝利。
 
-## Why decoding is memory-bound
+## 為什麼 decoding 受記憶體限制
 
-Apply the roofline. At decode step $t$, batch $B=1$, attention does
-$O(t\cdot d_h\cdot n_{heads})$ FLOPs but must **read** the entire KV cache,
-$O(t\cdot n_{kv}\cdot d_h)$ values. Arithmetic intensity is $O(1)$ — independent
-of $t$ and tiny. The attention step, and indeed the whole decode step (which
-also re-reads all model weights to produce one token), is **bandwidth-bound**.
+應用 roofline。在 decode 步驟$t$，批次$B=1$，attention 執行
+$O(t\cdot d_h\cdot n_{heads})$ FLOP，但必須**讀取**整個 KV 緩存，
+$O(t\cdot n_{kv}\cdot d_h)$ 值。 算術強度 是 $O(1)$ — 獨立
+$t$ 且很小。 attention 步驟，實際上是整個 decode 步驟（其中
+也重新讀取所有模型權重以產生一個 token），是**頻寬限制**。
 
-The consequences drive all of LLM serving:
+後果驅動所有 LLM serving：
 
-- **Per-token latency is set by bytes read, not FLOPs.** Halving weight bytes
-  (e.g. int8/fp8 weights) ~halves decode latency at batch 1.
-- **Throughput comes from batching.** Run $B$ requests together and the weight
-  read amortizes over $B$ tokens, raising intensity toward the ridge —
-  the basis of [continuous batching](../performance/inference-optimization.md).
-- **Prefill ≠ decode.** Prefill processes the whole prompt at once (many tokens,
-  compute-bound); decode is one token (memory-bound). Good serving systems
-  schedule them differently and even
-  [disaggregate](../performance/inference-optimization.md) them onto separate
-  hardware.
+-**Per-token latency 由讀取的位元組設置，而不是 FLOP。**將權重位元組減半
+（例如 int8/fp8 權重）〜在第 1 批中將 decode latency 減半。 -**throughput 來自批次。**一起運行 $B$ 請求和權重
+讀取攤銷於 $B$ tokens，向山脊方向提高強度 —
+[continuous batching](../performance/inference-optimization.md) 的基礎。 -**prefill ≠ decode。**prefill 一次處理整個提示（許多 tokens，
+計算限制）； decode 是 token 之一（受記憶體限制）。良好的 serving 系統
+以不同的方式安排它們，甚至
+[disaggregate](../performance/inference-optimization.md) 將它們分開
+硬體。
 
-## Paged attention: stop wasting the cache
+## 分頁 attention：停止浪費緩存
 
-A naive server pre-allocates a contiguous KV buffer per request sized to the
-*maximum* sequence length. Two problems: **internal fragmentation** (a request
-that stops at 200 tokens still holds a 4096-token buffer) and inability to share
-memory between requests with a common prefix.
+初始伺服器為每個請求預先分配一個連續的 KV 緩衝區，大小為
+*最大*序列長度。兩個問題：**內部碎片**（一個請求
+停止於 200 tokens 仍保留 4096-token 緩衝區）並且無法共享
+具有公共前綴的請求之間的記憶體。
 
-**PagedAttention** (from vLLM) borrows virtual memory's idea: chop the KV cache
-into fixed-size **blocks** (e.g. 16 tokens) and keep a per-request **block
-table** mapping logical positions to physical blocks. Now:
+**Pagedattention**（來自 vLLM）借用了虛擬記憶體的想法：砍掉 KV 緩存
+分成固定大小的**塊**（例如 16 tokens）並保留每個請求的**塊
+表**將邏輯位置對應到物理區塊。現在：
 
-- Blocks are allocated on demand → near-zero internal fragmentation (only the
-  last partial block of each sequence is wasted).
-- Beam search / parallel samples / shared system prompts **share** physical
-  blocks copy-on-write.
-- The attention kernel gathers K/V through the block table instead of assuming
-  contiguity.
+- 按需分配區塊 → 內部碎片接近零（僅
+  每個序列的最後部分區塊被浪費）。
+- 束搜尋/平行樣本/共享系統提示**共享**物理
+  阻止寫入時複製。
+- attention kernel 透過塊表收集 K/V，而不是假設
+  連續性。
 
 ```mermaid
 flowchart LR
@@ -144,50 +140,49 @@ flowchart LR
     t2 -.block table.-> p9[Phys block 9]
 ```
 
-This routinely doubles serving throughput by letting you fit more concurrent
-sequences in the same HBM. We return to it in
-[inference & serving](../moe/inference-serving.md), where MoE adds *expert*
-memory pressure on top of KV pressure.
+這通常會使 serving throughput 增加一倍，讓你適應更多並發
+相同 HBM 中的序列。我們回到它
+[inference & serving](../moe/inference-serving.md)，其中 MoE 加 _expert_
+記憶體壓力高於 KV 壓力。
 
-## Where FlashAttention fits
+## Flashattention 適合的地方
 
-The above is about *inference* memory. **FlashAttention** attacks a different
-cost: in *training/prefill* the $N\times N$ score matrix is huge and writing it
-to HBM is the bottleneck. The next page derives FlashAttention from scratch —
-it never materializes the score matrix, using **online softmax** and **tiling**
-to keep everything in on-chip SRAM. It's the canonical example of "raise
-arithmetic intensity by fusing," straight from the roofline playbook.
+以上是關於*inference*記憶體的內容。**Flashattention**攻擊方式不同
+成本：在 _training/prefill_ 中，$N\times N$ 分數矩陣很大並且寫入它
+HBM 是瓶頸。下一頁從頭開始衍生 Flashattention——
+它永遠不會使用**在線 softmax**和**平鋪**來具體化分數矩陣
+將所有內容儲存在片上 SRAM 中。這是「提高
+算術強度 透過融合”，直接來自 roofline 劇本。
 
-## Key takeaways
+## 要點
 
-- The **KV cache** turns $O(N^2)$ recompute into $O(N)$ compute + an
-  ever-growing memory read. Its size, $2 L n_{kv} d_h \cdot 2 N B$ bytes, often
-  dominates inference memory.
-- GQA/MQA/MLA are *architectural* attacks on KV-cache size.
-- **Decoding is memory-bandwidth-bound**; latency tracks bytes moved, throughput
-  comes from batching. Prefill is compute-bound.
-- **PagedAttention** eliminates KV fragmentation and enables sharing, the way
-  paging does for virtual memory.
+-**KV 快取**將 $O(N^2)$ 重新計算變成 $O(N)$ 計算 +
+不斷增長的記憶體讀取。它的大小，$2 L n_{kv} d_h \cdot 2 N B$字節，經常
+支配 inference 記憶體。
 
-## Exercises
+- GQA/MQA/MLA 是對 KV 快取大小的「架構」攻擊。 -**decoding 受記憶體頻寬限制**；latency 追蹤移動的字節，throughput
+  來自批次處理。 prefill 受計算限制。 -**Pagedattention**消除了 KV 碎片並啟用共享，這樣
+  分頁用於虛擬記憶體。
 
-!!! tip "Solutions"
-    Worked answers are on the [Part solutions page](../solutions/foundations.md). Try each exercise before expanding.
+## 練習
 
-1. Compute the KV-cache size for a GQA model with $L=32$, $n_{kv}=8$, $d_h=128$
-   at $N=8192$, $B=16$, bf16. Compare to the model weights (~7B params).
-2. Derive the arithmetic intensity of a single decode attention step as a
-   function of $t$. Confirm it's $O(1)$.
-3. With 16-token blocks, what fraction of KV memory is wasted (last-block
-   fragmentation) for sequences uniformly distributed in $[1, 4096]$?
-4. MLA compresses K/V to a latent of dim $d_c \ll n_{kv}d_h$. Write the
-   cache-size ratio vs GQA and explain the compute/memory trade it makes at
-   decode time.
+!!! tip "解決方案"
+    參考解答位於 [解答頁](../solutions/foundations.md) 上。請先嘗試每個練習，再展開解答。
 
-## References
+1. 使用 $L=32$、$n_{kv}=8$、$d_h=128$ 計算 GQA 模型的 KV 快取大小
+   在 $N=8192$、$B=16$、bf16。與模型權重（~7B 參數）進行比較。
+2. 匯出單一 decode attention 步驟的 算術強度 作為
+   $t$的功能。確認它是$O(1)$。
+3. 對於 16-token 區塊，浪費了多少 KV 記憶體（最後一個區塊
+   碎片）對於均勻分佈在 $[1, 4096]$ 中的序列？
+4. MLA 將 K/V 壓縮為暗淡 $d_c \ll n_{kv}d_h$ 的潛在值。寫下
+   快取大小比率與 GQA 的比較，並解釋其在計算/記憶體方面的權衡
+   decode 時間。
 
-- Shazeer. *Fast Transformer Decoding: One Write-Head is All You Need* (MQA). 2019.
-- Ainslie et al. *GQA: Training Generalized Multi-Query Transformer Models.* 2023.
-- Dao et al. *FlashAttention.* 2022. (derived next page)
-- Kwon et al. *Efficient Memory Management for LLM Serving with PagedAttention* (vLLM). 2023.
-- DeepSeek-AI. *DeepSeek-V2 / V3 Technical Reports* (MLA). 2024.
+## 參考文獻
+
+- 沙澤爾。 _快速 Transformer decoding：你只需要一個寫頭_ (MQA)。 2019.
+- 安斯利等人。 _GQA：training 通用多查詢 Transformer 模型。 _ 2023 年。
+- 道等人。 _Flashattention._ 2022。 （源自下一頁）
+- 權等人。 _使用 Pagedattention_ (vLLM) 實現 LLM serving 的高效能記憶體管理。 2023 年。
+- DeepSeek-AI。 _DeepSeek-V2 / V3 技術報告_ (MLA)。 2024 年。

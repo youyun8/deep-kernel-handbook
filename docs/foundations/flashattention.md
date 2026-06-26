@@ -1,21 +1,21 @@
-# FlashAttention from scratch
+# Flashattention 從頭開始
 
 <div class="page-meta">
-  <span class="chip"><strong>Level:</strong> intermediate</span>
-  <span class="chip"><strong>Prereqs:</strong> <a href="../attention-efficiency/">attention efficiency</a>, softmax, roofline</span>
-  <span class="chip"><strong>Code:</strong> <code>code/attention/</code> (runs on CPU)</span>
+  <span class="chip"><strong>等級：</strong>中階</span>
+  <span class="chip"><strong>先備知識：</strong> <a href="../attention-efficiency/">attention 效率</a>、softmax、roofline</span>
+  <span class="chip"><strong>代碼：</strong> <code>code/attention/</code>（在CPU上運行）</span>
 </div>
 
-FlashAttention is the textbook example of the roofline playbook: it computes
-*exactly the same* attention output but **never writes the $N\times N$ score
-matrix to HBM**, turning a memory-bound op into a compute-bound one. The trick
-is **online softmax** — computing a numerically-stable softmax in a single
-streaming pass — combined with **tiling**. We derive both here and give a numpy
-reference you can run and check against PyTorch.
+Flashattention 是 roofline 劇本的教科書範例：它計算
+_完全相同_ attention 輸出，但**從不寫入 $N\times N$ 分數
+矩陣到 HBM**，將受記憶體限制的操作轉變為受計算限制的操作。竅門
+是**online softmax**— 在一次計算中計算數值穩定的 softmax
+流傳遞－與**平鋪**結合。我們在這裡推導出兩者並給出一個 numpy
+你可以運行並檢查 PyTorch 的參考。
 
-## The problem with naive attention
+## naive attention 的問題
 
-Standard attention for one query block:
+一個查詢區塊的標準 attention：
 
 ```python
 S = Q @ K.T / sqrt(d)      # [N, N]  <- materialized in HBM
@@ -23,55 +23,55 @@ P = softmax(S, axis=-1)    # [N, N]  <- read + write again
 O = P @ V                  # [N, d]
 ```
 
-The score matrix $S$ is $N\times N$. At $N=8192$ that's 67M entries — written to
-HBM, read back for the softmax, written again, read again for $PV$. The matmuls
-are cheap relative to this traffic; we're **memory-bound on a quadratic
-tensor**. We want to produce $O$ while only ever holding small *tiles* of $S$ in
-on-chip SRAM.
+得分矩陣 $S$ 為 $N\times N$。在 $N=8192$ 中，有 67M 個條目 — 寫入
+HBM，讀回 softmax，再寫入，再讀取$PV$。馬特穆爾斯
+相對於該流量來說便宜；我們在二次方上受**內存限制
+張量**。我們想要生產 $O$，同時只持有 $S$ 的小*磁磚*
+片上 SRAM。
 
-The obstacle: **softmax needs a normalizer over the whole row** ($\sum_j
-e^{s_j}$), which seems to require all of $S$ at once. Online softmax removes that
-obstacle.
+障礙：**softmax 需要對整行進行歸一化器**($\sum_j
+立即 e^{s_j}$), which seems to require all of $S$。在線 softmax 刪除了這一點
+障礙。
 
-## Online softmax: the running-max trick
+## 線上 softmax：running-max 技巧
 
-We want $\text{softmax}(x)_i = e^{x_i - m} / \sum_j e^{x_j - m}$ where
-$m=\max_j x_j$ (subtracting the max is what keeps it numerically stable — see
-[numerics](numerics-precision.md)). Suppose we see $x$ in two chunks
-$x^{(1)}, x^{(2)}$ and want to combine partial results.
+我們想要 $\text{softmax}(x)_i = e^{x_i - m} / \sum_j e^{x_j - m}$ 在哪裡
+$m=\max_j x_j$（減去最大值可以保持數值穩定 - 請參閱
+[numerics](numerics-precision.md)）。假設我們看到 $x$ 分成兩個區塊
+$x^{(1)}, x^{(2)}$ 並且想要合併部分結果。
 
-Maintain a running max $m$ and running denominator $\ell$. After chunk 1:
+保持運行最大值 $m$ 和運行分母 $\ell$。在區塊 1 之後：
 
-$$ m_1 = \max(x^{(1)}), \qquad \ell_1 = \sum_{j} e^{x^{(1)}_j - m_1}. $$
+$$ m*1 = \max(x^{(1)}), \qquad \ell_1 = \sum*{j} e^{x^{(1)}\_j - m_1}. $$
 
-When chunk 2 arrives with local max $m_2' = \max(x^{(2)})$, the **new global
-max** is $m_2 = \max(m_1, m_2')$. The old denominator was computed against the
-*old* max, so we **rescale** it by $e^{m_1 - m_2}$ before adding the new chunk's
-contribution:
+當區塊 2 以本地最大值 $m_2' = \max(x^{(2)})$ 到達時，**新的全域
+最大**為$m_2 = \max(m_1, m_2')$。舊分母是根據
+*舊*最大值，所以我們在新增區塊之前透過 $e^{m_1 - m_2}$**重新調整**它
+貢獻：
 
-$$ \ell_2 = e^{m_1 - m_2}\,\ell_1 + \sum_j e^{x^{(2)}_j - m_2}. $$
+$$ \ell_2 = e^{m_1 - m_2}\,\ell_1 + \sum_j e^{x^{(2)}\_j - m_2}. $$
 
-That correction factor $e^{m_{\text{old}} - m_{\text{new}}}$ is the entire idea.
-It lets us fold in chunks one at a time and get the *exact* softmax denominator
-at the end — never needing all of $x$ simultaneously.
+校正因子 $e^{m_{\text{old}} - m_{\text{new}}}$ 就是整個想法。
+它讓我們一次折疊一個區塊並得到*精確的*softmax 分母
+最後 — 永遠不需要同時使用所有 $x$。
 
-### Extending to the weighted sum $O = PV$
+### 擴展到加權和$O = PV$
 
-Attention doesn't just need the denominator; it needs $O = \sum_j p_j v_j$ with
-$p_j = e^{s_j - m}/\ell$. Keep an **unnormalized** running output
-$\tilde{O} = \sum_j e^{s_j - m} v_j$ and rescale it by the *same* factor whenever
-the max updates:
+attention 不僅需要分母，還需要分母。它需要 $O = \sum_j p_j v_j$
+$p_j = e^{s_j - m}/\ell$。保持**非標準化**運行輸出
+$\tilde{O} = \sum_j e^{s_j - m} v_j$ 並在任何時候透過「相同」因子重新調整它
+最大更新次數：
 
-$$ \tilde{O} \leftarrow e^{m_{\text{old}} - m_{\text{new}}}\,\tilde{O} + \sum_{j \in \text{block}} e^{s_j - m_{\text{new}}}\, v_j. $$
+$$ \tilde{O} \leftarrow e^{m*{\text{old}} - m*{\text{new}}}\,\tilde{O} + \sum*{j \in \text{block}} e^{s_j - m*{\text{new}}}\, v_j. $$
 
-At the very end, $O = \tilde{O} / \ell$. We now have a streaming algorithm that
-touches each key/value block exactly once.
+最後，$O = \tilde{O} / \ell$。我們現在有一個流演算法
+每個鍵/值區塊恰好接觸一次。
 
-## The tiled algorithm
+## 平鋪演算法
 
-Split $K, V$ into blocks of $B_c$ rows and $Q$ into blocks of $B_r$ rows. For
-each query block, loop over key/value blocks, maintaining $(m, \ell, \tilde O)$
-per query row:
+將 $K, V$ 拆分為 $B_c$ 行區塊，將 $Q$ 拆分為 $B_r$ 行區塊。對於
+每個查詢區塊，循環鍵/值區塊，維護 $(m, \ell, \tilde O)$
+每個查詢行：
 
 ```text
 for each query block Qi:                      # outer (rows of output)
@@ -109,23 +109,23 @@ flowchart LR
     class f2 flagship;
 ```
 
-Memory traffic to HBM is now $O(N d)$ (read $Q,K,V$ once, write $O$ once) instead
-of $O(N^2)$. The score tiles live and die in SRAM. The FLOPs are unchanged — so
-on the roofline we've moved sharply **right** (higher intensity) and the kernel
-becomes compute-bound. That's the whole win.
+HBM 的記憶體流量現在為 $O(N d)$（讀取 $Q,K,V$ 一次，寫入 $O$ 一次）
+$O(N^2)$。分數區塊在 SRAM 中存在和消失。 FLOP 沒有改變——所以
+在 roofline 上，我們急劇**右**（更高強度）和 kernel
+變得受計算限制。這就是全部勝利。
 
-!!! note "The backward pass"
-    The backward pass recomputes the tiles of $S$ on the fly (cheap) rather than
-    storing them — trading a little extra compute for a massive memory saving.
-    FlashAttention-2 improves work partitioning (fewer rescalings, parallelize
-    over the sequence dim); FlashAttention-3 exploits Hopper's async copy
-    (TMA) and fp8. The *math above is identical* across all versions.
+!!! note "向後傳遞"
+    向後傳遞會動態重新計算 $S$ 的圖塊（便宜），而不是
+    儲存它們——用一點額外的計算來節省大量的記憶體。
+    Flashattention-2 改進了工作分區（更少的重新縮放、並行化
+    在序列上變暗）； Flashattention-3 利用 Hopper 的非同步複製
+    （TMA）和 fp8。 _以上數學在所有版本中都是相同的_。
 
-## Reference implementation (runnable)
+## 參考實作（可運行）
 
-A faithful, readable numpy implementation lives in
-[`code/attention/flash_attention_numpy.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/attention/flash_attention_numpy.py).
-The core loop:
+一個忠實的、可讀的 numpy 實作位於
+[`code/attention/flash_attention_numpy.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/attention/flash_attention_numpy.py)。
+核心循環：
 
 ```python
 import numpy as np
@@ -159,53 +159,53 @@ def flash_attention(Q, K, V, block=64, causal=True):
     return O
 ```
 
-The test [`code/attention/test_attention.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/attention/test_attention.py)
-checks it against a dense PyTorch reference with `torch.allclose` (atol 1e-5) for
-random inputs, with and without the causal mask. Run it:
+測試[`code/attention/test_attention.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/attention/test_attention.py)
+使用 `torch.allclose` (atol 1e-5) 對照密集的 PyTorch 參考進行檢查
+隨機輸入，帶或不帶因果掩碼。運行它：
 
 ```bash
 pip install -r code/requirements.txt
 pytest code/attention -q
 ```
 
-A standalone [`online_softmax.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/attention/online_softmax.py)
-shows the running-max combiner in isolation and proves it equals a one-shot
-softmax — read that first if the rescaling feels like magic.
+獨立的 [`online_softmax.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/attention/online_softmax.py)
+孤立地展示了 running-max 組合器並證明它等於一次性
+softmax－如果重新縮放感覺像魔法一樣，請先閱讀這篇文章。
 
-The GPU version (a real tiled Triton kernel) is in the
-[Triton track](../performance/triton-track.md); the same online-softmax math
-reappears, just with `tl.load`/`tl.dot` over SRAM tiles.
+GPU 版本（真正的平鋪 Triton kernel）位於
+[Triton track](../performance/triton-track.md)；相同的線上 softmax 數學
+再次出現，只是 `tl.load`/`tl.dot` 位於 SRAM 區塊上。
 
-## Key takeaways
+## 要點
 
-- Softmax's row-normalizer seems to block streaming, but **online softmax**
-  computes the exact result in one pass via a running max $m$, running
-  denominator $\ell$, and the correction factor $e^{m_{\text{old}}-m_{\text{new}}}$.
-- FlashAttention tiles $Q,K,V$ and keeps score tiles in SRAM, cutting HBM traffic
-  from $O(N^2)$ to $O(Nd)$ — a roofline move from memory-bound to compute-bound.
-- The output is **numerically identical** to naive attention (up to fp rounding);
-  it's a systems optimization, not an approximation.
-- The same algorithm underlies FA-2/FA-3 and every fused attention kernel,
-  including the MoE-friendly ones.
+- Softmax 的行歸一化器似乎會阻止串流傳輸，但**線上 softmax**
+  透過運行最大值 $m$ 一次計算精確結果，運行
+  分母 $\ell$ 和校正因子 $e^{m_{\text{old}}-m_{\text{new}}}$。
+- Flashattention 平鋪 $Q,K,V$ 並將得分平鋪保留在 SRAM 中，從而減少 HBM 流量
+  從 $O(N^2)$ 到 $O(Nd)$ — roofline 從記憶體綁定到計算綁定的轉變。
+- 輸出與簡單的 attention**數字相同**（最高 fp 舍入）；
+  這是系統最佳化，而不是近似值。
+- FA-2/FA-3 和每個融合的 attention kernel 的演算法相同，
+  包括 MoE 友善的。
 
-## Exercises
+## 練習
 
-!!! tip "Solutions"
-    Worked answers are on the [Part solutions page](../solutions/foundations.md). Try each exercise before expanding.
+!!! tip "解決方案"
+    參考解答位於 [解答頁](../solutions/foundations.md) 上。請先嘗試每個練習，再展開解答。
 
-1. Prove the online-softmax combiner is exact: show that folding in chunks gives
-   the same $\ell$ and $\tilde O$ as computing softmax over the full row.
-2. Why subtract the running max at all? Construct inputs (e.g. scores of +100)
-   where skipping it overflows fp16, and confirm the stable version survives.
-3. Modify the reference to skip key tiles that are *fully* masked under causality
-   (already partially done) and measure the FLOP reduction for $N=4096$.
-4. Estimate HBM bytes moved by naive vs flash attention at $N=8192, d=128$ and
-   place both on an H100 roofline.
+1. 證明 online-softmax 組合器是精確的：表示按塊折疊給出
+   與在整行上計算 softmax 相同的 $\ell$ 和 $\tilde O$。
+2. 為什麼要減去跑步最大值？建構輸入（例如 +100 的分數）
+   跳過它會溢出 fp16，並確認穩定版本仍然存在。
+3. 修改參考以跳過在因果關係下「完全」掩蓋的關鍵圖塊
+   （已經部分完成）並測量 $N=4096$ 的 FLOP 減少量。
+4. 估計 $N=8192, d=128$ 處 naive 與閃存 attention 移動的 HBM 位元組，以及
+   將兩者都放置在 H100 roofline 上。
 
-## References
+## 參考文獻
 
-- Milakov & Gimelshein. *Online normalizer calculation for softmax.* 2018.
-- Dao, Fu, Ermon, Rudra, Ré. *FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness.* 2022.
-- Dao. *FlashAttention-2.* 2023.
-- Shah et al. *FlashAttention-3.* 2024.
-- Rabe & Staats. *Self-attention Does Not Need $O(n^2)$ Memory.* 2021.
+- 米拉科夫和吉梅爾謝因。 _softmax 的線上標準化器計算。 _ 2018。
+- Dao、Fu、Ermon、Rudra、Ré。 _Flashattention：快速且記憶體高效的精確 attention，具有 IO 感知功能。 _ 2022 年。
+- 道。 _Flashattention-2。 _ 2023 年。
+- 沙阿等人。 _Flashattention-3。 _ 2024 年。
+- 拉貝和斯塔茨。 _自製 attention 不需要$O(n^2)$記憶體。 _ 2021。

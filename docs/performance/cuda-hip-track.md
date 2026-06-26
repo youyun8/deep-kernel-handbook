@@ -1,43 +1,43 @@
-# CUDA / HIP track
+# CUDA/HIP 軌道
 
 <div class="page-meta">
-  <span class="chip"><strong>Level:</strong> advanced</span>
-  <span class="chip"><strong>Prereqs:</strong> <a href="../gpu-programming/">GPU programming model</a>, C++</span>
-  <span class="chip"><strong>Hardware:</strong> NVIDIA (CUDA) or AMD (ROCm/HIP) GPU + toolchain</span>
+  <span class="chip"><strong>等級：</strong> 高階</span>
+  <span class="chip"><strong>先決條件：</strong> <a href="../gpu-programming/">GPU程式設計模型</a>、C++</span>
+  <span class="chip"><strong>硬體：</strong> NVIDIA (CUDA) 或 AMD (ROCm/HIP) GPU + 工具鏈</span>
 </div>
 
-When you need control Triton doesn't expose — custom data layouts, specific
-matrix-core instructions, fine-grained async pipelines — you drop to CUDA or HIP.
-This track treats **portability across NVIDIA and AMD as a first-class concern**:
-the source is nearly identical, but the tuning is not, and we make those
-differences explicit throughout.
+當你需要控制時，Triton 不會公開 — 自訂資料佈局、特定的
+矩陣核心指令、細粒度非同步管道—你可以使用 CUDA 或 HIP。
+該賽道將**跨 NVIDIA 和 AMD 的可移植性視為首要關注點**：
+來源幾乎相同，但調音不同，我們製作了這些
+差異貫穿始終。
 
-## HIP is "CUDA with a different prefix"
+## HIP 是“具有不同前綴的 CUDA”
 
-AMD's HIP mirrors the CUDA API almost name-for-name. Much code ports by running
-`hipify` (a search-and-replace of `cuda*` → `hip*`) and recompiling with `hipcc`.
-The same `.cpp` can target both via the `__HIP_PLATFORM_*` macros. So the
-*portability* is easy; the *performance portability* is the work.
+AMD 的 HIP 幾乎完全反映了 CUDA API。透過運行可以移植很多程式碼
+`hipify`（`cuda*`→`hip*`的搜尋與取代）並以`hipcc`重新編譯。
+相同的 `.cpp` 可以透過 `__HIP_PLATFORM_*` 巨集來定位兩者。所以
+*便攜性*很容易； *效能可移植性*就是工作。
 
-| Concept | CUDA | HIP / ROCm |
-|---|---|---|
-| Compiler | `nvcc` | `hipcc` |
-| Launch | `kernel<<<g,b,sh,st>>>(...)` | `hipLaunchKernelGGL(kernel,g,b,sh,st,...)` or `<<<>>>` |
-| Device malloc | `cudaMalloc` | `hipMalloc` |
-| Memcpy | `cudaMemcpy` | `hipMemcpy` |
-| Stream | `cudaStream_t` | `hipStream_t` |
-| Lock-step width | warp = **32** | wavefront = **64** |
-| On-chip scratch | `__shared__` (SMEM) | `__shared__` (LDS) |
-| Warp shuffle | `__shfl_down_sync(mask,...)` | `__shfl_down(...)` (no mask) |
-| Tensor matmul | Tensor Cores: `wmma` / `mma.sync` | Matrix Cores: `__builtin_amdgcn_mfma_*` / rocWMMA |
-| BLAS | cuBLAS / cuBLASLt | hipBLAS / hipBLASLt |
-| Templated GEMM | CUTLASS | Composable Kernel (CK) |
-| Profiler | Nsight Compute / Systems | rocprof / Omniperf |
+| 概念        | CUDA                          | HIP/ROCm                                               |
+| ----------- | ----------------------------- | ------------------------------------------------------ |
+| 編譯器      | `nvcc`                        | `hipcc`                                                |
+| 發佈        | `kernel<<<g,b,sh,st>>>(...)`  | `hipLaunchkernelGGL(kernel,g,b,sh,st,...)` 或 `<<<>>>` |
+| 設備 malloc | `cudaMalloc`                  | `hipMalloc`                                            |
+| 記憶體複製  | `cudaMemcpy`                  | `hipMemcpy`                                            |
+| 流          | `cudaStream_t`                | `hipStream_t`                                          |
+| 鎖步寬度    | 扭曲 =**32**                  | 波前 =**64**                                           |
+| 片上刮痕    | `__shared__` (SMEM)           | `__shared__` (LDS)                                     |
+| 扭曲洗牌    | `__shfl_down_sync(mask,...)`  | `__shfl_down(...)`（無面罩）                           |
+| 張量矩陣乘  | 張量核心：`wmma` / `mma.sync` | 矩陣核心：`__builtin_amdgcn_mfma_*` / rocWMMA          |
+| 布拉斯      | cuBLAS / cuBLASLt             | 庫布拉斯 hipBLAS/hipBLASLt                             |
+| 模板化 GEMM | 彎刀                          | 可組合 kernel (CK)                                     |
+| 探查器      | Nsight 計算/系統              | rocprof/Omniperf                                       |
 
-## A portable reduction (the wavefront trap)
+## 便攜式還原（波前陷阱）
 
-The classic bug: a warp-level reduction hardcoded to 32 lanes silently drops half
-the data on a 64-wide wavefront. Write it against `warpSize`:
+經典錯誤：硬編碼為 32 通道的扭曲等級減少默默地下降了一半
+64 寬波前的數據。針對 `warpSize` 編寫：
 
 ```cpp
 // Portable warp/wavefront sum reduction.
@@ -53,16 +53,16 @@ __device__ float warp_reduce_sum(float v) {
 }
 ```
 
-`warpSize` is 32 on NVIDIA and 64 on AMD, so the loop runs the right number of
-steps automatically. Hardcoding `16` as the first offset would be a correctness
-bug on AMD — the canonical portability mistake.
+`warpSize` 在 NVIDIA 上為 32，在 AMD 上為 64，因此循環運行正確的數量
+自動執行步驟。將 `16` 硬編碼為第一個偏移量是正確的
+AMD 上的錯誤－典型的可移植性錯誤。
 
-## Shared-memory tiled matmul (portable core)
+## 共享記憶體平鋪 matmul（可移植核心）
 
-The textbook tiled GEMM is identical source on both platforms; only the launch
-and tuning differ. Each block stages `TILE×TILE` sub-blocks of A and B into
-on-chip memory (SMEM/LDS), reused across the inner loop — the
-[golden rule](gpu-programming.md) made concrete:
+兩個平台上的教科書平鋪 GEMM 的來源相同；僅發射
+和調音不同。每個區塊將 A 和 B 的 `TILE×TILE` 子區塊放入
+片上記憶體 (SMEM/LDS)，在內循環中重複使用 —
+[golden rule](gpu-programming.md)混凝土：
 
 ```cpp
 #define TILE 16
@@ -87,35 +87,32 @@ __global__ void matmul_tiled(const float* A, const float* B, float* C,
 }
 ```
 
-This portable version is for *understanding*. For production you'd use the matrix
-cores: `mma`/`wmma`/CUTLASS on NVIDIA, `mfma`/rocWMMA/Composable-Kernel on AMD —
-or just call cuBLASLt/hipBLASLt. Tuning that *does* differ:
+這個便攜式版本是為了*理解*。對於生產，你可以使用矩陣
+核心：NVIDIA 上的 `mma`/`wmma`/CUTLASS、AMD 上的 `mfma`/rocWMMA/Composable-kernel —
+或直接呼叫 cuBLASLt/hipBLASLt。調整*確實*有所不同：
 
-- **TILE / block size**: a 16×16 block is 8 warps on NVIDIA, 4 wavefronts on AMD
-  → different occupancy; AMD often prefers different tile shapes.
-- **LDS sizing & bank conflicts** are tuned per architecture.
-- **Async copy / pipelining**: NVIDIA `cp.async` (and Hopper TMA) vs AMD's async
-  LDS loads — different intrinsics for the same idea.
+-**TILE/區塊大小**：16×16 區塊在 NVIDIA 上有 8 個扭曲，在 AMD 上有 4 個波前
+→ 不同的佔用； AMD 通常喜歡不同的瓷磚形狀。 -**LDS 大小和庫衝突**根據架構進行調整。 -**非同步複製/管線**：NVIDIA `cp.async`（和 Hopper TMA）與 AMD 的非同步
+LDS 負載－同一想法不同的內在。
 
-## Async pipelines and the matrix cores (where they diverge most)
+## 非同步管道和矩陣核心（它們分歧最大的地方）
 
-The highest-performance GEMM/attention kernels overlap global→shared copies with
-matrix-core math in a software pipeline. The *concept* is shared; the *primitives*
-differ:
+最高效能的 GEMM/attention kernels 重疊全域 → 共用副本
+軟體管道中的矩陣核心數學。 *概念*是共享的； _原語_
+不同：
 
-- **NVIDIA**: `cp.async` to prefetch tiles, `mma.sync` / `wgmma` (Hopper) for
-  matmul, TMA for bulk async copies; build with CUTLASS for the heavy lifting.
-- **AMD (CDNA3/MI300)**: `mfma` instructions (e.g. 16×16×16, 32×32×8 shapes) for
-  matmul, async LDS loads for prefetch; build with Composable Kernel.
+-**NVIDIA**：`cp.async` 用於預取圖塊，`mma.sync` / `wgmma`（料斗）用於
+matmul、TMA 用於批量非同步複製；使用 CUTLASS 進行建置以應對繁重的工作。 -**AMD (CDNA3/MI300)**：`mfma` 指令（例如 16×16×16、32×32×8 形狀）
+matmul，非同步 LDS 載入以進行預取；使用可組合 kernel 進行建置。
 
-A hand-written cross-vendor pipelined GEMM is a large undertaking — which is
-exactly why most people use Triton (auto-maps to both) or the vendor BLASLt
-libraries, dropping to raw CUDA/HIP only for the last few percent or for ops the
-libraries don't cover.
+手寫的跨供應商管線 GEMM 是一項艱鉅的任務 - 這是
+到底為什麼大多數人使用 Triton（自動映射到兩者）或供應商 BLASLt
+庫，僅在最後百分之幾或操作中下降到原始 CUDA/HIP
+圖書館不涵蓋。
 
-## Building and integrating with PyTorch
+## 建置並與 PyTorch 集成
 
-Wrap a kernel as a PyTorch extension so it's callable from Python:
+將 kernel 包裝為 PyTorch 擴展，以便可以從 Python 呼叫：
 
 ```python
 # setup via torch.utils.cpp_extension; one source compiles for both backends.
@@ -124,38 +121,39 @@ mod = load(name="myk", sources=["myk.cu"],   # hipify handles ROCm builds
            extra_cuda_cflags=["-O3"])
 ```
 
-On ROCm, PyTorch's build uses `hipcc` and `hipify_torch` transparently — the same
-`.cu` typically compiles for both. The
-[MoE permutation kernels](../moe/kernels.md) ship in both `.cu` and `_hip.cpp`
-forms to show the (small) differences explicitly.
+在 ROCm 上，PyTorch 的建造透明地使用 `hipcc` 和 `hipify_torch` — 相同
+`.cu` 通常針對兩者進行編譯。的
+[MoE permutation kernels](../moe/kernels.md) 以 `.cu` 和 `_hip.cpp` 形式出貨
+形式來明確顯示（小的）差異。
 
-## Key takeaways
+## 要點
 
-- **HIP ≈ CUDA with renamed APIs**; `hipify` + `hipcc` ports most source. The
-  hard part is **performance portability**, not source portability.
-- The recurring traps: **wavefront 64 vs warp 32** (use `warpSize`, never
-  hardcode), **shuffle mask argument**, **LDS vs SMEM tuning**, and **MFMA vs
-  Tensor Core** matmul paths.
-- Use **CUTLASS / Composable Kernel** or **cuBLASLt / hipBLASLt** for production
-  GEMMs; hand-write only what libraries/Triton can't give you.
-- Profile with the right tool: **Nsight** (NVIDIA) vs **rocprof/Omniperf** (AMD).
+-**HIP ≈ CUDA 並重新命名 API**； `hipify` + `hipcc` 移植大部分來源。的
+困難的部分是**效能可移植性**，而不是源可移植性。
 
-## Exercises
+- 重複出現的陷阱：**波前 64 與扭曲 32**（使用 `warpSize`，從不
+  硬編碼），**洗牌掩碼參數**，**LDS 與 SMEM 調整**，以及**MFMA 與
+  Tensor Core**matmul 路徑。
+- 使用**CUTLASS / 可組合 kernel**或**cuBLASLt / hipBLASLt**進行生產
+  GEMM；隻手寫圖書館/Triton 無法提供的內容。
+- 使用正確的工具進行設定：**Nsight**(NVIDIA) 與**rocprof/Omniperf**(AMD)。
 
-!!! tip "Solutions"
-    Worked answers are on the [Part solutions page](../solutions/performance.md). Try each exercise before expanding.
+## 練習
 
-1. Port the tiled matmul to HIP, build with `hipcc` (or via PyTorch on ROCm), and
-   verify against cuBLAS/hipBLAS.
-2. Find the largest first-offset bug: take a 32-lane reduction and demonstrate it
-   fails on a 64-wide wavefront; fix with `warpSize`.
-3. Benchmark `TILE` ∈ {8,16,32} on your GPU; relate the best value to occupancy
-   and warp/wavefront count.
-4. Replace the inner product with a matrix-core call (`wmma` or rocWMMA) and
-   measure the speedup over the scalar inner loop.
+!!! tip "解決方案"
+參考解答位於 [解答頁](../solutions/performance.md) 上。請先嘗試每個練習，再展開解答。
 
-## References
+1. 將平鋪 matmul 移植到 HIP，使用 `hipcc` 建置（或透過 ROCm 上的 PyTorch），以及
+   針對 cuBLAS/hipBLAS 進行驗證。
+2. 找出最大的第一個偏移 bug：減少 32 車道並進行示範
+   在 64 寬波前上失敗；用 `warpSize` 修復。
+3. 在你的 GPU 上對 `TILE` ∈ {8,16,32} 進行基準測試；將最佳價值與入住率連結起來
+   和扭曲/波前計數。
+4. 將內積替換為矩陣核心呼叫（`wmma` 或 rocWMMA）並
+   測量標量內循環的加速比。
 
-- NVIDIA CUDA C++ Programming Guide; CUTLASS docs.
-- AMD HIP Programming Guide; ROCm `hipify`; Composable Kernel; rocWMMA.
-- NVIDIA *cp.async*/TMA and CDNA3 *MFMA* ISA references.
+## 參考文獻
+
+- NVIDIA CUDA C++ 程式設計指南；彎刀文件。
+- AMD HIP 程式指南； ROCm `hipify`;可組合 kernel； rocWMMA。
+- NVIDIA _cp.async_/TMA 和 CDNA3 _MFMA_ ISA 參考。

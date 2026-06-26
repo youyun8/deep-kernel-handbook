@@ -7,136 +7,131 @@ hide:
 <section class="home-hero" markdown>
 <div class="home-hero__copy" markdown>
 
-# Learn SOTA ML systems from scratch
+<p class="home-kicker">ML 系統效能路線</p>
 
-Modern machine learning is a *systems* discipline. Knowing the math of a
-transformer is table stakes; the leverage is in understanding **how it runs**
-on real hardware: the FLOPs, bytes, kernels, collectives, and trade-offs that
-decide whether a model is practical.
+# 從模型到 GPU kernel 的完整效能手冊
 
-This handbook teaches state-of-the-art ML techniques together with the systems
-work that makes them efficient. Each core component moves from **intuition** to
-**math**, then to a **clean reference implementation**, then to the optimized
-version that scales across GPUs.
+現代機器學習已經是系統工程。理解 Transformer 的數學只是起點；真正
+決定模型能不能被有效部署的，是 FLOPs、記憶體流量、kernel、collective、
+量化格式，以及這些選擇在 GPU 上互相牽制的方式。
+
+這份手冊把每個核心主題拆成**直覺 → 數學 → 參考實作 → 效能化版本**。
+你會看到乾淨的 PyTorch/Triton/CUDA/HIP 版本，也會看到實際 profiling
+如何指出瓶頸，最後如何把瓶頸對應回可修改的原始碼。
 
 <div class="home-actions" markdown>
-[Start the reading path :material-arrow-right:](reading-path.md){ .md-button .md-button--primary }
-[Jump to the MoE flagship](moe/index.md){ .md-button }
+[開始閱讀路線 :material-arrow-right:](reading-path.md){ .md-button .md-button--primary }
+[查看 AITER 深入解析](aiter/index.md){ .md-button }
 </div>
 
 </div>
 
 <div class="home-hero__panel" aria-label="Course scope" markdown="0">
-<div class="home-kicker">Flagship track</div>
-<div class="home-panel-title">Mixture-of-Experts</div>
-<div class="home-panel-copy">From sparse scaling and router math to all-to-all dispatch, grouped GEMM, inference serving, and case studies.</div>
+<div class="home-kicker">核心深挖</div>
+<div class="home-panel-title">Kimi-K2.5 · MoE · AITER</div>
+<div class="home-panel-copy">從 routing、top-k、sort、MXFP4 quant 到 stage-1 / stage-2 MoE GEMM，使用真實 decode trace 串起整條執行路徑。</div>
 <div class="home-metrics">
-<div><strong>4</strong><span>parts</span></div>
-<div><strong>9</strong><span>MoE chapters</span></div>
-<div><strong>3</strong><span>kernel paths</span></div>
+<div><strong>5</strong><span>主題部件</span></div>
+<div><strong>25</strong><span>decode stages</span></div>
+<div><strong>TP4</strong><span>MI355X 追蹤</span></div>
 </div>
 </div>
 </section>
 
 ---
 
-## What makes this different
+## 本站如何使用
 
 <div class="grid cards" markdown>
 
--   :material-function-variant: **Intuition → math → code → systems**
+- :material-book-open-variant:**讀手冊**
 
-    No hand-waving on the hard parts. When a step is subtle — online-softmax
-    rescaling, aux-loss-free routing, all-to-all bucketing — you see the
-    algebra *and* the array shapes.
+  先建立共同語彙：FLOPs、bytes、roofline、attention memory traffic、
+  MoE routing、expert parallelism 與 all-reduce。
 
--   :material-flash: **Measured, not asserted**
+- :material-speedometer:**看 profiling**
 
-    Every performance topic shows the naive version, profiles it, then the
-    optimized version with **before/after numbers** and the methodology to
-    reproduce them.
+  每個效能結論都要能回到 trace、kernel 名稱、shape 與測量方法。
+  不只記住「哪裡慢」，也要知道為什麼慢。
 
--   :material-expansion-card: **CUDA *and* ROCm/HIP, side by side**
+- :material-code-braces:**對原始碼**
 
-    AMD Instinct (MI300-class) is a first-class target, not an afterthought.
-    We flag where warp vs wavefront (32 vs 64), occupancy, and APIs differ.
-
--   :material-play-circle: **Runnable from scratch**
-
-    Reference implementations live in a tested `code/` tree — checked against
-    PyTorch with `torch.allclose`, not just pasted into prose.
+  章節會標出 AITER / SGLang / kernel wrapper 的實際檔案位置，讓你能
+  從 profiling bucket 直接跳到需要修改或 tune 的路徑。
 
 </div>
 
 ---
 
-## The curriculum
+## 課程地圖
 
 <div class="curriculum-grid" markdown>
 
 <section class="curriculum-card" markdown>
-<span class="curriculum-card__eyebrow">Part I</span>
+<span class="curriculum-card__eyebrow">第一部</span>
 
-### :material-cube-outline: Foundations
+### :material-cube-outline: 基礎
 
-Get fluent in FLOPs, bytes, arithmetic intensity, attention memory traffic, and
-precision before optimizing anything.
+建立效能分析需要的數學與系統直覺：Transformer、attention、precision、
+roofline 與資料搬移。
 
-[Open foundations](foundations/index.md){ .md-button }
+[開啟基礎篇](foundations/index.md){ .md-button }
+
 </section>
 
 <section class="curriculum-card curriculum-card--feature" markdown>
-<span class="curriculum-card__eyebrow">Part II · flagship</span>
+<span class="curriculum-card__eyebrow">第二部 · flagship</span>
 
-### :material-star-circle: Mixture-of-Experts
+### :material-expansion-card: Mixture-of-Experts
 
-Build a production-shaped MoE stack: sparsity, routing, load balancing, expert
-parallelism, kernels, serving, and case studies.
+從稀疏化、routing、load balancing 到 expert parallelism、MoE kernels
+與 serving，把 MoE 看成完整系統。
 
-[Open MoE track](moe/index.md){ .md-button .md-button--primary }
+[開啟 MoE 路線](moe/index.md){ .md-button .md-button--primary }
+
 </section>
 
 <section class="curriculum-card" markdown>
-<span class="curriculum-card__eyebrow">Part III</span>
+<span class="curriculum-card__eyebrow">第三部</span>
 
-### :material-speedometer: Performance
+### :material-flash: 效能工程
 
-Work through GPU programming, Triton, CUDA/HIP, distributed training,
-quantization, inference optimization, and profiling.
+練習 GPU programming、Triton、CUDA/HIP、distributed training、量化與
+profiling 方法論。
 
-[Open performance](performance/index.md){ .md-button }
+[開啟效能篇](performance/index.md){ .md-button }
+
 </section>
 
-<section class="curriculum-card" markdown>
-<span class="curriculum-card__eyebrow">Part IV</span>
+<section class="curriculum-card curriculum-card--feature" markdown>
+<span class="curriculum-card__eyebrow">第四部 · production trace</span>
 
-### :material-trophy: Capstones
+### :material-chart-timeline-variant: AITER 深入解析
 
-Train a small MoE LM, optimize it, report measured speedups, then apply the
-parallelism techniques that make it scale.
+用 Kimi-K2.5 MXFP4 decode trace 解析 AITER MoE stack：moe gemm 1、
+moe gemm 2、routing/sort/quant、shared expert 與 all-reduce fusion。
 
-[Open capstones](capstones/index.md){ .md-button }
+[閱讀 AITER 章節](aiter/index.md){ .md-button .md-button--primary }
+
 </section>
 
 </div>
 
 ---
 
-## Who this is for
+## 近期重點
 
-You know Python and basic deep learning (you can read a training loop and you
-know what a softmax is) and you want to understand modern ML *systems* deeply —
-from first principles up to production-grade implementations. You do **not**
-need prior GPU-programming experience; Part III builds it from the memory
-hierarchy up.
+<div class="ml-stats-grid" markdown="0">
+<div class="ml-stat"><strong>52%</strong><span>8k conc32/64 decode 中 MoE expert GEMM 約占比</span></div>
+<div class="ml-stat"><strong>2×</strong><span>stage-1 gate/up + SwiGLU 約為 stage-2 down 的時間</span></div>
+<div class="ml-stat"><strong>11-18%</strong><span>TP all-reduce 在 decode 中不易隨 batch 攤平</span></div>
+</div>
 
-!!! tip "How to read it"
-    If you're new, follow the [reading path](reading-path.md) top to bottom.
-    If you came for MoE, skim [Part I](foundations/index.md) for the systems
-    vocabulary (roofline, arithmetic intensity, all-to-all) then dive into the
-    [MoE flagship](moe/index.md).
+!!! tip "閱讀建議"
+    若你剛開始，先照 [閱讀路線](reading-path.md) 建立系統語彙；若你正在處理
+    Kimi-K2.5 / SGLang / AITER profiling，直接看 [AITER decode 深入解析](aiter/index.md)，
+    再回到 MoE 與效能章節補齊背景。
 
 ---
 
-*Content is licensed CC BY 4.0; code is MIT. Contributions welcome — see the
-[contributor guide](https://github.com/youyun8/ml-perf-handbook/blob/main/CONTRIBUTING.md).*
+_內容採 CC BY 4.0 授權；程式碼採 MIT 授權。_

@@ -1,8 +1,7 @@
-site_name: ML Perf Handbook
+site_name: ML 效能手冊
 site_description: >-
-  Learn state-of-the-art ML systems from scratch — from the math and a clean
-  reference implementation to the performance-engineered, multi-GPU version.
-  Flagship deep-dive series: Mixture-of-Experts (MoE).
+  從數學、乾淨參考實作到效能工程化的多 GPU 版本，系統化學習現代
+  ML 系統。核心深度路線：Mixture-of-Experts (MoE) 與 AITER。
 site_author: ml-perf-handbook contributors
 site_url: https://youyun8.github.io/ml-perf-handbook/
 
@@ -12,13 +11,14 @@ repo_url: https://github.com/youyun8/ml-perf-handbook
 edit_uri: edit/main/docs/
 
 copyright: >-
-  Content licensed CC BY 4.0 · Code licensed MIT — see the repository LICENSE.
+  內容採 CC BY 4.0 授權，程式碼採 MIT 授權，詳見 repository LICENSE。
 
 theme:
   name: material
-  language: en
+  language: zh-TW
   features:
     - navigation.instant
+    - navigation.instant.progress
     - navigation.tracking
     - navigation.tabs
     - navigation.sections
@@ -33,27 +33,29 @@ theme:
     - content.code.annotate
     - content.tabs.link
     - content.tooltips
+    - content.action.edit
+    - content.action.view
   palette:
     - media: "(prefers-color-scheme)"
-      primary: teal
-      accent: amber
+      primary: indigo
+      accent: blue
       toggle:
         icon: material/brightness-auto
-        name: Switch to light mode
+        name: 切換為亮色模式
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: teal
-      accent: amber
+      primary: indigo
+      accent: blue
       toggle:
         icon: material/brightness-7
-        name: Switch to dark mode
+        name: 切換為深色模式
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: teal
-      accent: amber
+      primary: indigo
+      accent: blue
       toggle:
         icon: material/brightness-4
-        name: Switch to system preference
+        name: 跟隨系統偏好
   font:
     text: Inter
     code: JetBrains Mono
@@ -74,6 +76,7 @@ extra_css:
 
 extra_javascript:
   - javascripts/katex.js
+  - javascripts/site-settings.js
   - https://unpkg.com/katex@0/dist/katex.min.js
   - https://unpkg.com/katex@0/dist/contrib/auto-render.min.js
 
@@ -122,46 +125,48 @@ plugins:
       minify_html: true
 
 nav:
-  - Home: index.md
-  - Reading path: reading-path.md
-  - "Part I · Foundations":
+  - 首頁: index.md
+  - 閱讀路線: reading-path.md
+  - "第一部 · 基礎":
       - foundations/index.md
-      - The transformer from scratch: foundations/transformer-from-scratch.md
-      - Transformer as a system: foundations/transformer-systems.md
-      - Attention efficiency: foundations/attention-efficiency.md
-      - FlashAttention from scratch: foundations/flashattention.md
-      - Numerics & precision: foundations/numerics-precision.md
-  - "Part II · Mixture-of-Experts":
+      - 從零實作 Transformer: foundations/transformer-from-scratch.md
+      - 作為系統的 Transformer: foundations/transformer-systems.md
+      - Attention 效率: foundations/attention-efficiency.md
+      - 從零實作 FlashAttention: foundations/flashattention.md
+      - 數值與精度: foundations/numerics-precision.md
+  - "第二部 · Mixture-of-Experts":
       - moe/index.md
-      - Why sparsity: moe/why-sparsity.md
-      - MoE layer from scratch: moe/moe-from-scratch.md
-      - Load balancing: moe/load-balancing.md
-      - Routing variants: moe/routing-variants.md
-      - Training stability: moe/training-stability.md
-      - Systems & expert parallelism: moe/systems-ep.md
+      - 為什麼需要稀疏化: moe/why-sparsity.md
+      - 從零實作 MoE layer: moe/moe-from-scratch.md
+      - 負載平衡: moe/load-balancing.md
+      - Routing 變體: moe/routing-variants.md
+      - 訓練穩定性: moe/training-stability.md
+      - 系統與 expert parallelism: moe/systems-ep.md
       - MoE kernels (Triton/CUDA/HIP): moe/kernels.md
-      - Inference & serving: moe/inference-serving.md
-      - Case studies: moe/case-studies.md
-      - Anatomy of an MoE decode: moe/decode-anatomy.md
-  - "Part III · Performance":
+      - 推論與 serving: moe/inference-serving.md
+      - 案例研究: moe/case-studies.md
+      - MoE decode 剖析: moe/decode-anatomy.md
+  - "第三部 · 效能":
       - performance/index.md
-      - GPU programming model: performance/gpu-programming.md
-      - Triton track: performance/triton-track.md
-      - CUDA / HIP track: performance/cuda-hip-track.md
-      - Distributed training: performance/distributed-training.md
-      - Quantization & compression: performance/quantization.md
-      - Inference optimization: performance/inference-optimization.md
-      - Profiling & methodology: performance/profiling.md
-  - "Part IV · Capstones":
+      - GPU 程式設計模型: performance/gpu-programming.md
+      - Triton 路線: performance/triton-track.md
+      - CUDA / HIP 路線: performance/cuda-hip-track.md
+      - 分散式訓練: performance/distributed-training.md
+      - 量化與壓縮: performance/quantization.md
+      - 推論最佳化: performance/inference-optimization.md
+      - Profiling 與方法論: performance/profiling.md
+  - "第四部 · AITER":
+      - AITER decode 深入解析: aiter/index.md
+  - "第五部 · Capstones":
       - capstones/index.md
-      - Build a small MoE LM: capstones/build-moe.md
-      - Scaling it up: capstones/scaling.md
-  - Solutions:
+      - 建立小型 MoE LM: capstones/build-moe.md
+      - 擴展到更大規模: capstones/scaling.md
+  - 解答:
       - solutions/index.md
-      - "Part I · Foundations": solutions/foundations.md
-      - "Part II · Mixture-of-Experts": solutions/moe.md
-      - "Part III · Performance": solutions/performance.md
-      - "Part IV · Capstones": solutions/capstones.md
-  - Reference:
-      - Glossary: glossary.md
-      - Bibliography: references.md
+      - "第一部 · 基礎": solutions/foundations.md
+      - "第二部 · Mixture-of-Experts": solutions/moe.md
+      - "第三部 · 效能": solutions/performance.md
+      - "第五部 · Capstones": solutions/capstones.md
+  - 參考資料:
+      - 詞彙表: glossary.md
+      - 書目與連結: references.md

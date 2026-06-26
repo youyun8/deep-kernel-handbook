@@ -1,223 +1,223 @@
-# Glossary
+# 術語表
 
-Concise definitions of the terms used across the handbook. Links point to the
-page where each is developed.
+手冊中使用的術語的簡明定義。連結指向
+每個開發的頁面。
 
-## Systems & performance
+## 系統和效能
 
-**Arithmetic intensity ($I$)**
-: FLOPs performed per byte moved from memory, $I = W/Q$. Determines roofline
-regime. See [transformer as a system](foundations/transformer-systems.md).
+**算術強度 ($I$)**
+：從記憶體中移動的每個位元組執行的 FLOP 數，$I = W/Q$。確定 roofline
+政權。參見 [transformer as a system](foundations/transformer-systems.md)。
 
-**Roofline model**
-: Performance bound $P=\min(\pi, \beta I)$ from peak compute $\pi$ and bandwidth
-$\beta$. The organizing idea of the whole handbook.
+**roofline 型號**
+：峰值計算 $\pi$ 和頻寬的效能限制 $P=\min(\pi, \beta I)$
+$\beta$。整本手冊的組織思路。
 
-**Compute-bound / memory-bound**
-: Limited by the math units (right of the roofline ridge) vs by memory bandwidth
-(left of it). Decoding is memory-bound; large-batch matmuls are compute-bound.
+**計算限制/記憶體限制**
+：受數學單位限制（roofline 脊右側）與 記憶體頻寬 限制
+（它的左邊）。 decoding 受記憶體限制；大批量 matmul 是受計算限制的。
 
-**MFU (model FLOPs utilization)**
-: Achieved model FLOPs ÷ peak FLOPs; $\approx 6P\cdot\text{tok/s}/\pi$ for
-training. The headline efficiency metric. See [profiling](performance/profiling.md).
+**MFU（模型 FLOP 利用率）**
+：達到的模型 FLOP 數 ÷ 峰值 FLOP 數； $\approx 6P\cdot\text{tok/s}/\pi$ 為
+training。標題效率指標。參見 [profiling](performance/profiling.md)。
 
 **HBM**
-: High-bandwidth memory — the GPU's main DRAM; the bandwidth $\beta$ in the
-roofline.
+：高頻寬記憶體－GPU 的主 DRAM；頻寬$\beta$中
+roofline。
 
-**SRAM / shared memory / LDS**
-: Fast on-chip scratchpad. "Shared memory" (NVIDIA) = "LDS" (AMD). Staging tiles
-here is how kernels raise intensity.
+**SRAM/共享記憶體/LDS**
+：快速片上暫存器。 「共享記憶體」(NVIDIA) =「LDS」(AMD)。暫存磁磚
+這是 kernels 如何提高強度的。
 
-**Warp / wavefront**
-: The lock-step SIMT execution group — **32 threads** on NVIDIA (warp), **64**
-on AMD CDNA (wavefront). A frequent portability trap. See
-[GPU programming](performance/gpu-programming.md).
+**扭曲/波前**
+：鎖步 SIMT 執行群組 — NVIDIA 上的**32 個執行緒**（扭曲），**64**
+AMD CDNA（波前）。常見的可移植性陷阱。參見
+[GPU programming](performance/gpu-programming.md)。
 
-**Occupancy**
-: Resident warps/wavefronts per SM/CU; a latency-hiding means, not the goal.
+**入住率**
+：每個 SM/CU 的駐留扭曲/波前； latency-隱藏手段，而不是目標。
 
-**Coalescing**
-: Consecutive lanes accessing consecutive addresses so memory transactions merge.
+**合併**
+：連續通道存取連續位址，以便記憶體事務合併。
 
-**Operator fusion**
-: Combining ops to avoid HBM round-trips (e.g. FlashAttention, fused MLP) — raises
-intensity.
+**算子融合**
+：組合作業以避免 HBM 往返（例如 Flashattention、融合 MLP）- 提高
+強度。
 
-**FLOPs**
-: Floating-point operations; a matmul $(m{\times}k)(k{\times}n)$ costs $2mkn$.
+**失敗次數**
+：浮點運算； matmul $(m{\times}k)(k{\times}n)$ 的成本為 $2mkn$。
 
-## Precision
+## 精度
 
 **bf16 / fp16 / fp8**
-: 16/16/8-bit floats. bf16 keeps fp32's exponent range (8 bits) and won training;
-fp16 has more mantissa but narrow range; fp8 (E4M3/E5M2) is the frontier. See
-[numerics](foundations/numerics-precision.md).
+：16/16/8 位元浮點數。 bf16 保留了 fp32 的指數範圍（8 位）並贏得了 training；
+fp16 尾數較多，但範圍較窄； fp8（E4M3/E5M2）是前緣。參見
+[numerics](foundations/numerics-precision.md)。
 
-**Mixed precision**
-: Low-precision storage/matmul + fp32 accumulation + fp32 master weights.
+**mixed precision**
+：低精度儲存/matmul+fp32 累加+fp32 主權重。
 
-**Loss scaling**
-: Multiplying the loss to keep fp16 gradients in range; largely unneeded with
-bf16.
+**損失縮放**
+：乘以損失以將 fp16 梯度保持在範圍內；基本上不需要
+BF16。
 
-## Attention
+## attention
 
-**KV cache**
-: Stored keys/values of past tokens so decoding is $O(N)$ not $O(N^2)$; often the
-dominant inference memory. See [attention efficiency](foundations/attention-efficiency.md).
+**KV 緩存**
+：儲存過去 tokens 的鍵/值，因此 decoding 是$O(N)$而不是$O(N^2)$；常常是
+主導的 inference 記憶體。參見 [attention efficiency](foundations/attention-efficiency.md)。
 
 **MQA / GQA / MLA**
-: Multi-Query / Grouped-Query / Multi-head Latent Attention — architectural ways
-to shrink the KV cache (fewer or compressed KV heads).
+：多查詢/分組查詢/多頭潛在 attention — 架構方式
+縮小 KV 快取（減少或壓縮 KV 頭）。
 
-**FlashAttention**
-: IO-aware attention that tiles $Q,K,V$ and uses online softmax to avoid
-materializing the $N{\times}N$ score matrix. See
-[FlashAttention](foundations/flashattention.md).
+**Flashattention**
+：IO 感知 attention，平鋪$Q,K,V$並使用線上 softmax 來避免
+具體化 $N{\times}N$ 分數矩陣。參見
+[Flashattention](foundations/flashattention.md)。
 
-**Online softmax**
-: Single-pass, numerically-stable softmax via a running max and the correction
-factor $e^{m_{old}-m_{new}}$.
+**線上 softmax**
+：透過運行最大值和校正的單通道、數值穩定的 softmax
+係數 $e^{m_{old}-m_{new}}$。
 
-**PagedAttention**
-: Block-based KV-cache allocation (like virtual memory paging) that removes
-fragmentation and enables sharing.
+**已分頁 attention**
+：基於區塊的 KV 快取分配（如虛擬記憶體分頁），消除了
+碎片化並實現共享。
 
-## Mixture-of-Experts
+## experts 的混合物
 
-**MoE (Mixture-of-Experts)**
-: A layer with many expert FFNs and a router that activates a few per token,
-decoupling total parameters from per-token FLOPs. See [Part II](moe/index.md).
+**MoE（experts 的混合）**
+：具有許多 expert FFN 和一個 router 的層，每個 token 激活一些，
+將總參數與每個 token FLOP 解耦。參見 [Part II](moe/index.md)。
 
-**Expert**
-: One of the parallel FFNs in an MoE layer (usually SwiGLU).
+**expert**
+：MoE 層中的平行 FFN 之一（通常是 SwiGLU）。
 
-**Router / gate**
-: The small network producing per-expert scores; top-$k$ selects experts.
-**Softmax gating** makes experts compete; **sigmoid gating** scores them
-independently.
+**router / 門**
+：產生每 expert 分數的小型網路； top-$k$ 選擇 experts。
+**Softmax 門控**使 experts 競爭；**sigmoid 門控**對它們進行評分
+獨立。
 
-**Top-$k$ routing**
-: Each token uses its $k$ highest-scoring experts.
+**頂部-$k$ routing**
+：每個 token 都使用其 $k$ 最高得分的 experts。
 
-**Token-choice vs expert-choice**
-: Tokens pick experts (coverage guaranteed, balance not) vs experts pick their
-top-$C$ tokens (balance guaranteed, coverage not). See
-[routing variants](moe/routing-variants.md).
+**token-選擇與 expert-選擇**
+：tokens 選擇 experts（保證覆蓋，不平衡） vs experts 選擇他們的
+頂部-$C$ tokens（保證餘額，不承保）。參見
+[routing variants](moe/routing-variants.md)。
 
-**Shared expert**
-: An always-on FFN added to the routed experts to absorb common knowledge and
-stabilize training.
+**共享 expert**
+：路由 experts 中新增了始終在線的 FFN，以吸收常識和
+穩定 training。
 
-**Fine-grained experts**
-: Many small experts instead of few large ones, enlarging the combinatorial mix
-space at fixed active compute.
+**細粒度 experts**
+：許多小的 experts 而不是幾個大的，擴大了組合混合
+固定活動計算的空間。
 
-**Auxiliary (load-balancing) loss**
-: Penalty $\alpha E\sum_e f_e P_e$ encouraging uniform routing. See
-[load balancing](moe/load-balancing.md).
+**輔助（負載平衡）損耗**
+：處罰 $\alpha E\sum_e f_e P_e$ 鼓勵制服 routing。參見
+[負載平衡](moe/load-balancing.md)。
 
-**Aux-loss-free balancing**
-: Balancing via a controller-updated per-expert **bias on selection** (not the
-gate weight), avoiding gradient distortion (DeepSeek-style).
+**輔助無損耗平衡**
+：透過控制器更新的 per-expert**選擇偏差**（不是
+門權重），避免梯度失真（DeepSeek 式）。
 
-**Expert capacity / capacity factor**
-: Max tokens per expert per batch; the factor trades dropped tokens (quality) vs
-padding/buffer size (throughput/memory).
+**expert 容量/容量係數**
+：每批次每個 expert 的最大 tokens；因子交易下降了 tokens（品質）與
+填滿/緩衝區大小（throughput/記憶體）。
 
-**Token dropping / overflow**
-: Tokens beyond capacity skip the MoE layer (carried by the residual).
+**token 掉落/溢出**
+：tokens 超出容量跳過 MoE 層（由殘差攜帶）。
 
-**Router z-loss**
-: $\beta(\log\sum_e e^{x_e})^2$ penalizing large router logits for stability. See
-[training stability](moe/training-stability.md).
+**router z 損耗**
+：$\beta(\log\sum_e e^{x_e})^2$ 懲罰大 router 的穩定性。參見
+[training stability](moe/training-stability.md)。
 
-**Expert parallelism (EP)**
-: Sharding experts across GPUs; tokens reach their expert via all-to-all. See
-[systems & EP](moe/systems-ep.md).
+**expert 並行度 (EP)**
+：跨 GPU 分片 experts； tokens 透過 all-to-all 到達 expert。參見
+[systems & EP](moe/systems-ep.md)。
 
-**Grouped GEMM**
-: One kernel doing many different-sized matmuls (one per expert) without padding.
+**分組 GEMM**
+：一台 kernel 執行許多不同大小的矩陣乘法（每個 expert 一個），無需填滿。
 
-**MegaBlocks / block-sparse MoE**
-: Reformulating the MoE FFN as a block-sparse matmul to avoid token dropping and
-padding.
+**巨型塊/塊稀疏 MoE**
+：將 MoE FFN 重新表述為區塊稀疏 matmul，以避免 token 丟棄和
+填充。
 
-## Distributed training
+## 分散式 training
 
-**Collectives**
-: All-reduce, all-gather, reduce-scatter, all-to-all, broadcast/P2P (NCCL/RCCL).
-See [distributed training](performance/distributed-training.md).
+**集體**
+：all-reduce，全聚集，減少分散，all-to-all，廣播/P2P（NCCL/RCCL）。
+參見 [distributed training](performance/distributed-training.md)。
 
-**Data / tensor / pipeline / sequence / expert parallelism (DP/TP/PP/SP/EP)**
-: The dimensions along which training is split; composed into N-D parallelism.
+**資料/張量/管道/序列/expert 並行性(DP/TP/PP/SP/EP)**
+：training 分割的尺寸；組成 N 維並行。
 
-**ZeRO / FSDP**
-: Sharding optimizer state (1), gradients (2), and parameters (3) across the DP
-group to cut memory.
+**零/FSDP**
+：整個 DP 的分片優化器狀態 (1)、梯度 (2) 和參數 (3)
+組來削減記憶。
 
-**All-to-all**
-: The collective where each rank sends a distinct chunk to every other rank — the
-MoE dispatch/combine primitive.
+**all-to-all**
+：每個等級向每個其他等級發送不同區塊的集體 -
+MoE 調度/組合原語。
 
-**Node-limited routing**
-: Capping how many nodes a token's experts span, to bound cross-node all-to-all.
+**節點限制 routing**
+：限制 token 的 experts 跨度的節點數，以綁定跨節點 all-to-all。
 
-## Inference & compression
+## inference & 壓縮
 
-**Prefill / decode**
-: Processing the prompt (many tokens, compute-bound) vs generating one token at a
-time (memory-bound).
+**prefill / decode**
+：處理提示（許多 tokens，受計算限制）與在某個時間產生一個 token
+時間（受記憶體限制）。
 
-**Continuous (in-flight) batching**
-: Iteration-level scheduling that swaps finished sequences for waiting ones,
-keeping the GPU full. See [inference optimization](performance/inference-optimization.md).
+**連續（飛行中）配料**
+：迭代級調度，將已完成的序列交換為等待的序列，
+保持 GPU 滿載。參見 [inference optimization](performance/inference-optimization.md)。
 
-**Speculative decoding**
-: A cheap draft proposes tokens, the target verifies them in one pass; lossless,
-exploits decode's spare compute.
+**投機 decoding**
+：一個廉價的草案提出了 tokens，目標一次性驗證它們；無損,
+利用 decode 的備用計算。
 
 **PTQ / QAT**
-: Post-Training Quantization (calibration only) vs Quantization-Aware Training.
-See [quantization](performance/quantization.md).
+：training 後量化（僅校準）與量化感知 training。
+參見 [quantization](performance/quantization.md)。
 
 **GPTQ / AWQ / SmoothQuant**
-: PTQ methods: error-corrected weight quantization / activation-aware weight
-scaling / migrating activation outliers into weights.
+：PTQ 方法：糾錯權重量化/激活感知權重
+將激活異常值縮放/遷移到權重中。
 
-**Pruning**
-: Removing weights or structures (unstructured, structured, or 2:4
-semi-structured) to compress.
+**修剪**
+：去除重量或結構（非結構化、結構化或 2:4
+半結構化）進行壓縮。
 
-**Distillation**
-: Training a small student to mimic a large teacher.
+**蒸餾**
+：training 小學生模仿大老師。
 
 **TTFT / TPOT (ITL)**
-: Time To First Token (prefill latency) / Time Per Output Token (decode latency).
+：首次 token (prefill latency) 的時間/每次輸出 token (decode latency) 的時間。
 
-## Hardware quick reference
+## 硬體快速參考
 
-Round numbers for back-of-envelope estimates (the exercises and
-[solutions](solutions/index.md) use these). Peak FLOP/s is dense bf16; real
-kernels hit a fraction (MFU). Bandwidth is HBM. The **ridge** $\pi/\beta$ is the
-arithmetic intensity where a chip flips from memory- to compute-bound.
+用於粗略估計的整數（練習和
+[solutions](solutions/index.md) 使用這些）。峰值 FLOP/s 密集 bf16；真實的
+kernels 達到了分數 (MFU)。頻寬是 HBM。**山脊**$\pi/\beta$ 是
+算術強度，其中晶片從記憶體限制轉變為計算限制。
 
-| GPU | bf16 peak ($\pi$) | HBM BW ($\beta$) | HBM size | Ridge $\pi/\beta$ |
-|---|---|---|---|---|
-| A100 (80 GB) | ~312 TFLOP/s | ~2.0 TB/s | 80 GB | ~156 FLOP/byte |
-| H100 (SXM) | ~990 TFLOP/s | ~3.35 TB/s | 80 GB | ~295 FLOP/byte |
-| H200 | ~990 TFLOP/s | ~4.8 TB/s | 141 GB | ~206 FLOP/byte |
-| MI300X | ~1.3 PFLOP/s | ~5.3 TB/s | 192 GB | ~245 FLOP/byte |
+| 圖形處理器    | bf16 峰值 ($\pi$) | HBM BW ($\beta$) | HBM 尺寸 | 山脊 $\pi/\beta$        |
+| ------------- | ----------------- | ---------------- | -------- | ----------------------- |
+| A100（80 GB） | ~312 TFLOP/秒     | ~2.0 TB/秒       | 80GB     | ~156 FLOP/位元組        |
+| H100 (SXM)    | ~990 TFLOP/秒     | ~3.35 TB/秒      | 80GB     | ~295 FLOP/位元組        |
+| H200          | ~990 TFLOP/秒     | ~4.8 TB/秒       | 141 GB   | 141 GB ~206 FLOP/位元組 |
+| 小米 300X     | ~1.3 PFLOP/s      | ~5.3 TB/秒       | 192 GB   | 192 GB ~245 FLOP/位元組 |
 
-Interconnect (for [distributed training](performance/distributed-training.md)):
-intra-node **NVLink** ~0.9 TB/s/GPU (NVLink 4) or **Infinity Fabric** on MI300;
-cross-node **InfiniBand/RoCE** ~25–50 GB/s/GPU; host **PCIe Gen5** ~64 GB/s. The
-1–2 order-of-magnitude drop from HBM → NVLink → IB → PCIe is why parallelism is
-mapped so the chattiest collectives ride the fastest links.
+互連（適用於 [distributed training](performance/distributed-training.md)）：
+MI300 上的節點內**NVLink**~0.9 TB/s/GPU (NVLink 4) 或**Infinity Fabric**；
+跨節點**InfiniBand/RoCE**~25–50 GB/s/GPU；主機**PCIe Gen5**~64 GB/s。的
+從 HBM → NVLink → IB → PCIe 下降了 1-2 個數量級，這就是為什麼並行性變得如此重要的原因
+進行映射，以便最健談的集體乘坐最快的鏈接。
 
-!!! note "Using these"
-    Numbers vary by SKU, clocks, and sparsity claims (vendors often quote
-    2× with structured sparsity — halve for dense). What should be robust in your
-    estimates is the **regime** and the **order of magnitude**, not the third
-    significant figure.
+!!! note "使用這些"
+    數字因 SKU、時鐘和稀疏性聲明而異（供應商經常引用
+    2× 結構稀疏－減半為稠密）。你的哪些內容應該是穩健的
+    估計是**制度**和**數量級**，而不是第三個
+    重要數字。

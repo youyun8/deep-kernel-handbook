@@ -3,10 +3,19 @@
 :root {
   --md-code-font: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
   --ml-accent-warm: #f59e0b;
-  --ml-accent-cool: #0f766e;
-  --ml-accent-blue: #2563eb;
-  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 94%, var(--ml-accent-cool) 6%);
-  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 88%, var(--ml-accent-blue) 12%);
+  --ml-accent-cool: #2563eb;
+  --ml-accent-blue: #4f46e5;
+  --ml-accent-soft: #eef2ff;
+  --ml-surface: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 94%,
+    var(--ml-accent-cool) 6%
+  );
+  --ml-surface-strong: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 88%,
+    var(--ml-accent-blue) 12%
+  );
   --ml-border: color-mix(in srgb, var(--md-default-fg-color) 15%, transparent);
   --ml-shadow: 0 0.5rem 1.35rem rgba(15, 23, 42, 0.08);
   --ml-shadow-strong: 0 0.8rem 2rem rgba(15, 23, 42, 0.13);
@@ -19,7 +28,11 @@
   --ml-diagram-edge: #475569;
   --ml-diagram-text: #111827;
   --ml-diagram-muted-text: #475569;
-  --ml-diagram-label-bg: color-mix(in srgb, var(--md-default-bg-color) 92%, white 8%);
+  --ml-diagram-label-bg: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 92%,
+    white 8%
+  );
   --ml-diagram-cluster-bg: rgba(15, 118, 110, 0.08);
   --ml-diagram-cluster-stroke: rgba(15, 118, 110, 0.42);
   --ml-diagram-accent-bg: #ede9fe;
@@ -32,14 +45,27 @@
 
 [data-md-color-scheme="slate"] {
   --ml-accent-warm: #fbbf24;
-  --ml-accent-cool: #2dd4bf;
-  --ml-accent-blue: #60a5fa;
-  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 88%, var(--ml-accent-cool) 12%);
-  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 80%, var(--ml-accent-blue) 20%);
+  --ml-accent-cool: #60a5fa;
+  --ml-accent-blue: #818cf8;
+  --ml-accent-soft: #1e293b;
+  --ml-surface: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 88%,
+    var(--ml-accent-cool) 12%
+  );
+  --ml-surface-strong: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 80%,
+    var(--ml-accent-blue) 20%
+  );
   --ml-border: color-mix(in srgb, var(--md-default-fg-color) 22%, transparent);
   --ml-shadow: 0 0.55rem 1.6rem rgba(0, 0, 0, 0.22);
   --ml-shadow-strong: 0 1rem 2.4rem rgba(0, 0, 0, 0.28);
-  --ml-diagram-bg: color-mix(in srgb, var(--md-default-bg-color) 88%, #ffffff 12%);
+  --ml-diagram-bg: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 88%,
+    #ffffff 12%
+  );
   --ml-diagram-node-bg: #182335;
   --ml-diagram-node-muted-bg: #263244;
   --ml-diagram-node-stroke: #2dd4bf;
@@ -69,7 +95,7 @@
   --ml-diagram-text: #f1f5f9;
   --ml-diagram-muted-text: #94a3b8;
   --ml-diagram-label-bg: #0f172a;
-  --ml-diagram-cluster-bg: rgba(45, 212, 191, 0.10);
+  --ml-diagram-cluster-bg: rgba(45, 212, 191, 0.1);
   --ml-diagram-cluster-stroke: rgba(94, 234, 212, 0.45);
   --ml-diagram-accent-bg: #4c1d95;
   --ml-diagram-accent-stroke: #a78bfa;
@@ -78,13 +104,15 @@
 
 /* Slightly wider content column for math + code heavy pages. */
 .md-grid {
-  max-width: 68rem;
+  max-width: 78rem;
 }
 
 .md-main {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--ml-surface) 55%, transparent) 0, transparent 22rem),
-    linear-gradient(90deg, color-mix(in srgb, var(--ml-accent-cool) 8%, transparent), transparent 28%, color-mix(in srgb, var(--ml-accent-warm) 7%, transparent));
+  background: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 95%,
+    var(--ml-accent-soft) 5%
+  );
 }
 
 .md-main__inner {
@@ -101,7 +129,7 @@
 }
 
 .md-typeset h1 {
-  max-width: 20ch;
+  max-width: 24ch;
   margin-bottom: 0.4rem;
   color: var(--md-default-fg-color);
   font-weight: 800;
@@ -179,10 +207,18 @@
 
 .md-typeset .grid.cards > :is(ul, ol) > li {
   border-color: var(--ml-border);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--md-default-bg-color) 96%, var(--ml-accent-cool) 4%), var(--md-default-bg-color));
+  background: linear-gradient(
+    180deg,
+    color-mix(
+      in srgb,
+      var(--md-default-bg-color) 96%,
+      var(--ml-accent-cool) 4%
+    ),
+    var(--md-default-bg-color)
+  );
   box-shadow: var(--ml-shadow);
-  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  transition: transform 160ms ease, box-shadow 160ms ease,
+    border-color 160ms ease;
 }
 
 .md-typeset .grid.cards > :is(ul, ol) > li:hover {
@@ -194,7 +230,8 @@
 .md-typeset .md-button {
   border-radius: 0.4rem;
   box-shadow: none;
-  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+  transition: background-color 140ms ease, border-color 140ms ease,
+    color 140ms ease, transform 140ms ease;
 }
 
 .md-typeset .md-button:hover {
@@ -342,9 +379,26 @@ figure > figcaption {
   padding: 1rem;
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-radius);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--md-default-bg-color) 72%, var(--ml-accent-cool) 28%), color-mix(in srgb, var(--md-default-bg-color) 86%, var(--ml-accent-blue) 14%)),
-    repeating-linear-gradient(90deg, transparent 0, transparent 1.4rem, color-mix(in srgb, var(--md-default-fg-color) 7%, transparent) 1.4rem, color-mix(in srgb, var(--md-default-fg-color) 7%, transparent) 1.45rem);
+  background: linear-gradient(
+      135deg,
+      color-mix(
+        in srgb,
+        var(--md-default-bg-color) 72%,
+        var(--ml-accent-cool) 28%
+      ),
+      color-mix(
+        in srgb,
+        var(--md-default-bg-color) 86%,
+        var(--ml-accent-blue) 14%
+      )
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 1.4rem,
+      color-mix(in srgb, var(--md-default-fg-color) 7%, transparent) 1.4rem,
+      color-mix(in srgb, var(--md-default-fg-color) 7%, transparent) 1.45rem
+    );
   background-blend-mode: normal;
   box-shadow: var(--ml-shadow);
 }
@@ -425,7 +479,15 @@ figure > figcaption {
 
 .curriculum-card--feature {
   border-color: color-mix(in srgb, var(--ml-accent-cool) 48%, var(--ml-border));
-  background: linear-gradient(180deg, color-mix(in srgb, var(--md-default-bg-color) 90%, var(--ml-accent-cool) 10%), var(--md-default-bg-color));
+  background: linear-gradient(
+    180deg,
+    color-mix(
+      in srgb,
+      var(--md-default-bg-color) 90%,
+      var(--ml-accent-cool) 10%
+    ),
+    var(--md-default-bg-color)
+  );
 }
 
 .curriculum-card h3 {
@@ -578,48 +640,192 @@ figure > figcaption {
 
 /* Named accent schemes. Each `accColor` sets the `--ml-acc-*` trio (below),
    then the shared rules paint the shape and label from those variables. */
-.md-typeset .mermaid g.node.accViolet rect,  .md-typeset .mermaid g.node.accViolet circle,  .md-typeset .mermaid g.node.accViolet ellipse,  .md-typeset .mermaid g.node.accViolet polygon,  .md-typeset .mermaid g.node.accViolet path,
-.md-typeset .mermaid g.node.accTeal rect,    .md-typeset .mermaid g.node.accTeal circle,    .md-typeset .mermaid g.node.accTeal ellipse,    .md-typeset .mermaid g.node.accTeal polygon,    .md-typeset .mermaid g.node.accTeal path,
-.md-typeset .mermaid g.node.accBlue rect,    .md-typeset .mermaid g.node.accBlue circle,    .md-typeset .mermaid g.node.accBlue ellipse,    .md-typeset .mermaid g.node.accBlue polygon,    .md-typeset .mermaid g.node.accBlue path,
-.md-typeset .mermaid g.node.accCyan rect,    .md-typeset .mermaid g.node.accCyan circle,    .md-typeset .mermaid g.node.accCyan ellipse,    .md-typeset .mermaid g.node.accCyan polygon,    .md-typeset .mermaid g.node.accCyan path,
-.md-typeset .mermaid g.node.accAmber rect,   .md-typeset .mermaid g.node.accAmber circle,   .md-typeset .mermaid g.node.accAmber ellipse,   .md-typeset .mermaid g.node.accAmber polygon,   .md-typeset .mermaid g.node.accAmber path,
-.md-typeset .mermaid g.node.accRose rect,    .md-typeset .mermaid g.node.accRose circle,    .md-typeset .mermaid g.node.accRose ellipse,    .md-typeset .mermaid g.node.accRose polygon,    .md-typeset .mermaid g.node.accRose path,
-.md-typeset .mermaid g.node.accGreen rect,   .md-typeset .mermaid g.node.accGreen circle,   .md-typeset .mermaid g.node.accGreen ellipse,   .md-typeset .mermaid g.node.accGreen polygon,   .md-typeset .mermaid g.node.accGreen path,
-.md-typeset .mermaid g.node.accIndigo rect,  .md-typeset .mermaid g.node.accIndigo circle,  .md-typeset .mermaid g.node.accIndigo ellipse,  .md-typeset .mermaid g.node.accIndigo polygon,  .md-typeset .mermaid g.node.accIndigo path {
+.md-typeset .mermaid g.node.accViolet rect,
+.md-typeset .mermaid g.node.accViolet circle,
+.md-typeset .mermaid g.node.accViolet ellipse,
+.md-typeset .mermaid g.node.accViolet polygon,
+.md-typeset .mermaid g.node.accViolet path,
+.md-typeset .mermaid g.node.accTeal rect,
+.md-typeset .mermaid g.node.accTeal circle,
+.md-typeset .mermaid g.node.accTeal ellipse,
+.md-typeset .mermaid g.node.accTeal polygon,
+.md-typeset .mermaid g.node.accTeal path,
+.md-typeset .mermaid g.node.accBlue rect,
+.md-typeset .mermaid g.node.accBlue circle,
+.md-typeset .mermaid g.node.accBlue ellipse,
+.md-typeset .mermaid g.node.accBlue polygon,
+.md-typeset .mermaid g.node.accBlue path,
+.md-typeset .mermaid g.node.accCyan rect,
+.md-typeset .mermaid g.node.accCyan circle,
+.md-typeset .mermaid g.node.accCyan ellipse,
+.md-typeset .mermaid g.node.accCyan polygon,
+.md-typeset .mermaid g.node.accCyan path,
+.md-typeset .mermaid g.node.accAmber rect,
+.md-typeset .mermaid g.node.accAmber circle,
+.md-typeset .mermaid g.node.accAmber ellipse,
+.md-typeset .mermaid g.node.accAmber polygon,
+.md-typeset .mermaid g.node.accAmber path,
+.md-typeset .mermaid g.node.accRose rect,
+.md-typeset .mermaid g.node.accRose circle,
+.md-typeset .mermaid g.node.accRose ellipse,
+.md-typeset .mermaid g.node.accRose polygon,
+.md-typeset .mermaid g.node.accRose path,
+.md-typeset .mermaid g.node.accGreen rect,
+.md-typeset .mermaid g.node.accGreen circle,
+.md-typeset .mermaid g.node.accGreen ellipse,
+.md-typeset .mermaid g.node.accGreen polygon,
+.md-typeset .mermaid g.node.accGreen path,
+.md-typeset .mermaid g.node.accIndigo rect,
+.md-typeset .mermaid g.node.accIndigo circle,
+.md-typeset .mermaid g.node.accIndigo ellipse,
+.md-typeset .mermaid g.node.accIndigo polygon,
+.md-typeset .mermaid g.node.accIndigo path {
   fill: var(--ml-acc-bg) !important;
   stroke: var(--ml-acc-stroke) !important;
 }
 
-.md-typeset .mermaid g.node.accViolet .nodeLabel, .md-typeset .mermaid g.node.accViolet .nodeLabel *, .md-typeset .mermaid g.node.accViolet .label, .md-typeset .mermaid g.node.accViolet .label *, .md-typeset .mermaid g.node.accViolet foreignObject, .md-typeset .mermaid g.node.accViolet foreignObject *, .md-typeset .mermaid g.node.accViolet text,
-.md-typeset .mermaid g.node.accTeal .nodeLabel,   .md-typeset .mermaid g.node.accTeal .nodeLabel *,   .md-typeset .mermaid g.node.accTeal .label,   .md-typeset .mermaid g.node.accTeal .label *,   .md-typeset .mermaid g.node.accTeal foreignObject,   .md-typeset .mermaid g.node.accTeal foreignObject *,   .md-typeset .mermaid g.node.accTeal text,
-.md-typeset .mermaid g.node.accBlue .nodeLabel,   .md-typeset .mermaid g.node.accBlue .nodeLabel *,   .md-typeset .mermaid g.node.accBlue .label,   .md-typeset .mermaid g.node.accBlue .label *,   .md-typeset .mermaid g.node.accBlue foreignObject,   .md-typeset .mermaid g.node.accBlue foreignObject *,   .md-typeset .mermaid g.node.accBlue text,
-.md-typeset .mermaid g.node.accCyan .nodeLabel,   .md-typeset .mermaid g.node.accCyan .nodeLabel *,   .md-typeset .mermaid g.node.accCyan .label,   .md-typeset .mermaid g.node.accCyan .label *,   .md-typeset .mermaid g.node.accCyan foreignObject,   .md-typeset .mermaid g.node.accCyan foreignObject *,   .md-typeset .mermaid g.node.accCyan text,
-.md-typeset .mermaid g.node.accAmber .nodeLabel,  .md-typeset .mermaid g.node.accAmber .nodeLabel *,  .md-typeset .mermaid g.node.accAmber .label,  .md-typeset .mermaid g.node.accAmber .label *,  .md-typeset .mermaid g.node.accAmber foreignObject,  .md-typeset .mermaid g.node.accAmber foreignObject *,  .md-typeset .mermaid g.node.accAmber text,
-.md-typeset .mermaid g.node.accRose .nodeLabel,   .md-typeset .mermaid g.node.accRose .nodeLabel *,   .md-typeset .mermaid g.node.accRose .label,   .md-typeset .mermaid g.node.accRose .label *,   .md-typeset .mermaid g.node.accRose foreignObject,   .md-typeset .mermaid g.node.accRose foreignObject *,   .md-typeset .mermaid g.node.accRose text,
-.md-typeset .mermaid g.node.accGreen .nodeLabel,  .md-typeset .mermaid g.node.accGreen .nodeLabel *,  .md-typeset .mermaid g.node.accGreen .label,  .md-typeset .mermaid g.node.accGreen .label *,  .md-typeset .mermaid g.node.accGreen foreignObject,  .md-typeset .mermaid g.node.accGreen foreignObject *,  .md-typeset .mermaid g.node.accGreen text,
-.md-typeset .mermaid g.node.accIndigo .nodeLabel, .md-typeset .mermaid g.node.accIndigo .nodeLabel *, .md-typeset .mermaid g.node.accIndigo .label, .md-typeset .mermaid g.node.accIndigo .label *, .md-typeset .mermaid g.node.accIndigo foreignObject, .md-typeset .mermaid g.node.accIndigo foreignObject *, .md-typeset .mermaid g.node.accIndigo text {
+.md-typeset .mermaid g.node.accViolet .nodeLabel,
+.md-typeset .mermaid g.node.accViolet .nodeLabel *,
+.md-typeset .mermaid g.node.accViolet .label,
+.md-typeset .mermaid g.node.accViolet .label *,
+.md-typeset .mermaid g.node.accViolet foreignObject,
+.md-typeset .mermaid g.node.accViolet foreignObject *,
+.md-typeset .mermaid g.node.accViolet text,
+.md-typeset .mermaid g.node.accTeal .nodeLabel,
+.md-typeset .mermaid g.node.accTeal .nodeLabel *,
+.md-typeset .mermaid g.node.accTeal .label,
+.md-typeset .mermaid g.node.accTeal .label *,
+.md-typeset .mermaid g.node.accTeal foreignObject,
+.md-typeset .mermaid g.node.accTeal foreignObject *,
+.md-typeset .mermaid g.node.accTeal text,
+.md-typeset .mermaid g.node.accBlue .nodeLabel,
+.md-typeset .mermaid g.node.accBlue .nodeLabel *,
+.md-typeset .mermaid g.node.accBlue .label,
+.md-typeset .mermaid g.node.accBlue .label *,
+.md-typeset .mermaid g.node.accBlue foreignObject,
+.md-typeset .mermaid g.node.accBlue foreignObject *,
+.md-typeset .mermaid g.node.accBlue text,
+.md-typeset .mermaid g.node.accCyan .nodeLabel,
+.md-typeset .mermaid g.node.accCyan .nodeLabel *,
+.md-typeset .mermaid g.node.accCyan .label,
+.md-typeset .mermaid g.node.accCyan .label *,
+.md-typeset .mermaid g.node.accCyan foreignObject,
+.md-typeset .mermaid g.node.accCyan foreignObject *,
+.md-typeset .mermaid g.node.accCyan text,
+.md-typeset .mermaid g.node.accAmber .nodeLabel,
+.md-typeset .mermaid g.node.accAmber .nodeLabel *,
+.md-typeset .mermaid g.node.accAmber .label,
+.md-typeset .mermaid g.node.accAmber .label *,
+.md-typeset .mermaid g.node.accAmber foreignObject,
+.md-typeset .mermaid g.node.accAmber foreignObject *,
+.md-typeset .mermaid g.node.accAmber text,
+.md-typeset .mermaid g.node.accRose .nodeLabel,
+.md-typeset .mermaid g.node.accRose .nodeLabel *,
+.md-typeset .mermaid g.node.accRose .label,
+.md-typeset .mermaid g.node.accRose .label *,
+.md-typeset .mermaid g.node.accRose foreignObject,
+.md-typeset .mermaid g.node.accRose foreignObject *,
+.md-typeset .mermaid g.node.accRose text,
+.md-typeset .mermaid g.node.accGreen .nodeLabel,
+.md-typeset .mermaid g.node.accGreen .nodeLabel *,
+.md-typeset .mermaid g.node.accGreen .label,
+.md-typeset .mermaid g.node.accGreen .label *,
+.md-typeset .mermaid g.node.accGreen foreignObject,
+.md-typeset .mermaid g.node.accGreen foreignObject *,
+.md-typeset .mermaid g.node.accGreen text,
+.md-typeset .mermaid g.node.accIndigo .nodeLabel,
+.md-typeset .mermaid g.node.accIndigo .nodeLabel *,
+.md-typeset .mermaid g.node.accIndigo .label,
+.md-typeset .mermaid g.node.accIndigo .label *,
+.md-typeset .mermaid g.node.accIndigo foreignObject,
+.md-typeset .mermaid g.node.accIndigo foreignObject *,
+.md-typeset .mermaid g.node.accIndigo text {
   fill: var(--ml-acc-text) !important;
   color: var(--ml-acc-text) !important;
 }
 
 /* Per-scheme accent palettes. Light values are the defaults; slate overrides. */
-.md-typeset .mermaid .accViolet { --ml-acc-bg: #ede9fe; --ml-acc-stroke: #7c3aed; --ml-acc-text: #111827; }
-.md-typeset .mermaid .accTeal   { --ml-acc-bg: #ccfbf1; --ml-acc-stroke: #0f766e; --ml-acc-text: #111827; }
-.md-typeset .mermaid .accBlue   { --ml-acc-bg: #dbeafe; --ml-acc-stroke: #2563eb; --ml-acc-text: #111827; }
-.md-typeset .mermaid .accCyan   { --ml-acc-bg: #cffafe; --ml-acc-stroke: #0891b2; --ml-acc-text: #111827; }
-.md-typeset .mermaid .accAmber  { --ml-acc-bg: #fef3c7; --ml-acc-stroke: #d97706; --ml-acc-text: #111827; }
-.md-typeset .mermaid .accRose   { --ml-acc-bg: #ffe4e6; --ml-acc-stroke: #e11d48; --ml-acc-text: #111827; }
-.md-typeset .mermaid .accGreen  { --ml-acc-bg: #dcfce7; --ml-acc-stroke: #16a34a; --ml-acc-text: #111827; }
-.md-typeset .mermaid .accIndigo { --ml-acc-bg: #e0e7ff; --ml-acc-stroke: #4f46e5; --ml-acc-text: #111827; }
+.md-typeset .mermaid .accViolet {
+  --ml-acc-bg: #ede9fe;
+  --ml-acc-stroke: #7c3aed;
+  --ml-acc-text: #111827;
+}
+.md-typeset .mermaid .accTeal {
+  --ml-acc-bg: #ccfbf1;
+  --ml-acc-stroke: #0f766e;
+  --ml-acc-text: #111827;
+}
+.md-typeset .mermaid .accBlue {
+  --ml-acc-bg: #dbeafe;
+  --ml-acc-stroke: #2563eb;
+  --ml-acc-text: #111827;
+}
+.md-typeset .mermaid .accCyan {
+  --ml-acc-bg: #cffafe;
+  --ml-acc-stroke: #0891b2;
+  --ml-acc-text: #111827;
+}
+.md-typeset .mermaid .accAmber {
+  --ml-acc-bg: #fef3c7;
+  --ml-acc-stroke: #d97706;
+  --ml-acc-text: #111827;
+}
+.md-typeset .mermaid .accRose {
+  --ml-acc-bg: #ffe4e6;
+  --ml-acc-stroke: #e11d48;
+  --ml-acc-text: #111827;
+}
+.md-typeset .mermaid .accGreen {
+  --ml-acc-bg: #dcfce7;
+  --ml-acc-stroke: #16a34a;
+  --ml-acc-text: #111827;
+}
+.md-typeset .mermaid .accIndigo {
+  --ml-acc-bg: #e0e7ff;
+  --ml-acc-stroke: #4f46e5;
+  --ml-acc-text: #111827;
+}
 
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accViolet { --ml-acc-bg: #4c1d95; --ml-acc-stroke: #a78bfa; --ml-acc-text: #f8fafc; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accTeal   { --ml-acc-bg: #115e59; --ml-acc-stroke: #5eead4; --ml-acc-text: #f8fafc; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accBlue   { --ml-acc-bg: #1e3a8a; --ml-acc-stroke: #60a5fa; --ml-acc-text: #f8fafc; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accCyan   { --ml-acc-bg: #164e63; --ml-acc-stroke: #67e8f9; --ml-acc-text: #f8fafc; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accAmber  { --ml-acc-bg: #78350f; --ml-acc-stroke: #fbbf24; --ml-acc-text: #f8fafc; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accRose   { --ml-acc-bg: #881337; --ml-acc-stroke: #fda4af; --ml-acc-text: #f8fafc; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accGreen  { --ml-acc-bg: #14532d; --ml-acc-stroke: #86efac; --ml-acc-text: #f8fafc; }
-[data-md-color-scheme="slate"] .md-typeset .mermaid .accIndigo { --ml-acc-bg: #312e81; --ml-acc-stroke: #a5b4fc; --ml-acc-text: #f8fafc; }
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accViolet {
+  --ml-acc-bg: #4c1d95;
+  --ml-acc-stroke: #a78bfa;
+  --ml-acc-text: #f8fafc;
+}
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accTeal {
+  --ml-acc-bg: #115e59;
+  --ml-acc-stroke: #5eead4;
+  --ml-acc-text: #f8fafc;
+}
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accBlue {
+  --ml-acc-bg: #1e3a8a;
+  --ml-acc-stroke: #60a5fa;
+  --ml-acc-text: #f8fafc;
+}
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accCyan {
+  --ml-acc-bg: #164e63;
+  --ml-acc-stroke: #67e8f9;
+  --ml-acc-text: #f8fafc;
+}
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accAmber {
+  --ml-acc-bg: #78350f;
+  --ml-acc-stroke: #fbbf24;
+  --ml-acc-text: #f8fafc;
+}
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accRose {
+  --ml-acc-bg: #881337;
+  --ml-acc-stroke: #fda4af;
+  --ml-acc-text: #f8fafc;
+}
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accGreen {
+  --ml-acc-bg: #14532d;
+  --ml-acc-stroke: #86efac;
+  --ml-acc-text: #f8fafc;
+}
+[data-md-color-scheme="slate"] .md-typeset .mermaid .accIndigo {
+  --ml-acc-bg: #312e81;
+  --ml-acc-stroke: #a5b4fc;
+  --ml-acc-text: #f8fafc;
+}
 
 /* Tighten admonition / details spacing and align body text with the title.
    Material indents the title past its icon (~2.5rem) but leaves body content at
@@ -630,7 +836,8 @@ figure > figcaption {
 .md-typeset details {
   border-width: 0;
   box-shadow: var(--ml-shadow);
-  border-left: 0.18rem solid color-mix(in srgb, var(--md-accent-fg-color) 58%, var(--ml-accent-warm));
+  border-left: 0.18rem solid
+    color-mix(in srgb, var(--md-accent-fg-color) 58%, var(--ml-accent-warm));
   padding: 0 0.75rem 0.6rem;
 }
 
@@ -871,5 +1078,314 @@ figure > figcaption {
 
   .roofline-label {
     font-size: 20px;
+  }
+}
+
+/* Reference-site-inspired chrome: translucent header, softer cards, local settings. */
+.md-header {
+  border-bottom: 1px solid var(--ml-border);
+  background-color: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 82%,
+    transparent
+  );
+  color: var(--md-default-fg-color);
+  backdrop-filter: blur(18px);
+  box-shadow: none;
+}
+
+.md-tabs {
+  border-bottom: 1px solid var(--ml-border);
+  background-color: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 86%,
+    transparent
+  );
+  backdrop-filter: blur(18px);
+}
+
+.md-tabs__link,
+.md-nav__link {
+  border-radius: 0.55rem;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.md-tabs__link:is(:hover, .md-tabs__link--active),
+.md-nav__link:is(:hover, .md-nav__link--active) {
+  background: var(--ml-surface);
+}
+
+.md-typeset .admonition,
+.md-typeset details,
+.md-typeset .grid.cards > :is(ul, ol) > li,
+.curriculum-card,
+.home-hero,
+.home-hero__panel,
+.ml-stat,
+.ml-settings-panel {
+  border-radius: 0.8rem;
+  border-color: var(--ml-border);
+  box-shadow: 0 0.35rem 1.1rem rgba(15, 23, 42, 0.06);
+}
+
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(17rem, 0.8fr);
+  gap: 1.2rem;
+  margin: 0 0 1.6rem;
+  padding: clamp(1.2rem, 4vw, 2.2rem);
+  overflow: hidden;
+  border: 1px solid var(--ml-border);
+  background: radial-gradient(
+      circle at 15% 0%,
+      color-mix(in srgb, var(--ml-accent-cool) 20%, transparent),
+      transparent 36%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ml-accent-cool) 12%, var(--md-default-bg-color)),
+      color-mix(in srgb, var(--ml-accent-warm) 10%, var(--md-default-bg-color))
+    );
+}
+
+.home-hero__copy {
+  min-width: 0;
+}
+
+.home-kicker,
+.section-kicker {
+  margin: 0 0 0.55rem;
+  color: var(--ml-accent-cool);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.home-hero .md-typeset h1,
+.md-typeset .home-hero h1 {
+  max-width: 16ch;
+  margin-top: 0;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  line-height: 1.08;
+}
+
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.1rem;
+}
+
+.home-hero__panel {
+  align-self: stretch;
+  padding: 1.1rem;
+  border: 1px solid var(--ml-border);
+  background: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 82%,
+    var(--ml-accent-soft) 18%
+  );
+  backdrop-filter: blur(18px);
+}
+
+.home-panel-title {
+  margin-top: 0.35rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.home-panel-copy {
+  margin-top: 0.55rem;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.78rem;
+}
+
+.home-metrics,
+.ml-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.home-metrics > div,
+.ml-stat {
+  padding: 0.75rem;
+  border: 1px solid var(--ml-border);
+  background: color-mix(in srgb, var(--md-default-bg-color) 88%, transparent);
+}
+
+.home-metrics strong,
+.ml-stat strong {
+  display: block;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.home-metrics span,
+.ml-stat span {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.68rem;
+}
+
+.curriculum-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.curriculum-card {
+  padding: 1rem;
+  border: 1px solid var(--ml-border);
+  background: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 91%,
+    var(--ml-accent-soft) 9%
+  );
+}
+
+.curriculum-card--feature {
+  border-color: color-mix(in srgb, var(--ml-accent-cool) 42%, var(--ml-border));
+  background: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 82%,
+    var(--ml-accent-soft) 18%
+  );
+}
+
+.curriculum-card__eyebrow {
+  color: var(--ml-accent-cool);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.aiter-stage-table table code {
+  white-space: nowrap;
+}
+
+.ml-settings-launcher {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 5;
+  min-width: 3.5rem;
+  min-height: 3.5rem;
+  border: 1px solid var(--ml-border);
+  border-radius: 999rem;
+  background: var(--md-primary-fg-color);
+  color: var(--md-primary-bg-color);
+  font: 700 0.72rem/1 var(--md-text-font-family);
+  box-shadow: var(--ml-shadow-strong);
+  cursor: pointer;
+}
+
+.ml-settings-panel {
+  position: fixed;
+  right: 1rem;
+  bottom: 5rem;
+  z-index: 6;
+  width: min(19rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid var(--ml-border);
+  background: color-mix(in srgb, var(--md-default-bg-color) 94%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.ml-settings-panel__head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.9rem;
+}
+
+.ml-settings-panel__head p {
+  margin: 0;
+  color: var(--ml-accent-cool);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.ml-settings-panel__head strong {
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.ml-settings-close {
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 1px solid var(--ml-border);
+  border-radius: 0.45rem;
+  background: var(--ml-surface);
+  color: var(--md-default-fg-color);
+  cursor: pointer;
+}
+
+.ml-settings-row {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.ml-settings-row > span,
+.ml-settings-check {
+  color: var(--md-default-fg-color--light);
+  font-size: 0.72rem;
+}
+
+.ml-settings-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.ml-setting-option {
+  min-height: 2rem;
+  border: 1px solid var(--ml-border);
+  border-radius: 0.55rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  cursor: pointer;
+}
+
+.ml-setting-option.is-active {
+  border-color: var(--ml-accent-cool);
+  background: var(--ml-surface-strong);
+}
+
+.ml-settings-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+[data-reading-density="compact"] .md-typeset {
+  font-size: 0.74rem;
+  line-height: 1.58;
+}
+
+[data-reading-density="compact"] .md-typeset h2 {
+  margin-top: 1.8em;
+}
+
+[data-reading-width="wide"] .md-grid {
+  max-width: 88rem;
+}
+
+[data-code-wrap="true"] .md-typeset pre > code {
+  white-space: pre-wrap;
+}
+
+@media screen and (max-width: 60rem) {
+  .home-hero,
+  .curriculum-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-metrics,
+  .ml-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

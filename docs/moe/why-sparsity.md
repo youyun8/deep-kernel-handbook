@@ -1,127 +1,123 @@
-# Why sparsity
+# 為什麼稀疏
 
 <div class="page-meta">
-  <span class="chip"><strong>Level:</strong> intermediate</span>
-  <span class="chip"><strong>Prereqs:</strong> <a href="../../foundations/transformer-systems/">transformer as a system</a></span>
-  <span class="chip"><strong>Hardware:</strong> none</span>
+  <span class="chip"><strong>等級：</strong>中階</span>
+  <span class="chip"><strong>先備知識：</strong> <a href="../../foundations/transformer-systems/">Transformer作為系統</a></span>
+  <span class="chip"><strong>硬體：</strong> 無</span>
 </div>
 
-Before building an MoE, it's worth being precise about *what problem sparsity
-solves* and *what it costs*. The headline: MoE **decouples parameter count from
-FLOPs per token**. This page makes that statement quantitative and honest about
-the trade-offs, so the rest of Part II has a clear target.
+在建構 MoE 之前，有必要準確了解稀疏性問題是什麼
+解決*和*成本\*。標題：MoE**將參數計數與
+每個 token**的失敗次數。此頁面使該聲明定量且誠實
+權衡，所以第二部分的其餘部分有一個明確的目標。
 
-## The dense bottleneck
+## 密集瓶頸
 
-In a dense transformer, the FFN dominates both parameters and FLOPs. From
-[Part I](../foundations/transformer-systems.md): forward cost is $\approx 2P$
-FLOPs per token, where $P$ is the parameter count — *every parameter touches
-every token*. To make the model "know more" you grow $P$, and your compute bill
-grows lockstep. Scaling laws say loss falls smoothly with both parameters and
-data, but compute $\approx 6 P D$ (params × tokens) is the budget you actually
-pay.
+在密集 Transformer 中，FFN 主導參數和 FLOP。來自
+[Part I](../foundations/transformer-systems.md)：遠期成本為$\approx 2P$
+每個 token 的 FLOPs，其中 $P$ 是參數計數 — _每個參數都涉及
+每個 token_。為了使模型“了解更多”，你需要增加 $P$ 和你的計算費用
+步調一致地成長。縮放定律表示損失隨著參數和
+數據，但計算 $\approx 6 P D$ (params × tokens) 是你實際的預算
+付錢。
 
-The question MoE asks: **can we add parameters without adding proportional
-FLOPs?**
+MoE 提出的問題：**我們可以在不加入比例的情況下加入參數嗎
+失敗？**
 
-## Conditional computation
+## 條件計算
 
-Yes — if each token only uses a *subset* of the parameters. Replace one FFN with
-$E$ expert FFNs and a router that activates $k$ of them per token ($k \ll E$,
-often $k=1$ or $2$). Then:
+是 - 如果每個 token 僅使用參數的*子集*。將 1 個 FFN 替換為
+$E$ expert FFN 和一個 router，每個 token 啟動其中的 $k$（$k \ll E$，
+通常為 $k=1$ 或 $2$）。然後：
 
-- **Total parameters** scale with $E$ (all experts exist, store knowledge).
-- **Active parameters per token** scale with $k$ (only $k$ experts run).
-- **FLOPs per token** track *active* params, not total.
+-**總參數**與$E$縮放（所有 experts 都存在，儲存知識）。 -**每個 token**的有效參數與 $k$ 一起縮放（僅 $k$ experts 運行）。 -**每個 token**追蹤 _活動_ 參數的 FLOP，而不是總數。
 
-Define the **sparsity ratio** $k/E$. A model with $E=64$ experts, $k=2$ has
-$\sim$32× more FFN parameters than its active-compute-equivalent dense model. Real
-examples: Mixtral 8×7B has 47B total but ~13B active; DeepSeek-V3 has 671B total
-but only **37B active** per token. You pay ~37B-model FLOPs and get closer to a
-671B-model's quality.
+定義**稀疏率**$k/E$。具有$E=64$、experts、$k=2$的型號有
+$\sim$ 比其主動計算等效密集模型多 32 倍 FFN 參數。真實
+例：Mixtral 8×7B 總共有 47B，但活躍的約有 13B； DeepSeek-V3 總共有 671B
+但每個 token 僅有**37B 活動**。你支付了大約 37B 模型的 FLOPs，並且更接近
+671B 型的品質。
 
-$$ \underbrace{P_{\text{total}}}_{\text{capacity / memory}} \;\propto\; E, \qquad \underbrace{P_{\text{active}}}_{\text{FLOPs, speed}} \;\propto\; k. $$
+$$ \underbrace{P*{\text{total}}}*{\text{capacity / memory}} \;\propto\; E, \qquad \underbrace{P*{\text{active}}}*{\text{FLOPs, speed}} \;\propto\; k. $$
 
-## The scaling argument
+## 縮放參數
 
-Empirically (Switch Transformer, GShard, and follow-ups), at a **fixed training
-FLOP budget**, sparse models reach a given loss faster than dense ones, and at a
-**fixed active-parameter budget**, adding experts keeps improving quality with
-sub-linear extra compute. Intuitions for *why*:
+根據經驗（開關 Transformer、GShard 和後續產品），**固定 training
+FLOP 預算**，稀疏模型比密集模型更快達到給定的損失，並且在
+**固定活動參數預算**，增加 experts 可以持續提高質量
+次線性額外計算。 *為什麼*的直覺：
 
-- **Specialization.** Different experts can specialize (loosely — by token type,
-  topic, or syntactic role), so the effective function class is richer than a
-  single FFN of the same active size.
-- **More parameters = more memorized knowledge** without more per-token math; the
-  router acts as a learned sparse lookup.
-- **Capacity where it's cheap.** Parameters are cheap to *store* (HBM/offload);
-  FLOPs are expensive to *run*. MoE buys capacity in the cheap currency.
+-**專業化。**不同的 experts 可以專業化（寬鬆地 - 透過 token 類型，
+主題，或句法角色），因此有效功能類比
+相同活動大小的單一 FFN。 -**更多參數 = 更多記憶知識**，無需更多 token 數學；的
+router 充當學習稀疏查找。 -**容量便宜。**參數的儲存成本低廉（HBM/卸載）；
+_運行_ FLOP 的成本很高。MoE 以廉價貨幣購買產能。
 
-!!! note "It's not free quality"
-    Sparse models are less *parameter-efficient* than dense ones — a 671B sparse
-    model is not as good as a hypothetical 671B dense model would be. The win is
-    **quality per FLOP** and **quality per dollar at inference**, not quality per
-    parameter. You're trading abundant memory for scarce compute.
+!!! note "這不是免費品質"
+    稀疏模型的「參數效率」低於密集模型—671B 稀疏模型
+    模型不如假設的 671B 密集模型。勝利是
+    **每 FLOP 的質量**和**inference 的每美元質量**，而不是每美元的質量
+    參數。你正在用充足的記憶體換取稀缺的計算。
 
-## What sparsity costs (the rest of Part II)
+## 稀疏性的代價是什麼（第二部分的其餘部分）
 
-Conditional computation is not a free lunch; it imports a stack of systems
-problems that dense models never face:
+條件計算不是免費的午餐；它導入了一堆系統
+密集模型永遠不會遇到的問題：
 
-| Cost | Where it bites | Covered in |
-|---|---|---|
-| **Load imbalance** — routers collapse to a few popular experts | wasted experts, stragglers | [load balancing](load-balancing.md) |
-| **Discrete routing** — top-k is non-differentiable, unstable | training divergence | [training stability](training-stability.md) |
-| **All-to-all communication** — tokens must travel to their expert's GPU | network-bound layers | [systems & EP](systems-ep.md) |
-| **Memory footprint** — all experts must be stored/loaded | huge HBM / offload | [inference & serving](inference-serving.md) |
-| **Irregular compute** — variable tokens-per-expert breaks dense GEMM | kernel inefficiency | [kernels](kernels.md) |
-| **Capacity & padding** — fixed buffers waste or drop tokens | quality/throughput trade | [load balancing](load-balancing.md), [systems](systems-ep.md) |
+| 成本                                                     | 被咬的地方             | 涵蓋於                                                  |
+| -------------------------------------------------------- | ---------------------- | ------------------------------------------------------- |
+| **負載不平衡**— router 崩潰為一些流行的 experts          | 浪費了 experts，掉隊者 | [負載平衡](load-balancing.md)                           |
+| **離散 routing**— top-k 不可微，不穩定                   | training 背離          | [training stability](training-stability.md)             |
+| **all-to-all 通訊**— tokens 必須前往其 expert 的 GPU     | 網路綁定層             | [systems & EP](systems-ep.md)                           |
+| **記憶體佔用**— 所有 experts 都必須儲存/載入             | 巨大的 HBM/卸載        | [inference & serving](inference-serving.md)             |
+| **不規則計算**— 變數 tokens-per-expert 破壞了密集的 GEMM | kernel 效率低          | [kernels](kernels.md)                                   |
+| **容量與填充**— 修復緩衝區浪費或下降 tokens              | 品質/throughput 貿易   | [負載平衡](load-balancing.md)、[systems](systems-ep.md) |
 
-The art of MoE is paying these costs efficiently enough that the
-FLOPs-decoupling win survives. Everything else in this part is about that.
+MoE 的藝術在於足夠有效地支付這些成本，以便
+失敗——解耦的勝利得以延續。這部分的其他內容都是關於這個的。
 
-## A back-of-envelope comparison
+## 粗略比較
 
-Compare a dense FFN vs an MoE FFN at the same *active* compute, hidden $d$,
-$d_{ff}=4d$, $E$ experts, top-$k$:
+在相同的「活動」計算下比較密集 FFN 與 MoE FFN，隱藏 $d$，
+$d_{ff}=4d$、$E$ experts、上-$k$：
 
-- Dense FFN params: $\approx 8 d^2$ (up+down). FLOPs/token: $\approx 16 d^2$.
-- MoE: params $\approx 8 d^2 E$; FLOPs/token $\approx 16 d^2 k$ (plus a tiny
-  router $d\times E$). Same FLOPs as dense when $k=1$, $E$× the parameters.
+- 密集 FFN 參數：$\approx 8 d^2$（上+下）。失敗次數/token：$\approx 16 d^2$。
+- MoE：參數 $\approx 8 d^2 E$； FLOPs/token $\approx 16 d^2 k$（加上一個微小的
+  router $d\times E$）。當 $k=1$、$E$× 參數時，FLOPs 與密集相同。
 
-So at $k=1$ you get $E$× the FFN capacity for the *same* FLOPs, plus a negligible
-router cost — minus the systems overheads above. The whole engineering question
-is how small you can make those overheads.
+因此，在 $k=1$，你將獲得 $E$× _相同_ FLOP 的 FFN 容量，加上可忽略的
+router 成本 — 減去上述系統開銷。整個工程問題
+就是你可以將這些管理費用減少到多少。
 
-## Key takeaways
+## 要點
 
-- MoE **decouples total parameters (capacity) from active parameters (FLOPs)**.
-  Capacity scales with $E$; compute scales with $k$.
-- The win is **quality per FLOP / per inference dollar**, achieved by buying
-  capacity in cheap memory rather than expensive compute. It is *not* better
-  quality-per-parameter.
-- Sparsity imports load-balancing, communication, memory, and kernel-irregularity
-  costs — the subject of the rest of Part II.
+- MoE**將總參數（容量）與活動參數 (FLOP) 解耦**。
+  容量可隨 $E$ 擴充；使用 $k$ 計算秤。
+- 獲勝是**每 FLOP 的品質/每 inference 美元**，透過購買實現
+  便宜記憶體而不是昂貴的計算能力。這*不是*更好
+  每個參數的品質。
+- 稀疏性導入負載平衡、通訊、記憶體和 kernel-不規則性
+  成本——第二部分其餘部分的主題。
 
-## Exercises
+## 練習
 
-!!! tip "Solutions"
-    Worked answers are on the [Part solutions page](../solutions/moe.md). Try each exercise before expanding.
+!!! tip "解決方案"
+    參考解答位於 [解答頁](../solutions/moe.md) 上。請先嘗試每個練習，再展開解答。
 
-1. For $E=128$, $k=2$, $d=4096$, compute total vs active FFN parameters and the
-   FLOPs-per-token ratio against the dense $E=1$ baseline.
-2. DeepSeek-V3: 671B total, 37B active. What effective sparsity ratio is that?
-   How does it compare to Mixtral 8×7B?
-3. Argue both sides: when would you prefer a dense 37B model over a 671B/37B-active
-   sparse one? Consider memory, latency at batch 1, and fine-tuning.
-4. If experts are offloaded to CPU/NVMe and streamed in, which roofline axis
-   (compute or bandwidth) becomes the new limiter? (Foreshadows
-   [inference & serving](inference-serving.md).)
+1. 對於 $E=128$、$k=2$、$d=4096$，計算總 FFN 參數與有效 FFN 參數及
+   每 token 的 FLOPs 與密集 $E=1$ 基線的比率。
+2. DeepSeek-V3：總共 671B，活躍 37B。那有效稀疏比是多少？
+   它與 Mixtral 8×7B 相比如何？
+3. 爭論雙方：什麼時候你喜歡密集的 37B 型號而不是 671B/37B-active
+   稀疏的一個？考慮記憶體、第 1 批的 latency 以及微調。
+4. 如果 experts 被卸載到 CPU/NVMe 並流入，roofline 軸
+   （計算或頻寬）成為新的限制因素？ （預示
+   [inference & serving](inference-serving.md)。 ）
 
-## References
+## 參考文獻
 
-- Shazeer et al. *Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer.* 2017.
-- Lepikhin et al. *GShard.* 2020.
-- Fedus, Zoph, Shazeer. *Switch Transformer.* 2021.
-- Clark et al. *Unified Scaling Laws for Routed Language Models.* 2022.
-- DeepSeek-AI. *DeepSeek-V3 Technical Report.* 2024.
+- 沙澤爾等人。 _極為龐大的神經網路：experts 層的稀疏門控混合。 _ 2017。
+- 萊皮欣等人。 _GShard。 _ 2020。
+- 費杜斯、佐夫、沙吉爾。 _開關 Transformer。 _ 2021 年。
+- 克拉克等人。 _路由語言模型的統一縮放法則。 _ 2022。
+- DeepSeek-AI。 _DeepSeek-V3 技術報告。 _ 2024 年。

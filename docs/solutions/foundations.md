@@ -1,232 +1,234 @@
-# Solutions — Part I · Foundations
+# 解決方案 — 第一部分·基礎
 
 <div class="page-meta">
-  <span class="chip"><strong>Covers:</strong> Transformer-as-system, Attention efficiency, FlashAttention, Numerics</span>
-  <span class="chip"><strong>Use:</strong> attempt first, then check</span>
+  <span class="chip"><strong>涵蓋：</strong>Transformer系統、attention效率、Flashattention、數位</span>
+  <span class="chip"><strong>使用：先試試</strong>，再檢查</span>
 </div>
 
-Worked answers to the exercises in [Part I](../foundations/index.md). Numbers
-use round hardware specs (A100 ≈ 312 TFLOP/s bf16 / 2.0 TB/s; H100 ≈ 990 TFLOP/s
-bf16 / 3.35 TB/s; MI300X ≈ 1.3 PFLOP/s bf16 / 5.3 TB/s); your exact deltas will
-shift with the chip you assume, but the *regime* (memory- vs compute-bound) is
-what matters.
+解答 [Part I](../foundations/index.md) 中的練習。數位
+使用圓形硬體規格（A100 ≈ 312 TFLOP/s bf16 / 2.0 TB/s；H100 ≈ 990 TFLOP/s
+bf16 / 3.35 TB/秒； MI300X ≈ 1.3 PFLOP/s bf16 / 5.3 TB/s)；你的確切增量將
+隨你假設的晶片而變化，但*制度*（記憶體與計算限制）是
+重要的是。
 
-## The transformer from scratch
+## 從頭開始 Transformer
 
-??? success "1 — Trace the shapes"
-    Starting from token ids $[N]$:
+??? success "1 — 描繪形狀"
+    從 token id $[N]$ 開始：
 
-    | After | Shape |
+    |之後|形狀|
     |---|---|
-    | embedding | $[N, d]$ |
-    | $QK^\top$ | $[N, N]$ ← **quadratic in $N$** |
-    | softmax | $[N, N]$ |
-    | $\times V$ | $[N, d_h]$ (per head) |
-    | $W_O$ | $[N, d]$ |
-    | LM head | $[N, V]$ |
 
-    Only the $QK^\top$ score matrix (and its softmax) is quadratic in sequence
-    length — the cost FlashAttention attacks. Everything else is linear in $N$.
+|嵌入| $[N, d]$ |
+| $QK^\top$ | $[N, N]$ ←**$N$ 中的二次**|
+|軟最大| $[N, N]$ |
+| $\times V$ | $[N, d_h]$（每頭）|
+| $W_O$ | $[N, d]$ |
+| LM 頭| $[N, V]$ |
 
-??? success "2 — Head dim and GQA cache savings"
-    $d_h = d/h = 4096/32 = 128$. Full multi-head caches K,V for all 32 heads;
-    8-head GQA caches for only 8 → the per-token KV cache shrinks by
-    $32/8 = \mathbf{4\times}$. The query heads stay at 32; only K,V are shared
-    across groups of 4 query heads.
+    只有 $QK^\top$ 分數矩陣（及其 softmax）在序列上是二次的
+    length — Flashattention 攻擊的成本。 $N$ 中的其他一切都是線性的。
 
-??? success "3 — Why residuals and layer norm"
-    **Residual** ($x+\text{sublayer}(x)$): gives gradients an identity path so they
-    don't vanish through a deep stack, and lets each layer *refine* the
-    representation rather than rebuild it. Without it, deep models barely train
-    (gradients shrink/explode geometrically with depth). **Layer norm**: keeps each
-    sublayer's input at a stable scale so activations don't drift over depth and
-    saturate the nonlinearity. Without it, training is unstable and
-    learning-rate-fragile.
+??? success "2 — 頭部暗淡和 GQA 快取節省"
+    $d_h = d/h = 4096/32 = 128$。所有 32 個磁頭均具有完整的多磁頭快取 K、V；
+    8 頭 GQA 快取僅為 8 → 每個 token KV 快取縮小
+    $32/8 = \mathbf{4\times}$。查詢頭保持在 32；僅共用 K,V
+    跨 4 個查詢頭組。
 
-??? success "4 — Why cache K/V but not Q"
-    The causal mask makes attention lower-triangular: token $t$ attends to keys/
-    values $1..t$, and *those vectors never change* as generation proceeds — so
-    they can be cached and reused. The **query**, by contrast, is needed only for
-    the **current** token being generated; past queries have already produced their
-    outputs and are never reused. So K/V accumulate in a cache; Q is computed fresh
-    for the one new token each step.
+??? success "3 - 為什麼殘差和層範數"
+    **殘差**($x+\text{sublayer}(x)$)：為漸變提供身份路徑，以便它們
+    不要透過深堆疊消失，並讓每一層“細化”
+    代表而不是重建它。沒有它，深度模型幾乎無法訓練
+    （梯度隨深度呈幾何收縮/爆炸）。**圖層規範**：保留每個
+    子層的輸入處於穩定的規模，因此活化不會隨著深度的變化而漂移
+    使非線性飽和。沒有它，training 不穩定並且
+    學習率脆弱。
 
-??? success "5 — FFN vs attention params; MoE"
-    Per layer attention projections ($W_Q,W_K,W_V,W_O$) ≈ $4d^2$; the FFN
-    (up $4d^2$ + down $4d^2$) ≈ $8d^2$. So the **FFN dominates** (~2× attention)
-    — for $d=4096$, ~$1.3\times10^8$ vs ~$6.7\times10^7$ params/layer. An
-    [MoE](../moe/index.md) layer replaces the single FFN with many experts and
-    routes each token to only $k$ of them: total FFN params grow by the expert
-    count while *active* params-per-token stay ~$k$ experts' worth — decoupling
-    capacity from compute.
+??? success "4 — 為什麼快取 K/V 而不是 Q"
+    因果掩碼使 attention 成為下三角： token $t$ 關注鍵/
+    值 $1..t$，並且*這些向量永遠不會隨著生成的進行而改變* - 所以
+    它們可以被快取和重複使用。相比之下，**查詢**僅需要
+    **目前**token 正在產生；過去的查詢已經產生了它們的
+    輸出並且永遠不會重複使用。所以 K/V 在快取中累積；Q 是新計算的
+    每一步都有一個新的 token。
 
-## Transformer as a system
+??? success "5 — FFN 與 attention 參數；MoE"
+    每層 attention 投影($W_Q,W_K,W_V,W_O$) ≈ $4d^2$；FFN
+    （向上 $4d^2$ + 向下 $4d^2$） ≈ $8d^2$。所以**FFN 主導**(~2× attention)
+    — 對於 $d=4096$、~$1.3\times10^8$ 與~$6.7\times10^7$ 參數/層。安
+    [MoE](../moe/index.md)層用許多 experts 和
+    將每個 token 僅路由到其中的 $k$：總 FFN 參數依 expert 成長
+    在 _active_ params-per-token 保持 ~$k$ experts' 值時進行計數 — 解耦
+    計算能力。
 
-??? success "1 — Forward FLOPs for a 7B model, 4096 tokens"
-    Forward is $\approx 2P$ FLOPs per token (one multiply-add per parameter):
+## Transformer 作為一個系統
+
+??? success "1 — 7B 模型的正向觸發器，4096 tokens"
+    前向是每個 token 的 $\approx 2P$ FLOP（每個參數一次乘加）：
 
     $$ 2 \times 7\times10^9 \times 4096 \approx 5.7\times10^{13}\ \text{FLOPs}. $$
 
-    On an MI300X at 60% MFU the sustained rate is $0.6 \times 1.3\times10^{15}
-    \approx 7.8\times10^{14}$ FLOP/s, so
+    在 60% MFU 的 MI300X 上，持續費率為 $0.6 \times 1.3\times10^{15}
+    \約 7.8\times10^{14}$ FLOP/s，所以
 
     $$ t \approx \frac{5.7\times10^{13}}{7.8\times10^{14}} \approx 73\ \text{ms}. $$
 
-    The attention-score term ($\propto N^2$) is small here — at $N=4096$ it adds
-    only a few percent — which is exactly why the $2P$ rule is a good first
-    estimate until context gets long.
+    attention 分數項目 ($\propto N^2$) 在這裡很小 — 在 $N=4096$ 處它添加了
+    只有百分之幾——這正是為什麼 $2P$ 法則是個好的第一規則
+    估計直到上下文變長。
 
-??? success "2 — Sequence length where attention = linear FLOPs"
-    Per layer, parameters $\approx 12d^2$ (attention $4d^2$ for $W_{q,k,v,o}$ +
-    FFN $8d^2$), so **linear** forward FLOPs $\approx 2\cdot 12d^2 \cdot N = 24Nd^2$.
-    **Attention-score** FLOPs (QKᵀ + AV) $\approx 4N^2 d$. Setting equal:
+??? success "2 — 序列長度，其中 attention = 線性 FLOP"
+    每層，參數 $\approx 12d^2$（$W_{q,k,v,o}$ + attention $4d^2$）
+    FFN $8d^2$)，因此**線性**向前 FLOPs $\approx 2\cdot 12d^2 \cdot N = 24Nd^2$。
+    **attention-分數**失敗次數 (QKᵀ + AV) $\approx 4N^2 d$。設定相等：
 
     $$ 4N^2 d = 24 N d^2 \;\Rightarrow\; N = 6d. $$
 
-    For $d=5120$, $N \approx 3.1\times10^{4}$ tokens. Below that, the matmuls
-    dominate the FLOP bill; past it attention's quadratic term takes over — which
-    is why long-context work lives or dies on attention efficiency, not the FFN.
+    適用於 $d=5120$、$N \approx 3.1\times10^{4}$、tokens。在此之下，matmuls
 
-??? success "3 — bf16 LayerNorm: FLOPs, bytes, regime"
-    Elements $= 32 \times 2048 \times 4096 \approx 2.68\times10^{8}$.
+主導翻牌帳單；經過它 attention 的二次項接管 - 這
+這就是為什麼長上下文工作的生死取決於 attention 效率，而不是 FFN。
 
-    - **FLOPs:** mean, variance, normalize, scale+shift ≈ ~10 FLOPs/elem →
-      $\approx 2.7\times10^{9}$.
-    - **Bytes:** read input + write output in bf16 = $2+2 = 4$ bytes/elem →
-      $\approx 1.07\times10^{9}$ bytes (the $\gamma,\beta$ vectors are negligible).
-    - **Intensity:** $I \approx 2.7\times10^9 / 1.07\times10^9 \approx 2.5$ FLOP/byte.
+??? success "3 — bf16 LayerNorm：FLOPs、位元組、機制"
+    元素 $= 32 \times 2048 \times 4096 \approx 2.68\times10^{8}$。
 
-    A100 ridge $= 312\text{T}/2.0\text{T} \approx 156$ FLOP/byte. Since
-    $2.5 \ll 156$, LayerNorm is **deeply memory-bound** — almost pure data
-    movement. **Yes, fuse it** into the adjacent matmul/residual so the tensor is
-    never round-tripped to HBM just to be normalized.
+    -**FLOPs：**平均值、變異數、歸一化、縮放+移位 ≈ ~10 FLOPs/elem →
+      $\approx 2.7\times10^{9}$。
+    -**位元組：**讀取輸入 + 寫入 bf16 中的輸出 = $2+2 = 4$ 位元組/elem →
+      $\approx 1.07\times10^{9}$ 位元組（$\gamma,\beta$ 向量可以忽略不計）。
+    -**強度：**$I \approx 2.7\times10^9 / 1.07\times10^9 \approx 2.5$ FLOP/位元組。
 
-??? success "4 — Re-deriving the 6P rule"
-    Per token:
+    A100 脊 $= 312\text{T}/2.0\text{T} \approx 156$ FLOP/位元組。自從
+    $2.5 \ll 156$，LayerNorm**深受記憶體限制**— 幾乎是純數據
+    運動。**是的，將其融合到相鄰的矩陣乘/殘差中，因此張量為
+    永遠不會為了標準化而往返 HBM。
 
-    - **Forward:** every parameter is used in one multiply-add = **2 FLOPs** →
-      $2P$. *(The factor of 2 is the MAC: one multiply + one add.)*
-    - **Backward:** you compute the gradient w.r.t. the layer **input** ($2P$)
-      *and* w.r.t. the **weights** ($2P$) → $4P$.
+??? success "4——重新推導 6P 規則"
+    根據 token：
 
-    Total $2P + 4P = 6P$. *(The factor of 3 = one forward + two backward passes;
-    $2P \times 3 = 6P$.)* Every place a matmul appears, its transpose appears
-    twice in the backward — that is where the 3 comes from.
+    -**正向：**每個參數都用於一次乘加 =**2 FLOPs**→
+      $2P$。 *（2 的因數是 MAC：一次乘法 + 一次加法。）*
+    -**向後：**你計算梯度 w.r.t。層**輸入**($2P$)
+      *和* w.r.t。**權重**($2P$) → $4P$。
 
-## Attention efficiency
+    總計 $2P + 4P = 6P$。 *（係數 3 = 一次向前傳球 + 兩次向後傳球；
+    $2P \times 3 = 6P$.)* 每個 matmul 出現的地方都會出現它的轉置
+    向後兩次——這就是 3 的由來。
 
-??? success "1 — KV-cache size for a GQA model"
-    Per token per layer: $2\ (\text{K,V}) \times n_{kv} \times d_h \times 2\
-    \text{bytes} = 2 \times 8 \times 128 \times 2 = 4096$ B $= 4$ KB.
+## attention 效率
+
+??? success "1 - GQA 模型的 KV 快取大小"
+    每層 token：$2\ (\text{K,V}) \times n_{kv} \times d_h \times 2\
+    \text{bytes} = 2 \times 8 \times 128 \times 2 = 4096$ B $= 4$ KB。
 
     $$ 4\,\text{KB} \times L(32) \times N(8192) \times B(16) \approx 1.7\times10^{10}\ \text{B} \approx 17\ \text{GB}. $$
 
-    The 7B weights in bf16 are $\approx 14$ GB. So at this batch/length the **KV
-    cache already exceeds the weights** — concrete motivation for GQA/MLA and for
-    why decode is memory-bound.
+    bf16中的7B權重為$\approx 14$ GB。所以在這個批次/長度下**KV
+    快取已經超過了權重**——GQA/MLA 和
+    為什麼 decode 受記憶體限制。
 
-??? success "2 — Arithmetic intensity of one decode step"
-    One query attends to $t$ cached keys. FLOPs $\approx \underbrace{2td_h}_{QK^T}
-    + \underbrace{2td_h}_{AV} = 4td_h$. Bytes (read K,V) $\approx 2\cdot t d_h \cdot
-    2 = 4td_h$. Therefore
+??? success "2 — 算術強度 的一個 decode 步"
+    一項查詢涉及 $t$ 快取的金鑰。失敗次數 $\approx \underbrace{2td_h}_{QK^T}
+    + \underbrace{2td_h}_{AV} = 4td_h$. Bytes (read K,V) $\約 2\cdot t d_h \cdot
+    2 = 4td_h$。因此
 
     $$ I = \frac{4td_h}{4td_h} = O(1)\ \text{FLOP/byte}, $$
 
-    independent of $t$. Decode reads the *entire* KV cache to emit **one** token
-    — the canonical memory-bound op, and the reason batching many requests is the
-    main throughput lever.
+    獨立於$t$。 decode 讀取*整個* KV 快取以發出**一個**token
+    — 規範的記憶體綁定操作，批次許多請求的原因是
+    主 throughput 控制桿。
 
-??? success "3 — Fragmentation waste with 16-token blocks"
-    A length-$\ell$ sequence uses $\lceil \ell/16\rceil$ blocks; wasted slots
-    $= 16\lceil\ell/16\rceil - \ell$. With $\ell$ uniform, $\ell \bmod 16$ is
-    ~uniform on $\{0..15\}$, so mean waste $\approx 7.5$ slots/sequence. As a
-    fraction of used memory: $7.5 / \overline{\ell} = 7.5/2048 \approx 0.37\%$.
-    Negligible — that is precisely why paged KV uses small blocks instead of
-    pre-reserving max length (which wastes ~50%).
+??? success "3 — 具有 16-token 塊的碎片廢物"
+    長度為 $\ell$ 的序列使用 $\lceil \ell/16\rceil$ 區塊；浪費的插槽
+    $= 16\lceil\ell/16\rceil - \ell$。與$\ell$統一，$\ell \bmod 16$是
+    ~在 $\{0..15\}$ 上統一，因此意味著浪費 $\approx 7.5$ 插槽/序列。作為一個
+    已用記憶體的比例：$7.5 / \overline{\ell} = 7.5/2048 \approx 0.37\%$。
+    可以忽略不計——這正是分頁 KV 使用小塊而不是
+    pre-reserving 最大長度（浪費約 50%）。
 
-??? success "4 — MLA cache ratio vs GQA"
-    GQA caches $2\,n_{kv}d_h$ per token-layer; MLA caches a single latent of dim
-    $d_c$ (K and V are reconstructed by an up-projection at compute time):
+??? success "4 — MLA 快取比率與 GQA"
+    GQA 在每個 token 層快取 $2\,n_{kv}d_h$； MLA 快取單一潛在的暗淡
+    $d_c$（K 和 V 在計算時透過上投影重建）：
 
     $$ \frac{\text{MLA}}{\text{GQA}} \approx \frac{d_c}{2\,n_{kv}d_h}. $$
 
-    With DeepSeek-style $d_c \approx 512$ this is several-fold to an
-    order-of-magnitude smaller cache. The **trade**: less memory and bandwidth at
-    decode (the binding constraint) in exchange for extra FLOPs to up-project the
-    latent back to K/V each step — a good deal precisely because decode is
-    memory-bound, so the added compute is nearly free.
+對於 DeepSeek 風格的 $d_c \approx 512$，這是
+數量級較小的快取。**交易**：更少的記憶體和頻寬
+decode（綁定約束）以換取額外的 FLOP 來向上投影
+每一步都潛在地回到 K/V——這很重要，因為 decode 是
+受記憶體限制，因此增加的計算幾乎是免費的。
 
-## FlashAttention
+## Flashattention
 
-??? success "1 — Online-softmax combiner is exact"
-    For two chunks with local maxes $m_1,m_2$, denominators $\ell_1,\ell_2$, and
-    partial outputs $O_1,O_2$, let $m=\max(m_1,m_2)$ and
+??? success "1 — Online-softmax 組合器是精確的"
+    對於兩個具有局部最大值 $m_1,m_2$、分母 $\ell_1,\ell_2$ 的區塊，以及
+    部分輸出 $O_1,O_2$，讓 $m=\max(m_1,m_2)$ 和
 
     $$ \ell = \ell_1 e^{m_1-m} + \ell_2 e^{m_2-m},\qquad
        O = \frac{O_1\,\ell_1 e^{m_1-m} + O_2\,\ell_2 e^{m_2-m}}{\ell}. $$
 
-    Because $e^{x_i-m_1}\cdot e^{m_1-m} = e^{x_i-m}$, every term is re-expressed
-    against the *global* max, so $\ell$ becomes $\sum_i e^{x_i-m}$ and $O$ becomes
-    $\sum_i \mathrm{softmax}(x)_i v_i$ over the union — **identical** to one-pass
-    softmax. Folding is associative, so any number of chunks is exact.
+    因為$e^{x_i-m_1}\cdot e^{m_1-m} = e^{x_i-m}$，每一項都被重新表達
+    反對*全局*最大值，因此 $\ell$ 變成 $\sum_i e^{x_i-m}$，$O$ 變成
+    $\sum_i \mathrm{softmax}(x)_i v_i$ 透過聯合 —**與一次性相同**
+    軟最大。折疊是關聯的，因此任何數量的塊都是精確的。
 
-??? success "2 — Why subtract the running max"
-    With a score of $+100$, naive fp16 computes $e^{100}$, which overflows
-    (fp16 max $= 65504 \ll e^{100}$) → `inf` → `nan` after normalization. The
-    stable form subtracts the max first: $e^{100-100}=1$, all terms in $[0,1]$,
-    no overflow. Subtracting the max changes nothing mathematically (it cancels
-    in the ratio) but everything numerically.
+??? success "2 — 為什麼減去運行最大值"
+    分數為 $+100$，樸素的 fp16 計算出 $e^{100}$，結果溢出
+    (fp16 最大 $= 65504 \ll e^{100}$) → `inf` → 歸一化後的 `nan`。的
+    穩定形式先減去最大值：$e^{100-100}=1$，$[0,1]$中的所有項，
+    沒有溢出。減去最大值在數學上沒有任何變化（它取消了
+    比例）但一切都是數字。
 
-??? success "3 — Skipping fully-masked tiles under causality"
-    Causal masking means query-tile $i$ only needs key-tiles $j \le i$. Of an
-    $n\times n$ tile grid you compute the lower triangle, $n(n+1)/2$ tiles. For
-    $N=4096$ with tile $128$, $n=32$: computed $= 32\cdot33/2 = 528$ of $1024$ →
-    **~48% of the score FLOPs eliminated**, approaching the $\tfrac{n-1}{2n}\to
-    50\%$ asymptote.
+??? success "3 — 在因果關係下跳過完全屏蔽的圖塊"
+    因果屏蔽意味著查詢圖塊 $i$ 僅需要關鍵圖塊 $j \le i$。的一個
+    $n\times n$ 平鋪網格你計算下三角形，$n(n+1)/2$ 平鋪。對於
+    $N=4096$ 與瓦片 $128$、$n=32$：計算出 $1024$ 的 $= 32\cdot33/2 = 528$ →
+    **~48% 的 FLOP 被消除**，接近 $\tfrac{n-1}{2n}\to
+    50\%$ 漸近線。
 
-??? success "4 — HBM bytes: naive vs flash at N=8192, d=128 (per head)"
-    Naive materializes the $N\times N$ score matrix (write then re-read for
-    softmax): $\approx 2 \cdot N^2 \cdot 2\,\text{B} = 4N^2 \approx 2.7\times10^8$
-    B ≈ **270 MB**. Flash never writes $S$; it streams Q,K,V once and writes O:
-    $\approx (3{\cdot}Nd + Nd)\cdot 2 = 8Nd \approx 8\times10^6$ B ≈ **8 MB** —
-    roughly **30× less traffic**. On an H100 (ridge ≈ $990\text{T}/3.35\text{T}
-    \approx 295$ FLOP/byte) the naive version sits left of the ridge
-    (memory-bound on the $S$ round-trip); flash raises $I$ past the ridge into
-    compute-bound territory.
+??? success "4 — HBM 位元組：N=8192、d=128（每頭）時的樸素 vs 快閃記憶體"
+    Naive 實現了 $N\times N$ 分數矩陣（寫入然後重新讀取
+    Softmax）：$\approx 2 \cdot N^2 \cdot 2\,\text{B} = 4N^2 \approx 2.7\times10^8$
+    B ≈**270 MB**。 Flash 從不寫入$S$；它串流 Q、K、V 一次並寫入 O：
+    $\approx (3{\cdot}Nd + Nd)\cdot 2 = 8Nd \approx 8\times10^6$ B ≈**8 MB**—
+    大約**流量減少 30 倍**。在 H100 上（脊 ≈ $990\text{T}/3.35\text{T}
+    \大約 295$ FLOP/位元組）天真的版本位於山脊左側
+    （$S$ 往返內存受限）；閃光燈將 $I$ 升過山脊進入
+    受計算限制的領域。
 
-## Numerics & precision
+## 數字和精度
 
-??? success "1 — Largest finite-`exp` logit: fp16 vs bf16"
-    `exp(x)` is finite while $x < \ln(\text{max normal})$.
+??? success "1 — 最大有限 `exp` logit：fp16 與 bf16"
+    `exp(x)` 是有限的，而 $x < \ln(\text{max normal})$ 是有限的。
 
-    - **fp16** (5 exponent bits, max $65504$): $x < \ln 65504 \approx 11.1$.
-    - **bf16** (8 exponent bits, max $\approx 3.4\times10^{38}$): $x < \ln(3.4\times10^{38}) \approx 88.7$.
+    -**fp16**（5 個指數位，最大 $65504$）：$x < \ln 65504 \approx 11.1$。
+    -**bf16**（8 個指數位，最大 $\approx 3.4\times10^{38}$）：$x < \ln(3.4\times10^{38}) \approx 88.7$。
 
-    The 8 vs 5 exponent bits give bf16 fp32-level *range*, so softmax logits that
-    instantly overflow fp16 are comfortably safe in bf16 — a core reason bf16 is
-    the default training dtype.
+    8 vs 5 指數位給出 bf16 fp32 等級 *範圍*，因此 softmax logits
+    立即溢出 fp16 在 bf16 中非常安全——bf16 的一個核心原因是
+    預設 training 資料類型。
 
-??? success "2 — bf16 loses a $10^6 \times$ `1e-3` sum; fp32 recovers it"
-    True sum $= 1000$. bf16 has 8 mantissa bits (~2–3 decimal digits). Once the
-    running total passes ~256, the ULP exceeds $10^{-3}$, so each new addend
-    rounds away (**swamping**) and the sum stalls far below 1000. An fp32
-    accumulator (23 mantissa bits, ~7 digits) keeps $10^{-3}$ significant well
-    past 1000, recovering the right answer. Lesson: **reduce in fp32** even when
-    inputs are bf16.
+??? success "2 — bf16 遺失 $10^6 \times$ `1e-3` 總和；fp32 恢復它"
+    真和$= 1000$。 bf16 有 8 個尾數位（約 2-3 位十進制數字）。一旦
+    運行總次數約 256，ULP 超過 $10^{-3}$，因此每個新加數
+    四捨五入（**沼澤**）並且總和遠低於 1000。 fp32
+    累加器（23 個尾數位，約 7 位元）可保持 $10^{-3}$ 有效
+    超過 1000，恢復正確答案。教訓：**即使在下列情況下也要減少 fp32**
+    輸入為 bf16。
 
-??? success "3 — Dynamic loss scaling; why bf16 rarely halves"
-    Keep a scale $S$: multiply the loss by $S$ before `backward`, unscale grads
-    before `step`. If any grad is `inf`/`nan`, **skip the step and halve $S$**;
-    after $N$ clean steps, **double $S$**. The halve branch fires only on
-    overflow, which is an fp16 problem (5 exponent bits, tiny range). bf16 shares
-    fp32's exponent range, so gradients essentially never overflow/underflow —
-    loss scaling is an fp16 fix and is usually unnecessary in bf16.
+??? success "3 — 動態損失縮放；為什麼 bf16 很少減半"
+    保持縮放$S$：在`backward`之前將損失乘以$S$，取消縮放梯度
+    在`step`之前。若任意等級為`inf`/`nan`，**跳過此步驟，將$S$減半**；
+    在 $N$ 清潔步驟之後，**雙 $S$**。半分支僅在
+    溢出，這是一個 fp16 問題（5 個指數位，很小的範圍）。 BF16 股
+    fp32 的指數範圍，因此梯度基本上不會上溢/下溢 —
+    損失縮放是 fp16 的修復，在 bf16 中通常是不必要的。
 
-??? success "4 — fp8 E4M3 with per-tensor scale, max = 1000"
-    E4M3 max representable $\approx 448$. Pick scale $s = 448/1000 = 0.448$ so the
-    tensor max lands near the top of range. **Quantize** $q = \text{cast}_{E4M3}(x
-    \cdot s)$; **dequantize** $\hat x = q / s$. With 3 mantissa bits the
-    half-ULP relative error is $\le 2^{-(3+1)} = 6.25\%$ (a few percent typical).
-    The error is dominated by the **coarse mantissa**, not the scale choice —
-    which is why fp8 needs fine-grained (per-tensor/per-block) scaling and is
-    applied to tolerant tensors (e.g. routed-expert weights), not the router.
+??? success "4 — fp8 E4M3，每個張量尺度，最大值 = 1000"
+    E4M3 最大可代表$\approx 448$。挑選秤 $s = 448/1000 = 0.448$ 所以
+    張量最大值接近範圍的頂端。**量化**$q = \text{cast}_{E4M3}(x
+    \cdot s)$;**dequantize**$\hat x = q / s$。具有 3 個尾數位
+    半 ULP 相對誤差為 $\le 2^{-(3+1)} = 6.25\%$（典型值為幾個百分點）。
+    誤差主要由**粗尾數**決定，而非比例選擇 -
+    這就是為什麼 fp8 需要細粒度（每個張量/每個區塊）縮放並且是
+    應用於容錯張量（例如路由 expert 權重），而不是 router。

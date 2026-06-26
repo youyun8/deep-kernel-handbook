@@ -1,38 +1,38 @@
-# GPU programming model & memory hierarchy
+# GPU 程式設計模型與記憶體層次結構
 
 <div class="page-meta">
-  <span class="chip"><strong>Level:</strong> beginner → intermediate</span>
-  <span class="chip"><strong>Prereqs:</strong> <a href="../../foundations/transformer-systems/">roofline</a></span>
-  <span class="chip"><strong>Hardware:</strong> none (a GPU helps for the later tracks)</span>
+  <span class="chip"><strong>等級：</strong>初級→中階</span>
+  <span class="chip"><strong>先決條件：</strong> <a href="../../foundations/transformer-systems/">roofline</a></span>
+  <span class="chip"><strong>硬體：</strong> 無（GPU 有助於後面的曲目）</span>
 </div>
 
-To write fast kernels you need a correct mental model of how a GPU executes code
-and where data lives. This page builds that model from the memory hierarchy up,
-in **CUDA and ROCm/HIP terms together**, so the [Triton](triton-track.md) and
-[CUDA/HIP](cuda-hip-track.md) tracks have firm ground.
+要快速編寫 kernels，你需要一個關於 GPU 如何執行程式碼的正確思維模型
+以及數據所在的位置。該頁面從記憶體層次結構向上建構該模型，
+在**CUDA 和 ROCm/HIP 術語一起**中，因此 [Triton](triton-track.md) 和
+[CUDA/HIP](cuda-hip-track.md) 路線有穩固基礎。
 
-## The execution hierarchy
+## 執行層次
 
-A GPU runs a **kernel** as a grid of threads, organized hierarchically:
+GPU 將**kernel**作為執行緒網格運行，以層次結構組織：
 
-| Level | NVIDIA term | AMD term | What it is |
-|---|---|---|---|
-| Single lane | thread | work-item | one scalar execution stream |
-| Lock-step group | **warp (32)** | **wavefront (64)** | threads that execute together (SIMT) |
-| Cooperating group | thread block | workgroup | shares fast on-chip memory, can sync |
-| Whole launch | grid | grid | all blocks for one kernel |
-| Hardware unit | SM (streaming multiprocessor) | CU (compute unit) | runs many warps/wavefronts concurrently |
+| 水平     | NVIDIA 術語        | AMD 術語       | 它是什麼                     |
+| -------- | ------------------ | -------------- | ---------------------------- |
+| 單車道   | 執行緒             | 工作項目       | 一個標量執行流程             |
+| 鎖步組   | **經線 (32)**      | **波前 (64)**  | 一起執行的線程 (SIMT)        |
+| 合作團體 | 線程塊             | 工作小組       | 共享快速片上記憶器，可以同步 |
+| 整體推出 | 網格               | 網格           | 一個 kernel 的所有區塊       |
+| 硬體單元 | SM（流式多處理器） | CU（計算單元） | 同時運行許多扭曲/波前        |
 
-The **SIMT** model: within a warp/wavefront, all lanes execute the *same*
-instruction on different data. A branch where lanes disagree (**divergence**)
-serializes the two paths — a major performance pitfall. The single most important
-NVIDIA↔AMD difference: **warp = 32, wavefront = 64**. Code that assumes 32 (e.g.
-a hardcoded shuffle reduction) is wrong on AMD; always use `warpSize`.
+**SIMT**模型：在扭曲/波前內，所有通道執行*相同*
+不同數據的指令。車道不一致的分支（**分歧**）
+序列化兩條路徑－這是一個主要的效能缺陷。最重要的一個
+NVIDIA↔AMD 差異：**扭曲 = 32，波前 = 64**。假設為 32 的代碼（例如
+硬編碼的隨機減少）在 AMD 上是錯誤的；始終使用 `warpSize`。
 
-## The memory hierarchy
+## 記憶體層次結構
 
-This is where the roofline lives. Latency and bandwidth differ by orders of
-magnitude across levels:
+這就是 roofline 所在的地方。 latency 和頻寬的順序不同
+跨等級的大小：
 
 ```mermaid
 flowchart TD
@@ -43,107 +43,100 @@ flowchart TD
     class H flagship;
 ```
 
-| Space | NVIDIA | AMD | Scope | Rough role |
-|---|---|---|---|---|
-| Registers | registers | registers | thread | operands |
-| On-chip scratch | **shared memory (SMEM)** | **LDS** | block/workgroup | staging tiles, reductions |
-| Cache | L1/L2 | L1/L2 | varies | automatic reuse |
-| Device DRAM | global / HBM | global / HBM | grid | the big tensors |
+| 空間      | 英偉達                 | AMD        | 範圍      | 粗角色         |
+| --------- | ---------------------- | ---------- | --------- | -------------- |
+| 暫存器    | 暫存器                 | 暫存器     | 執行緒    | 操作數         |
+| 片上刮痕  | **共享記憶體（SMEM）** | **摩門教** | 塊/工作組 | 分段瓷磚，減少 |
+| 快取      | L1/L2                  | L1/L2      | 變更      | 自動重複使用   |
+| 設備 DRAM | 全球 / HBM             | 全球 / HBM | 網格      | 大張量         |
 
-**The golden rule of GPU performance**: move data from HBM into registers/SMEM
-**once**, do as much work on it as possible, then write back. This is literally
-"raise arithmetic intensity" from the [roofline](../foundations/transformer-systems.md) —
-FlashAttention, grouped GEMM, and every fused kernel are instances of it.
+**GPU 效能的黃金法則**：將資料從 HBM 移至暫存器/SMEM
+**一次**，盡可能地處理它，然後寫回來。這實際上是
+來自 [roofline](../foundations/transformer-systems.md) 的「提高 算術強度」 —
+Flashattention、分組 GEMM 和每個融合的 kernel 都是它的實例。
 
-## Coalescing and bank conflicts
+## 合併與銀行衝突
 
-Two access patterns dominate kernel performance:
+兩種存取模式主導 kernel 效能：
 
-- **Coalesced global access**: consecutive lanes in a warp should read
-  consecutive addresses, so the hardware merges them into a few wide memory
-  transactions. Strided/scattered access wastes bandwidth (the MoE gather is
-  exactly this risk — [kernels](../moe/kernels.md)).
-- **Bank conflicts in SMEM/LDS**: shared memory is split into banks; if multiple
-  lanes hit the same bank, accesses serialize. Pad tile widths to avoid it.
+-**合併全域存取**：經紗中的連續通道應讀取
+連續的位址，因此硬體將它們合併到幾個寬記憶體中
+交易。跨步/分散訪問浪費頻寬（MoE 收集是
+正是這種風險 - [kernels](../moe/kernels.md)）。 -**SMEM/LDS 中的儲存體衝突**：共享記憶體被分割成多個儲存體；如果有多個
+通道到達同一銀行，存取串行化。墊塊寬度以避免它。
 
-## Occupancy
+## 入住率
 
-**Occupancy** = how many warps/wavefronts are resident per SM/CU, bounded by the
-scarcest resource: registers per thread, SMEM/LDS per block, or block-count
-limits. More resident warps → more latency hiding (while one warp waits on HBM,
-another computes). But maximum occupancy isn't always fastest — a kernel that
-uses lots of registers/SMEM per thread (e.g. a big matmul tile) may run faster at
-*lower* occupancy because each thread does more work. Occupancy is a means
-(latency hiding), not the goal (throughput).
+**佔用率**= 每個 SM/CU 駐留有幾個扭曲/波前，以
+最稀缺的資源：每個執行緒的暫存器、每個區塊的 SMEM/LDS 或區塊計數
+限制。更多常駐扭曲 → 更多 latency 隱藏（當一個扭曲等待 HBM 時，
+另一個計算）。但最大入住率並不總是最快——kernel
+每個執行緒使用大量暫存器/SMEM（例如，一個大的 matmul 區塊）可能會運行得更快
+*降低*佔用率，因為每個執行緒執行更多工作。佔有是一種手段
+（latency 隱藏），不是目標（throughput）。
 
-!!! note "AMD specifics that change tuning"
-    Occupancy on CDNA is measured per **CU** with **LDS** and **VGPR** limits,
-    and the 64-wide wavefront means a 256-thread block is 4 wavefronts (vs 8
-    warps on NVIDIA) — so the same block size implies different occupancy and
-    different ideal tile sizes. Matrix math maps to **MFMA** instructions
-    (vs NVIDIA Tensor Core `mma`). Profile with **rocprof/Omniperf** rather than
-    Nsight.
+!!! note "改變調整的 AMD 細節"
+    CDNA 的佔用率以**CU**測量，並具有**LDS**和**VGPR**限制，
+    64 寬波前意味著 256 線程塊有 4 個波前（相對於 8 個波前）
+    NVIDIA 上的扭曲）—因此相同的區塊大小意味著不同的佔用率和
+    不同的理想磁磚尺寸。矩陣數學映射到**MFMA**指令
+    （與 NVIDIA Tensor Core `mma` 相比）。使用**rocprof/Omniperf**而不是進行設定文件
+    視力。
 
-## The launch, in both dialects
+## 兩種方言的發布
 
 === "CUDA"
-
-    ```cpp
+`cpp
     __global__ void add(const float* a, const float* b, float* c, int n) {
         int i = blockIdx.x * blockDim.x + threadIdx.x;
         if (i < n) c[i] = a[i] + b[i];
     }
     add<<<(n + 255) / 256, 256>>>(a, b, c, n);   // grid, block
-    ```
-
-=== "ROCm / HIP"
-
-    ```cpp
+    `
+=== "ROCm/HIP"
+`cpp
     #include <hip/hip_runtime.h>
     __global__ void add(const float* a, const float* b, float* c, int n) {
         int i = blockIdx.x * blockDim.x + threadIdx.x;   // identical body
         if (i < n) c[i] = a[i] + b[i];
     }
     hipLaunchKernelGGL(add, dim3((n+255)/256), dim3(256), 0, 0, a, b, c, n);
-    ```
+    `
+kernel 本體相同； HIP 是 CUDA 概念之上的一個薄可移植層。
+*效能*工作 — 切片尺寸、波前感知縮減、LDS 與 SMEM
+大小調整、MFMA 與 Tensor Core — 是你的專長。這就是本期的主題
+[CUDA/HIP track](cuda-hip-track.md)。不過，對大多數 kernels 來說，
+[Triton](triton-track.md) 讓你可以跳過此步驟，仍然獲得接近峰值的效能
+可移植——從這裡開始。
 
-The kernel body is identical; HIP is a thin portability layer over CUDA concepts.
-The *performance* work — tile sizes, wavefront-aware reductions, LDS vs SMEM
-sizing, MFMA vs Tensor Core — is where you specialize. That's the subject of the
-[CUDA/HIP track](cuda-hip-track.md). For most kernels, though,
-[Triton](triton-track.md) lets you skip this and still get near-peak performance
-portably — start there.
+## 要點
 
-## Key takeaways
+- GPU 以鎖步方式執行線程網格**warps (32, NVIDIA)**/
+  **SIMT**模型下 SM/CU 上的**波前（64、AMD）**；分支分歧
+  序列化。 -**記憶體層次結構**（暫存器 → SMEM/LDS → L2 → HBM → 主機）跨越順序
+  數量級；黃金法則是**加載一次，最大限度地重複使用**- 即提高
+  算術強度。 -**合併**全域訪問，**避免 SMEM/LDS 中的銀行衝突**，並處理
+  **佔用**作為 latency 隱藏的手段，而不是目的。
+- CUDA 和 HIP 共享概念和來源； AMD 的不同之處在於波前寬度、LDS、
+  MFMA、每個 CU 佔用率和工具 - 進行相應調整。
 
-- GPUs execute a grid of threads in lock-step **warps (32, NVIDIA)** /
-  **wavefronts (64, AMD)** on SMs/CUs under the **SIMT** model; branch divergence
-  serializes.
-- The **memory hierarchy** (registers → SMEM/LDS → L2 → HBM → host) spans orders
-  of magnitude; the golden rule is **load once, reuse maximally** — i.e. raise
-  arithmetic intensity.
-- **Coalesce** global accesses, **avoid bank conflicts** in SMEM/LDS, and treat
-  **occupancy** as a latency-hiding means, not an end.
-- CUDA and HIP share concepts and source; AMD differs in wavefront width, LDS,
-  MFMA, per-CU occupancy, and tooling — tune accordingly.
+## 練習
 
-## Exercises
+!!! tip "解決方案"
+    參考解答位於 [解答頁](../solutions/performance.md) 上。請先嘗試每個練習，再展開解答。
 
-!!! tip "Solutions"
-    Worked answers are on the [Part solutions page](../solutions/performance.md). Try each exercise before expanding.
+1. 為什麼為 32 通道編寫的扭曲/波前減少會給出錯誤的結果
+   CDNA？重寫它以使用 `warpSize`。
+2. 對於在 64K SM 上使用 64 個暫存器/執行緒和 48 KB SMEM/區塊的 kernel
+   寄存器和 100 KB SMEM，估計佔用限制器。
+3. 顯示針對行主張量合併但不合併的記憶體存取模式
+   它的轉置；與 MoE 收集有關。
+4. 解釋什麼時候*降低*佔用率可以提高 throughput（提示：暫存器重
+   matmul 瓷磚）。
 
-1. Why does a warp/wavefront reduction written for 32 lanes give wrong results on
-   CDNA? Rewrite it to use `warpSize`.
-2. For a kernel using 64 registers/thread and 48 KB SMEM/block on an SM with 64K
-   registers and 100 KB SMEM, estimate the occupancy limiter.
-3. Show a memory access pattern that is coalesced for a row-major tensor but not
-   its transpose; relate to the MoE gather.
-4. Explain when *lowering* occupancy can raise throughput (hint: register-heavy
-   matmul tiles).
+## 參考文獻
 
-## References
-
-- NVIDIA CUDA C++ Programming Guide.
-- AMD ROCm / HIP Programming Guide; CDNA3 ISA (MI300).
-- Volkov. *Better Performance at Lower Occupancy.* 2010.
-- *Programming Massively Parallel Processors* (Hwu, Kirk, El Hajj).
+- NVIDIA CUDA C++ 程式設計指南。
+- AMD ROCm / HIP 程式指南； CDNA3 ISA (MI300)。
+- 沃爾科夫。 _以更低的佔用率實現更好的效能。 _ 2010。
+- _大規模平行處理器程式設計_（Hwu、Kirk、El Hajj）。

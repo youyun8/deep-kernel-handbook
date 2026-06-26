@@ -1,33 +1,33 @@
-# Profiling & methodology
+# 分析和方法
 
 <div class="page-meta">
-  <span class="chip"><strong>Level:</strong> all</span>
-  <span class="chip"><strong>Prereqs:</strong> <a href="../../foundations/transformer-systems/">roofline</a></span>
-  <span class="chip"><strong>Hardware:</strong> GPU to run profilers</span>
+  <span class="chip"><strong>等級：</strong> 全部</span>
+  <span class="chip"><strong>先決條件：</strong> <a href="../../foundations/transformer-systems/">roofline</a></span>
+  <span class="chip"><strong>硬體：</strong> GPU 用於運行分析器</span>
 </div>
 
-**Read this early and reread it often.** Every optimization in this handbook is
-justified by a measurement, and most measurement is wrong the first time. This
-page covers how to benchmark a GPU correctly, the pitfalls that produce fake
-speedups, and how to read a profile to find the real bottleneck.
+**儘早閱讀並經常重讀。**本手冊中的每項優化都是
+透過測量來證明其合理性，並且大多數測量第一次都是錯誤的。這個
+該頁面介紹如何正確對 GPU 進行基準測試，以及產生假冒產品的陷阱
+加速，以及如何閱讀設定檔以找到真正的瓶頸。
 
-## Measure against a target, not a vibe
+## 針對目標而非氛圍進行衡量
 
-Always start from the [roofline](../foundations/transformer-systems.md): compute
-the *theoretical* time for your op (FLOPs/π if compute-bound, bytes/β if
-memory-bound). That number is your target. "It takes 2 ms" is meaningless;
-"it takes 2 ms against a 1.1 ms roofline → 50% of peak" is actionable. Without a
-target you can't tell a good kernel from a bad one.
+始終從 [roofline](../foundations/transformer-systems.md) 開始：計算
+你的操作的*理論*時間（如果受計算限制，則為 FLOPs/π；如果受計算限制，則為位元組/β）
+內存限制）。這個數字就是你的目標。 「需要 2 毫秒」毫無意義；
+「roofline 需要 2 毫秒，而 roofline 需要 1.1 毫秒 → 峰值的 50%」是可行的。沒有一個
+目標是你無法區分 kernel 的好壞。
 
-Compute **MFU** (model FLOPs utilization) for training: $\text{MFU} =
-\frac{6 P \cdot \text{tokens/s}}{\pi}$. Healthy large-model training is roughly
-40–55% MFU; if you're at 15%, communication or a stall — not the matmuls — is the
-problem.
+計算 training 的**MFU**（模型 FLOP 使用率）： $\text{MFU} =
+\frac{6 P \cdot \text{tokens/s}}{\pi}$。健康大型號 training 大致是
+40–55% MFU；如果你處於 15%，那麼溝通或失速（而不是 matmuls）才是最重要的
+問題。
 
-## Benchmarking a GPU correctly
+## 正確地對 GPU 進行基準測試
 
-GPU kernels launch **asynchronously**, so naive timing measures launch latency,
-not execution. The rules:
+GPU kernels**非同步**啟動，因此天真的計時措施啟動 latency，
+不執行。規則：
 
 ```python
 import torch
@@ -45,64 +45,55 @@ def benchmark(fn, iters=100, warmup=20):
     return start.elapsed_time(end) / iters    # ms per iter (use CUDA events!)
 ```
 
-The non-negotiables:
+不可協商的事項：
 
-1. **Warm up.** The first call pays JIT/autotune, allocator, and cuDNN/cuBLAS
-   algorithm-selection costs, and the GPU may be at a low clock. Discard it.
-2. **Use CUDA events** (`torch.cuda.Event`), not `time.time()` — events measure
-   on-device time and bracket async work correctly.
-3. **`synchronize()`** before and after timing; otherwise you time the launch, not
-   the kernel.
-4. **Repeat and aggregate.** Report median (robust to outliers), and the spread.
-5. **Lock clocks if you can** (`nvidia-smi -lgc` / `rocm-smi --setperflevel`) so
-   thermal/boost variation doesn't masquerade as a regression.
+1. **熱身。**第一次呼叫支付 JIT/autotune、分配器和 cuDNN/cuBLAS
+   演算法選擇成本，且 GPU 的時鐘可能較低。丟棄它。
+2. **使用 CUDA 事件**(`torch.cuda.Event`)，而非 `time.time()` — 事件測量
+   設備上時間和括號異步工作正常。
+   3、**`synchronize()`**計時前後；否則你會為發射計時，而不是
+   kernel。
+3. **重複並彙總。**報告中位數（對異常值穩健）和分佈。
+4. ** 如果可以的話，鎖定時鐘**(`nvidia-smi -lgc` / `rocm-smi --setperflevel`)
+   熱/升壓變化不會偽裝成回歸。
 
-On AMD the same applies with `torch.cuda` (HIP-backed) APIs;
-`triton.testing.do_bench` handles warmup + events for you and is the easy default.
+在 AMD 上，這也適用於 `torch.cuda`（HIP 支援）API；
+`triton.testing.do_bench` 為你處理熱身+事件，並且是簡單的預設設定。
 
-## The pitfalls that produce fake speedups
+## 產生虛假加速的陷阱
 
-These bite everyone at least once:
+這些至少咬每個人一次：
 
-- **No warmup** → you "optimized away" first-call overhead, not the kernel.
-- **No sync** → you measured launch latency (~microseconds), reporting an
-  absurd speedup.
-- **Dead-code elimination** → the compiler dropped your kernel because the output
-  is unused. *Consume the output* (sum it, return it).
-- **Caching / constant folding** → identical inputs every iter let caches or the
-  framework short-circuit. Vary inputs or clear caches if relevant.
-- **Including H2D/D2H transfers** in a compute benchmark → you measured PCIe.
-  Keep tensors on-device; time the copy separately if it matters.
-- **Tiny problem sizes** → dominated by launch overhead; not representative of the
-  real workload. Benchmark realistic shapes.
-- **Clock drift / thermal throttling** → run long enough or lock clocks; a "2%
-  regression" is often just boost variance.
-- **Comparing apples to oranges** → different precision, batch, or sequence length
-  between baseline and optimized. Change one thing at a time.
-- **Cherry-picking one shape** → report a sweep; a kernel fast at one size can be
-  slow at others (this is why we [autotune](triton-track.md)).
+-**無需預熱**→ 你「優化掉」了首次呼叫開銷，而不是 kernel。 -**無同步**→ 你測量了啟動 latency（~微秒），報告了
+荒謬的加速。 -**死程式碼消除**→ 編譯器刪除了你的 kernel 因為輸出
+未使用。 _消耗輸出_（求和，返回）。 -**快取/常數折疊**→ 每個 iter 讓快取或相同的輸入
+框架短路。改變輸入或清除快取（如果相關）。 -**在計算基準測試中包含 H2D/D2H 傳輸**→ 你測量了 PCIe。
+將張量保留在設備上；如果重要的話，單獨計時。 -**小問題規模**→ 由啟動開銷主導；不代表
+實際工作量。對真實形狀進行基準測試。 -**時鐘漂移/熱節流**→ 運行足夠長的時間或鎖定時鐘；一個「2%
+迴歸”通常只是增加變異數。 -**比較蘋果和橘子**→ 不同的精確度、批次或序列長度
+介於基線和最佳化之間。一次改變一件事。 -**挑選一個形狀**→ 報告掃蕩；一個 kernel 快速在一個尺寸可以
+別人慢（這就是我們[autotune](triton-track.md)的原因）。
 
-!!! warning "The cardinal rule: verify correctness first"
-    A fast kernel that returns wrong numbers is infinitely slow at its job. Every
-    `code/` kernel here checks `torch.allclose` against a reference *before* any
-    timing. Benchmark only verified code.
+!!! warning "基本規則：首先驗證正確性"
+    傳回錯誤數字的快速 kernel 的工作速度無限慢。每個
+    `code/` kernel 這裡檢查 `torch.allclose` 與任何*之前*的參考
+    時機。僅對經過驗證的程式碼進行基準測試。
 
-## Reading a profile
+## 讀取個人資料
 
-Wall-clock tells you *how slow*; a profiler tells you *why*. Two views:
+掛鐘告訴你*有多慢*；分析器會告訴你*原因*。兩種觀點：
 
-- **Timeline / system view** (Nsight Systems; rocprof + Perfetto): shows kernels,
-  memcpys, and gaps on a timeline. Look for **gaps** (CPU-bound launch overhead,
-  Python, sync points), **serialized comm** (an all-reduce/all-to-all not
-  overlapping compute — the [MoE](../moe/systems-ep.md) failure mode), and which
-  kernels dominate.
-- **Kernel view** (Nsight Compute; Omniperf): per-kernel counters — achieved
-  occupancy, memory throughput vs peak, compute throughput vs peak,
-  warp-stall reasons. This tells you the **regime**: if memory throughput is near
-  peak and compute is low, you're memory-bound (fuse / raise intensity); the
-  reverse means compute-bound (lower precision / fewer FLOPs).
+-**時間軸/系統視圖**（Nsight Systems；rocprof + Perfetto）：顯示 kernels，
+memcpys，以及時間線上的間隙。尋找**差距**（CPU 限制的啟動開銷，
+Python，同步點），**序列化通訊**（all-reduce/all-to-all 不是
+重疊計算 — [MoE](../moe/systems-ep.md) 故障模式），以及
+kernels 為主。 -**kernel 視圖**（Nsight Compute；Omniperf）：每個 kernel 計數器 — 已實現
+佔用率、記憶體 throughput 與峰值、計算 throughput 與峰值、
+翹曲失速原因。這告訴你**制度**：如果內存 throughput 接近
+峰值和計算量較低，你會受到記憶體限制（熔斷/提高強度）；的
+反向意味著計算限制（較低的精度/較少的 FLOP）。
 
-The PyTorch profiler is the easy on-ramp (no external tool):
+PyTorch 分析器是簡單的入門工具（無需外部工具）：
 
 ```python
 from torch.profiler import profile, ProfilerActivity
@@ -113,54 +104,55 @@ print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=15))
 # prof.export_chrome_trace("trace.json")  # view in chrome://tracing / Perfetto
 ```
 
-## A profiling workflow
+## 分析工作流程
 
-1. **Roofline first** — compute the target time and the expected regime.
-2. **Timeline view** — is time in kernels, gaps, or comm? Fix gaps/comm before
-   micro-optimizing kernels (often the bigger win).
-3. **Kernel view on the top kernel** — confirm the regime, find the limiter
-   (memory throughput? occupancy? stalls?).
-4. **Optimize the limiter**, not what's easy — raise intensity if memory-bound,
-   cut FLOPs/precision if compute-bound, overlap if comm-bound.
-5. **Re-measure correctly** (warmup, events, sync, sweep) and compare to target.
-6. **Repeat** until you're near the roofline or out of headroom.
+1. **首先是 roofline**— 計算目標時間和預期狀態。
+2. **時間軸視圖**— 時間是 kernels、間隙還是通訊？修復之前的間隙/通訊
+   微優化 kernels（通常是更大的勝利）。
+3. **kernel 頂部視圖 kernel**— 確認狀態，找到限制器
+   （內存 throughput？佔用？卡頓？）。
+4. **優化限制器**，這不是一件容易的事 - 如果內存有限，則提高強度，
+   如果計算受限，則削減 FLOPs/精度；如果通訊受限，則重疊。
+5. **正確重新測量**（預熱、事件、同步、掃描）並與目標進行比較。
+6. **重複**，直到你靠近 roofline 或超出淨空高度。
 
-| Profiler | NVIDIA | AMD |
-|---|---|---|
-| Timeline | Nsight Systems | rocprof (+ Perfetto) |
-| Kernel counters | Nsight Compute | Omniperf / rocprof |
-| In-framework | PyTorch profiler | PyTorch profiler (ROCm) |
-| Quick kernel timing | `triton.testing.do_bench` | same |
+| 探查器           | 英偉達                    | AMD                   |
+| ---------------- | ------------------------- | --------------------- |
+| 時間軸           | Nsight 系統               | rocprof (+ Perfetto)  |
+| kernel 櫃檯      | Nsight 計算               | Omniperf/rocprof      |
+| 框架內           | PyTorch 分析器            | PyTorch 分析器 (ROCm) |
+| 快速 kernel 計時 | `triton.testing.do_bench` | 相同                  |
 
-## Key takeaways
+## 要點
 
-- **Compute a roofline target first** — a measured time means nothing without one;
-  track **MFU** for training.
-- Benchmark with **warmup + CUDA events + synchronize + repeat + locked clocks**,
-  and **consume the output** so it isn't optimized away.
-- Most "speedups" are artifacts: no sync, no warmup, dead-code elimination,
-  included transfers, tiny shapes, clock drift. Change one variable at a time.
-- Use the **timeline view** to find gaps/serialized comm and the **kernel view**
-  to find the per-kernel limiter; **optimize the limiter**. Verify correctness
-  before timing.
+-**先計算 roofline 目標**— 沒有測量時間就沒有任何意義；
+追蹤 training 的**MFU**。
 
-## Exercises
+- 使用**預熱 + CUDA 事件 + 同步 + 重複 + 鎖定時鐘**進行基準測試，
+  並且**消耗輸出**，因此它不會被最佳化掉。
+- 大多數「加速」都是偽影：沒有同步、沒有預熱、死碼消除、
+  包括轉移、微小形狀、時鐘漂移。一次更改一個變數。
+- 使用**時間軸視圖**尋找間隙/序列化通訊和**kernel 視圖**
+  找到每個 kernel 限制器；**最佳化限制器**。驗證正確性
+  在計時之前。
 
-!!! tip "Solutions"
-    Worked answers are on the [Part solutions page](../solutions/performance.md). Try each exercise before expanding.
+## 練習
 
-1. Take the [Triton softmax](triton-track.md), benchmark it wrong (no
-   warmup/sync) then right; quantify the difference.
-2. Profile a small transformer's decode step; identify whether attention, the FFN,
-   or launch overhead dominates, and propose a fix.
-3. Compute MFU for a training run given tokens/s and GPU peak; diagnose a 15% MFU
-   result.
-4. Construct a benchmark where dead-code elimination hides the kernel, then fix it
-   by consuming the output.
+!!! tip "解決方案"
+    參考解答位於 [解答頁](../solutions/performance.md) 上。請先嘗試每個練習，再展開解答。
 
-## References
+1. 拿[Triton softmax](triton-track.md)，基準測試錯誤（沒有
+   熱身/同步）然後對；量化差異。
+2. 剖析小型 Transformer 的 decode 步驟；辨識是否為 attention、FFN、
+   或啟動開銷占主導地位，並提出修復方案。
+3. 給定 tokens/s 和 GPU 峰值，計算 training 運行的 MFU；診斷 15% MFU
+   結果。
+4. 建立一個基準測試，其中死程式碼消除隱藏了 kernel，然後修復它
+   透過消耗輸出。
 
-- Williams et al. *Roofline.* 2009.
-- NVIDIA Nsight Systems / Nsight Compute documentation.
-- AMD rocprof / Omniperf documentation.
-- PyTorch Profiler and `triton.testing` docs.
+## 參考文獻
+
+- 威廉斯等人。 _roofline。 _ 2009 年。
+- NVIDIA Nsight 系統/Nsight 計算文件。
+- AMD rocprof / Omniperf 文件。
+- PyTorch Profiler 和 `triton.testing` 文件。
