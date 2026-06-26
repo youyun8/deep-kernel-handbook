@@ -2,12 +2,12 @@ site_name: 深核手冊
 site_description: >-
   深核手冊：從模型數學、乾淨參考實作到多 GPU 效能工程，系統化看穿現代
   ML 系統如何在 GPU kernel 上跑得快。核心深度路線：Mixture-of-Experts (MoE) 與 AITER。
-site_author: ml-perf-handbook contributors
-site_url: https://youyun8.github.io/ml-perf-handbook/
+site_author: deep-kernel-handbook contributors
+site_url: https://youyun8.github.io/deep-kernel-handbook/
 
 # Repository
-repo_name: youyun8/ml-perf-handbook
-repo_url: https://github.com/youyun8/ml-perf-handbook
+repo_name: youyun8/deep-kernel-handbook
+repo_url: https://github.com/youyun8/deep-kernel-handbook
 edit_uri: edit/main/docs/
 
 copyright: >-
@@ -67,7 +67,7 @@ theme:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/youyun8/ml-perf-handbook
+      link: https://github.com/youyun8/deep-kernel-handbook
   generator: false
 
 extra_css:
