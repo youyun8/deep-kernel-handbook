@@ -1,51 +1,41 @@
-# training MoE 穩定性
+# 訓練穩定性
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong>中階→高階</span>
-  <span class="chip"><strong>先備知識：</strong> <a href="../load-balancing/">負載平衡</a>、<a href="../../foundations/numerics-precision/">數位</a></span>
+  <span class="chip"><strong>先備知識：</strong> <a href="../load-balancing/">負載平衡</a>、<a href="../../foundations/numerics-precision/">數值與精度</a></span>
   <span class="chip"><strong>硬體：</strong> 無</span>
 </div>
 
-MoE 比密集模型更難訓練，因為**routing 是離散的並且
-自我強化**。小數值擾動會翻轉 routing 決策，其中
-更改哪些參數獲得梯度，這會再次更改 routing。本頁
-涵蓋特定的病理學和標準修復：**router z-loss**，
-**初始化**，router 的精確規則，以及一些實用的
-護欄。
+MoE 比密集模型更難訓練，因為 **routing 既離散又會自我強化**。微小的數值擾動就能翻轉 routing
+決策，改變哪些參數拿到梯度，而這又會再次改變 routing。本頁談這些特定的病態與標準解法：
+**router z-loss**、**初始化**、router 的精度紀律，以及一些實務護欄。
 
 ## 為什麼 MoE training 很敏感
 
-三個耦合問題：
+三個彼此耦合的問題：
 
-1. **離散性。**Top-$k$ 是一個硬性的、不可微分的選擇。大門
-   權重是可微的，但*其中*experts 運作不可微。一個微小的改變
-   logit 可以將 token 移到不同的 expert — 不連續跳轉
-   損失面。
-2. **自我強化。**與 [負載平衡](load-balancing.md) 一樣，routing 是
-   容易崩潰的正向回饋環路。
-3. **Logit 膨脹。**router logits 沒有任何內在限制。如果它們長大了
-   大時，softmax 飽和（routing 幾乎變成熱狀態並且「凍結」——不
-   梯度來逃避錯誤的分配），而大的 logits 與
-   [low precision](../foundations/numerics-precision.md)。
+1. **離散性。** top-$k$ 是一個硬性、不可微的選擇。gate 權重可微，但*哪些* expert 被啟用這件事
+   不可微。一個極小的 logit 變動就能把 token 移到不同 expert——在損失面上造成不連續的跳動。
+2. **自我強化。** 如同 [負載平衡](load-balancing.md)，routing 是一個容易崩塌的正回饋迴圈。
+3. **logit 膨脹。** router logits 本身沒有任何約束。一旦變大，softmax 飽和（routing 幾乎變成
+   one-hot 並「凍結」——沒有梯度可以逃離錯誤分配），而大的 logit 又和
+   [低精度](../foundations/numerics-precision.md)互動不良。
 
-未經處理的結果：損失尖峰、NaN、「死」experts 和 routing
-很早就鎖定並且永遠不會恢復。
+不處理的後果：損失尖峰、NaN、「死」expert，以及很早就鎖死、再也回不來的 routing。
 
 ## router z 損失
 
-router z 損失（來自 ST-MoE）直接懲罰大的 router logits 以保持
-Softmax 處於理智狀態。對於每個 token 的 logits $x \in \mathbb{R}^{E}$：
+router z-loss（出自 ST-MoE）直接懲罰過大的 router logits，讓 softmax 保持清醒。對每個 token 的
+logits $x \in \mathbb{R}^{E}$：
 
-$$ \mathcal{L}_{z} = \frac{\beta}{T}\sum_{t=1}^{T}\Big(\log\sum*{e=1}^{E} e^{x*{t,e}}\Big)^{2}. $$
+$$ \mathcal{L}_{z} = \frac{\beta}{T}\sum_{t=1}^{T}\Big(\log\sum_{e=1}^{E} e^{x_{t,e}}\Big)^{2}. $$
 
-術語 $\log\sum_e e^{x_e}$ 是對數分割區（softmax 歸一化器）；
-對它進行平方和懲罰會將 logits 拉向較小的值。效果：
+其中 $\log\sum_e e^{x_e}$ 是 log-partition（softmax 的歸一化器）；對它平方並懲罰，會把 logits
+往較小的值拉。效果：
 
-- 保持 `exp` 參數較小 → bf16/fp16 中**無溢出**，softmax 更穩定。
-- 防止澆口飽和至結凍狀態 → routing 保留
-  *塑膠*並且可以糾正早期的錯誤。
-- 微小係數 ($\beta \approx 10^{-3}$) — 它是正規化器，而不是主係數
-  客觀。
+- 讓 `exp` 的引數維持小 → 在 bf16/fp16 中**不溢位**，softmax 更穩定。
+- 防止 gate 飽和到凍結狀態 → routing 保持*可塑*，能修正早期的錯誤。
+- 係數很小（$\beta \approx 10^{-3}$）——它是正規化項，不是主要目標。
 
 ```python
 def router_z_loss(logits, beta=1e-3):
@@ -54,93 +44,89 @@ def router_z_loss(logits, beta=1e-3):
     return beta * (logsumexp**2).mean()
 ```
 
-MoE training 總損失：
+MoE training 的總損失：
 
-$$ \mathcal{L} = \mathcal{L}_{\text{LM}} + \alpha\,\mathcal{L}_{\text{aux}} + \beta\,\mathcal{L}\_{z}, $$
+$$ \mathcal{L} = \mathcal{L}_{\text{LM}} + \alpha\,\mathcal{L}_{\text{aux}} + \beta\,\mathcal{L}_{z}, $$
 
-（$\mathcal{L}_{\text{aux}}$ 可選地替換為
-[aux-loss-free bias](load-balancing.md)）。即使在 aux-loss-free 中，z-loss 也被保留
-食譜——它解決了 logit 大小，這是一個與平衡不同的問題。
+（$\mathcal{L}_{\text{aux}}$ 可選擇換成 [aux-loss-free 偏差](load-balancing.md)）。即使在
+aux-loss-free 的配方裡，z-loss 仍會保留——它處理的是 logit 大小，這跟平衡是兩個不同的問題。
 
 ## router 的精確紀律
 
-這就是[numerics](../foundations/numerics-precision.md)和 MoE 的碰撞點。
-routing 是一個由 logits 之間的「微小差異」驅動的「離散」決策，因此
-舍入雜訊會翻轉分配並破壞回授迴路的穩定性。
+這是 [數值與精度](../foundations/numerics-precision.md)和 MoE 正面相撞的地方。routing 是一個由
+logit 之間「微小差距」驅動的「離散」決策，所以捨入雜訊會翻轉分配、破壞回饋迴路的穩定。
 
--**計算 router logits、softmax/sigmoid 和 fp32 中的 aux/z 損失**，甚至
-在 BF16 型號。 router 矩陣很小 - fp32 成本可以忽略不計
-穩定性增益大。 -**偏移控制器的計數必須在 fp32**中減少並同步
-跨數據並行排名，或不同排名針對不同目標進行平衡。
+- **router logits、softmax/sigmoid 與 aux/z-loss 一律用 fp32 計算**，即使是 bf16 模型。router
+  矩陣很小，fp32 成本可忽略，但穩定性收益很大。
+- **偏差控制器的計數必須以 fp32 reduce 並跨 data-parallel rank 同步**，否則不同 rank 會朝不同
+  目標平衡。
+- 在任何 softmax 之前都先減掉 max（用 `logsumexp`／`log_softmax` 即免費取得）。
 
-- 在任何 softmax 之前減去 max（透過 `logsumexp`/`log_softmax` 免費）。
-
-!!! warning "經典的無聲蟲子"
-    bf16 中的 routing 可以使兩個 experts' logits 平手（bf16 有 ~7 尾數
-    位），並且決勝局（argmax/topk）變得任意且依賴於排名
-    在資料並行性下 - 不同的副本以不同的方式路由相同的 token，
-    破壞平衡統計。 fp32 router 數學避免了它。
+!!! warning "經典的無聲 bug"
+    在 bf16 裡做 routing，可能讓兩個 expert 的 logit 打平（bf16 只有約 7 個 mantissa bit），於是
+    決勝（argmax/topk）變得任意、而且在 data parallel 下依 rank 而異——不同副本把同一個 token
+    路由到不同地方，破壞平衡統計。用 fp32 做 router 數學可以避免。
 
 ## 初始化
 
-routing 是最脆弱的**早期**，在 experts 分化之前。好
-練習：
+routing 在**早期**最脆弱，也就是 expert 還沒分化的時候。良好實務：
 
--**小 router 初始化。**使用小秤初始化 router 重量（例如
-$\text{std}\sim 0.01$–$d^{-1/2}$ 具有額外收縮），因此初始 logits 為
-接近零 → 接近均勻的 routing→ 每個 expert 都獲得梯度並微分
-在循環崩潰之前。 （開關使用了截斷法線，並減少了
-初始化規模正是為了這個。 ） -**標準 expert 初始化。**experts 是普通 FFN；像你一樣初始化它們
-密集 FFN。 -**預熱 router/容量。**儘早獲得更大的容量係數（更少的跌落
-而 routing 是隨機的）和 LR 預熱減少了早期的不穩定。 -**共用 expert 作為穩 ​​ 定器。**A [shared expert](routing-variants.md)
-保證從步驟 0 開始的密集梯度路徑，平滑冷啟動。
+- **小的 router 初始化。** 用小尺度初始化 router 權重（例如 $\text{std}\sim 0.01$–$d^{-1/2}$
+  再額外縮小），讓初始 logit 接近零 → routing 接近均勻 → 每個 expert 都拿到梯度、在迴圈崩塌前
+  先分化開來。（Switch 用截斷常態並刻意縮小初始化尺度，正是為此。）
+- **標準的 expert 初始化。** expert 就是普通 FFN，照密集 FFN 的方式初始化即可。
+- **router/容量 warmup。** 早期用較大的容量係數（routing 還隨機時少丟一點）加上 LR warmup，可
+  降低早期不穩定。
+- **用共享 expert 當穩定器。** 一個 [共享 expert](routing-variants.md) 從第 0 步就保證有一條密集
+  梯度路徑，能平滑冷啟動。
 
 ## 其他實用護欄
 
--**梯度削波**（全球標準）－MoE 損失峰值很常見；剪輯
-防止一顆尖峰破壞運轉。 -**平衡每個微批次/每個序列的輔助損耗**，而不僅僅是全局性的，以
-避免全域統計資料隱藏的批次內熱點。 -**監控死 experts**（許多步驟零負載）和 routing 熵；一個
-熵的突然下降是崩潰的預警訊號。 -**logits 上的抖動/雜訊**（較舊的方法，例如 Switch 的乘法
-輸入抖動）增加了探索，因此 routing 不會鎖定 - 較少使用
-z-loss + 很好的 init，但仍然是一個工具。 -**保持優化器狀態 fp32**（亞當矩），標準但雙重重要
-當損失表面粗糙時。
+- **梯度裁剪（global norm）**——MoE 的損失尖峰很常見；裁剪能防止單一尖峰毀掉整個訓練。
+- **per-microbatch／per-sequence 的 auxiliary loss**，而不只是全域，以避免全域統計掩蓋掉
+  batch 內部的熱點。
+- **監控死 expert**（連續多步零負載）與 routing 熵；熵突然下降是崩塌的早期警訊。
+- **在 logit 上加 jitter/雜訊**（較舊的手法，例如 Switch 的乘法式輸入 jitter）增加探索，避免
+  routing 鎖死——有了 z-loss + 良好初始化後較少用，但仍是一項工具。
+- **optimizer 狀態保持 fp32**（Adam 的動量）——標準做法，在損失面崎嶇時格外重要。
 
 ## 診斷有問題的 MoE 運行
 
-| 症狀                                | 可能的原因                    | 修復                                         |
-| ----------------------------------- | ----------------------------- | -------------------------------------------- |
-| 早期損失峰值/NaN                    | router logit 放大； fp16 溢出 | 添加/提高 z 損失； fp32 中的路線；剪輯畢業生 |
-| 幾個 experts 得到全部 tokens        | 弱平衡                        | 提高$\alpha$或啟用偏移控制器                 |
-| 死了的 experts 再也無法恢復         | 早期倒塌，飽和閘門            | 更小的 router init，更大的早期容量，z-loss   |
-| 不同的複製品在 routing 上意見不一致 | BF16 router 領帶              | fp32 router 數學；同步偏差計數               |
-| 高掉率                              | 容量過低/不平衡               | 提高容量係數；修復平衡                       |
+| 症狀                          | 可能原因                     | 解法                                          |
+| ----------------------------- | ---------------------------- | --------------------------------------------- |
+| 早期損失尖峰／NaN             | router logit 膨脹；fp16 溢位 | 加入／提高 z-loss；router 走 fp32；裁剪梯度    |
+| 少數 expert 拿走所有 token    | 平衡太弱                     | 提高 $\alpha$ 或啟用偏差控制器                |
+| 死 expert 再也回不來          | 早期崩塌、gate 飽和          | 更小的 router 初始化、更大的早期容量、z-loss  |
+| 不同副本對 routing 意見不一   | bf16 router 打平             | router 走 fp32 數學；同步偏差計數             |
+| drop rate 過高                | 容量太低／不平衡             | 提高容量係數；修好平衡                        |
 
 ## 要點
 
-- MoE 的不穩定性源自於**離散、自我強化的 routing**和
-  **無限 router logits**。 -**router z-loss**$\beta(\log\sum e^{x})^2$ 保持 logits 小 → 穩定的 softmax，
-  無溢出，塑膠 routing。即使在無輔助損耗設定中也能保持它。 -**在 fp32 中執行所有 router 數學**- 對小 logit 差異的離散決策
-  對精確度敏感，且 bf16 關係會導致跨副本不一致。 -**小型 router 初始化+（可選）共用 expert +預熱**使脆弱
-  冷啟動可生存；剪輯梯度並監控熵/死 experts。
+- MoE 的不穩定源自**離散、自我強化的 routing**與**無界的 router logits**。
+- **router z-loss** $\beta(\log\sum e^{x})^2$ 讓 logit 維持小 → softmax 穩定、不溢位、routing
+  可塑。即使在 aux-loss-free 配方裡也要保留它。
+- **所有 router 數學都用 fp32**——基於微小 logit 差距的離散決策對精度敏感，bf16 的打平會造成
+  跨副本不一致。
+- **小 router 初始化 +（可選）共享 expert + warmup** 讓脆弱的冷啟動得以存活；裁剪梯度，並監控
+  熵與死 expert。
 
 ## 練習
 
 !!! tip "解決方案"
     參考解答位於 [解答頁](../solutions/moe.md) 上。請先嘗試每個練習，再展開解答。
 
-1. 證明最小化 $\mathcal{L}_z$ 會縮小 $\|x\|$ 並限制 softmax
-   遠離一熱。 routing 分佈的熵會發生什麼變化？
-2. 構造 router logits，其中 bf16 捨去會翻轉 argmax，但 fp32 不會。
-3. 在玩具 MoE 上，使用故意較大的 router 進行有或沒有 z 損失的訓練
-   初始化；比較損耗尖峰頻率和死亡 expert 計數。
-4. 為什麼共用 expert 可以緩解冷啟動？追蹤步驟 0 上的梯度路徑
-   對於 token，其佈線 experts 幾乎相同。
+1. 證明最小化 $\mathcal{L}_z$ 會縮小 $\|x\|$、把 softmax 從 one-hot 拉開。routing 分佈的熵會怎麼
+   變？
+2. 構造一組 router logits，使 bf16 捨入會翻轉 argmax、但 fp32 不會。
+3. 在玩具 MoE 上，用一個刻意偏大的 router 初始化，分別訓練有 z-loss 與沒有 z-loss 的版本；比較
+   損失尖峰頻率與死 expert 數。
+4. 為什麼共享 expert 能緩解冷啟動？追蹤第 0 步時，一個 token 的梯度路徑（此時其路由 expert 幾乎
+   無差別）。
 
 ## 參考文獻
 
--佐夫等。 _ST-MoE：設計穩定且可轉移的稀疏 expert 模型_（router z 損失）。 2022 年。
-
-- 費杜斯、佐夫、沙吉爾。 _開關 Transformer_（初始化、抖動、選擇性 fp32）。 2021 年。
-- 萊皮欣等人。 _GShard。 _ 2020。
-- DeepSeek-AI。 _DeepSeek-V3_（偏置控制器，穩定性配方）。 2024 年。
-- Micikevicius 等人。 _mixed precision training。 _ 2017 年。
+- Zoph et al. _ST-MoE: Designing Stable and Transferable Sparse Expert Models_（router z-loss）。2022。
+- Fedus, Zoph, Shazeer. _Switch Transformer_（初始化、jitter、選擇性 fp32）。2021。
+- Lepikhin et al. _GShard._ 2020。
+- DeepSeek-AI. _DeepSeek-V3_（偏差控制器、穩定性配方）。2024。
+- Micikevicius et al. _Mixed Precision Training._ 2017。

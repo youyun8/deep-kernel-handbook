@@ -1,34 +1,32 @@
-# Capstone：端到端建造小型 MoE LM
+# Capstone：端到端建立小型 MoE LM
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong> 中階 → 高階</span>
-  <span class="chip"><strong>先修改條件：</strong> 第 II 部分的全部 </span>
-  <span class="chip"><strong>代碼：</strong> <code>code/moe/train_tiny_moe.py</code> (CPU/GPU)</span>PH
+  <span class="chip"><strong>先備知識：</strong> 第二部全部</span>
+  <span class="chip"><strong>程式碼：</strong> <code>code/moe/train_tiny_moe.py</code>（CPU/GPU）</span>
 </div>
 
-這個 Capstone 將[Part II](../moe/index.md)的所有內容拼成一個小
-但完整的 MoE 語言模型，在玩具任務上訓練它，然後優化它並
-**報告測量的加速度**
-[profiling methodology](../performance/profiling.md)。參考是
-[`code/moe/train_tiny_moe.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/moe/train_tiny_moe.py),
-它在 CPU（小型）和單一 GPU 上運行。
+這個 Capstone 把[第二部](../moe/index.md)的所有東西拼成一個小但完整的 MoE 語言模型，在玩具
+任務上訓練它，再優化、並用 [profiling 方法論](../performance/profiling.md) **回報量測到的加速**。
+參考實作是
+[`code/moe/train_tiny_moe.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/moe/train_tiny_moe.py)，
+它在 CPU（小規模）與單張 GPU 上都能跑。
 
 ## 目標與設計
 
-現在一個字元級（或微型 BPE）解碼器專用 LM，其中 FFN 被替換為
-MoE 層，夠小，可以在筆記型電腦/GPU 上在四分之一內進行訓練。配置：
+做一個 char 級（或微型 BPE）的 decoder-only LM，把 FFN 換成 MoE 層，小到可以在筆電/GPU 上幾分鐘
+內訓完。組態：
 
-- $d_{model}=256$、$L=4$ 層、$n_{heads}=4$、$d_{ff}=512$ 抽屜專家。
-- $E=8$ 專家，嚴格$k=2$，**sigmoid 門**+ 選擇性**共享專家**。
-- 平衡度：[aux-loss-free bias controller](../moe/load-balancing.md)（+小）
+- $d_{model}=256$、$L=4$ 層、$n_{heads}=4$、每個 expert $d_{ff}=512$。
+- $E=8$ 個 expert、$k=2$、**sigmoid gate** + 選用的**共享 expert**。
+- 平衡：[aux-loss-free 偏差控制器](../moe/load-balancing.md)（外加一點點
   [z-loss](../moe/training-stability.md)）。
-- GPU 上的 bf16 自動投射；fp32 路由器數學（
-  [precision discipline](../foundations/numerics-precision.md)）。
+- GPU 上用 bf16 autocast；router 數學走 fp32（[精度紀律](../foundations/numerics-precision.md)）。
 
 ## 第 1 步 — 組裝模型
 
-重複使用組件：因果焦點（第一部分）、
-[MoE layer from scratch](../moe/moe-from-scratch.md)，及塊接線：
+重用既有元件：因果 attention（第一部）、[從零實作 MoE layer](../moe/moe-from-scratch.md)，以及
+block 接線：
 
 ```python
 class TinyMoELM(nn.Module):
@@ -51,9 +49,9 @@ class TinyMoELM(nn.Module):
         return self.head(self.norm(x)), aux
 ```
 
-## 步驟 2 — 使用平衡機進行訓練
+## 第 2 步 — 帶平衡機制訓練
 
-訓練循環添加 MoE 損失並每一步更新偏差控制器：
+訓練迴圈把 MoE 損失加進去，並在每一步更新偏差控制器：
 
 ```python
 for step, (xb, yb) in enumerate(loader):
@@ -69,88 +67,74 @@ for step, (xb, yb) in enumerate(loader):
         log_metrics(lm, load_cv(model), drop_rate(model), entropy(model))
 ```
 
-觀看 [health metrics](../moe/load-balancing.md)：損失下降，**負載 CV**下降
-接近 0，**丟棄率**低，**路由熵**穩定（不崩潰）。如果你
-查看尖峰/NaN，重新造訪 [training stability](../moe/training-stability.md)
-（z-loss、fp32 路由器、初始化、剪輯）。
+盯著 [健康指標](../moe/load-balancing.md)：損失下降、**負載 CV** 趨近 0、**drop rate** 維持低、
+**routing 熵**穩定（不崩塌）。若看到尖峰/NaN，回去看 [訓練穩定性](../moe/training-stability.md)
+（z-loss、fp32 router、初始化、梯度裁剪）。
 
 ??? success "你應該看到什麼"
-在玩具任務上，訓練損失應該會平穩下降，負載係數為
-變化應在幾內從其初始值下降到~0.1–0.2
-一百步（偏置控制器工作），且下降率應保持較低。
-禁用平衡以“看著它崩潰”——少數專家拿走了一切，
-熵崩潰－這使得平衡機械的價值變得具體。
+    在玩具任務上，訓練損失應平穩下降，負載 CV 應在幾百步內從初始值降到約 0.1–0.2（偏差控制器
+    在發揮作用），drop rate 維持低。把平衡關掉「看它崩塌」——少數 expert 吃掉一切、熵崩潰——
+    平衡機制的價值就具體了。
 
-## 第 3 步 — 優化與衡量
+## 第 3 步 — 優化並量測
 
-現在應用第三部分。**正確測量**（預熱、CUDA 事件、同步、掃描、
-鎖定時鐘 — 請參閱 [profiling](../performance/profiling.md)）與報告
-之前/之後。優化，按照該模型的大致回報順序：
+現在套用第三部。**好好量測**（warmup、CUDA event、同步、掃描、鎖頻——見
+[profiling](../performance/profiling.md)），並回報前後對比。依這個模型大致的報酬順序來優化：
 
-1. **用調度形式替換 Python 專家循環**（排序 → 分組
-   計算 → 分散），依據 [MoE-from-scratch](../moe/moe-from-scratch.md)。
-2. **為專家 ([Triton](../moe/kernels.md)) 使用分組 GEMM 核心**
-   圖形處理器；將聚集/分散融合到核心。
-3. **bf16 autocast**+ 注意力子層的融合注意力（FlashAttention）。
-4. **CUDA 圖**產生的解碼步驟（消除啟動開銷）。
-5. **量化專家**(int8/fp8) 用於推理
-   （[quantization](../performance/quantization.md)）。
+1. **用 dispatch 形式取代 Python expert 迴圈**（排序 → grouped 計算 → scatter），依
+   [從零實作 MoE layer](../moe/moe-from-scratch.md)。
+2. **在 GPU 上為 expert 用 grouped GEMM kernel**（[Triton](../moe/kernels.md)）；把 gather/scatter
+   融進 kernel。
+3. **bf16 autocast** + attention 子層用融合 attention（FlashAttention）。
+4. **CUDA graph** 包住 decode 步驟（消除啟動開銷）。
+5. **量化 expert**（int8/fp8）做 inference（[量化](../performance/quantization.md)）。
 
-報告這樣的表格（填寫*你的*測量數字並說明
-硬體/形狀 - 下面的值是說明性的）：
+回報一張像這樣的表（填上*你的*量測數字，並註明硬體/shape——下面的值僅供示意）：
 
-| 變體                | 訓練步長（毫秒） | 代幣 | MFU | 筆記                        |
-| ------------------- | ---------------: | ---: | --: | --------------------------- |
-| 天真的專家循環      |           _基線_ |    — |   — | Python 循環，參差不齊的批次 |
-| 派遣（已排序）      |                — |    — |   — | 連續的每個專家區塊          |
-| + 分組 GEMM 核心    |                — |    — |   — | 一次發射，無填充            |
-| + 融合聚集/分散     |                — |    — |   — | 節省了一次 HBM 往返行程     |
-| + bf16 + 閃光燈附加 |                — |    — |   — |                             |
+| 變體                  | 訓練步長 (ms) | tok/s | MFU | 備註                         |
+| --------------------- | ------------: | ----: | --: | ---------------------------- |
+| 樸素 expert 迴圈      |        _基線_ |     — |   — | Python 迴圈、參差不齊的批次  |
+| dispatch（已排序）    |             — |     — |   — | 每個 expert 連續區塊         |
+| + grouped GEMM kernel |             — |     — |   — | 一次啟動、無 padding         |
+| + 融合 gather/scatter |             — |     — |   — | 省下一次 HBM 往返            |
+| + bf16 + 融合 attention |           — |     — |   — |                              |
 
-Capstone 的要點是**規則**：每一行都是一個假設（“
-專家循環是發射限制的」）透過對屋頂線的正確測量進行測試
-目標，而不是氛圍。
+這個 Capstone 的重點是**紀律**：每一行都是一個假設（「expert 迴圈是 launch-bound」），用對照
+roofline 目標的正確量測去檢驗，而不是憑感覺。
 
-## 步驟 4 — 從中取樣
+## 第 4 步 — 從模型取樣
 
-確認它學到了一些東西：使用經過訓練的模型生成文字（貪婪或
-溫度採樣）。對於小型語料庫上的 char-LM，你應該在本地獲取
-連貫的文字。生成循環是添加
-[inference optimizations](../performance/inference-optimization.md)（KV 快取—
-你將添加它以及 CUDA 圖表）。
+確認它真的學到了東西：用訓練好的模型生成文字（greedy 或 temperature 取樣）。對小語料上的
+char-LM，你應該在本地就能拿到通順的文字。這個生成迴圈也是加上
+[inference 優化](../performance/inference-optimization.md)（KV cache——你會連同 CUDA graph 一起加）
+的下手處。
 
 ## 擴充
 
-- 交換 softmax↔sigmoid 門控和 aux-loss↔aux-loss-free；比較損耗和負載 CV。
-- 加入 [expert-choice routing](../moe/routing-variants.md) 並觀察
-  無掉落行為。
-- 向上擴展 $E$（細微）並觀察路由/通訊開銷的成長 — 激勵
-  [Scaling it up](scaling.md)。
+- 把 softmax↔sigmoid gating、aux-loss↔aux-loss-free 互換；比較損失與負載 CV。
+- 加入 [expert-choice routing](../moe/routing-variants.md)，觀察 dropless 行為。
+- 把 $E$ 往上擴（細粒度），觀察 routing/通訊開銷如何成長——這是 [擴展到更大規模](scaling.md) 的
+  動機。
 
 ## 重點
 
-- 完整的 MoE LM 只是連接到 Transformer 的第二部分組件加上一個
-  承載**平衡+穩定性**機械的訓練循環。
-- 優化階段是**測量、屋頂線錨定**的練習
-  工程：假設瓶頸，修復它，重新正確測量，重複。
-- 切換平衡開/關會導致崩潰——以及負載平衡的價值
-  工具包－內心清晰。
+- 一個完整的 MoE LM，不過就是接進 Transformer 的第二部元件，加上一個承載**平衡 + 穩定性**機制
+  的訓練迴圈。
+- 優化階段是一場**以量測、以 roofline 為錨**的工程練習：假設瓶頸、修掉它、重新正確量測、再重複。
+- 把平衡開關切來切去（看它崩塌），會讓負載平衡工具箱的價值變得一目了然。
 
 ## 練習
 
-!!! tip "解決方案"
-參考解答位於 [解答頁](../solutions/capstones.md) 上。請先嘗試每個練習，再展開解答。
+!!! tip "解答"
+    參考解答在 [解答頁](../solutions/capstones.md)。請先試做每一題，再展開對照。
 
-1. 運行參考，然後刪除平衡並量化崩潰（熵，
-   負載 CV，最終損失）。
-2. 實施調度表和分組 GEMM；產生前/後表
-   用正確的方法論。
-3. 將 KV 快取添加到生成循環並測量解碼延遲與
-   重新計算一切基線。
-4. 將專家量化為 int8 並報告品質（val 損失）與速度。
+1. 跑參考實作，再拿掉平衡、量化它的崩塌（熵、負載 CV、最終損失）。
+2. 實作 dispatch 與 grouped GEMM；用正確的方法論產生前/後對比表。
+3. 在生成迴圈加上 KV cache，量測 decode latency，並與「每步全部重算」的基線比較。
+4. 把 expert 量化成 int8，回報品質（val 損失）與速度。
 
 ## 參考
 
-- 所有 [Part II](../moe/index.md) 和 [Part III](../performance/index.md)。
-- 卡帕蒂。 _nanoGPT_（延伸的密集骨架）。
-- 大風等人。 _巨型塊_；江等人。 _混合_； DeepSeek-AI _DeepSeek-V3_。
+- 整個[第二部](../moe/index.md)與[第三部](../performance/index.md)。
+- Karpathy. _nanoGPT_（可擴充的密集骨架）。
+- Gale et al. _MegaBlocks_；Jiang et al. _Mixtral_；DeepSeek-AI _DeepSeek-V3_。

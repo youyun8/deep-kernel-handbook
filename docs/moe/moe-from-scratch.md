@@ -1,65 +1,58 @@
-# 從頭開始的 MoE 層
+# 從零實作 MoE layer
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong>中階</span>
-  <span class="chip"><strong>先備知識：</strong> <a href="../why-sparsity/">為什麼稀疏</a>，PyTorch</span>
-  <span class="chip"><strong>代碼：</strong> <code>code/moe/</code>（CPU，已測試）</span>
+  <span class="chip"><strong>先備知識：</strong> <a href="../why-sparsity/">為什麼需要稀疏化</a>、PyTorch</span>
+  <span class="chip"><strong>程式碼：</strong> <code>code/moe/</code>（CPU、已測試）</span>
 </div>
 
-現在我們在 PyTorch 中建立一個完整的 MoE 層 - experts、router/gate、top-$k$
-選擇和加權組合—從最乾淨的正確版本開始
-並重構為調度表單
-[systems pages](systems-ep.md) 和 [kernels](kernels.md) 最佳化。一切
-這裡在 CPU 上運行並透過測試進行檢查
-[`code/moe/`](https://github.com/youyun8/ml-perf-handbook/tree/main/code/moe)。
+現在我們用 PyTorch 把一個完整的 MoE 層做出來——expert、router/gate、top-$k$ 選擇與加權合併。
+先寫一個最乾淨、保證正確的版本，再重構成 [系統章節](systems-ep.md)與 [kernels](kernels.md) 要
+優化的那種 dispatch 形式。這裡的所有程式碼都在 CPU 上可跑，並由
+[`code/moe/`](https://github.com/youyun8/ml-perf-handbook/tree/main/code/moe) 的測試把關。
 
 ## MoE 層的剖析
 
-MoE FFN 將單一前饋塊替換為：
+MoE FFN 把單一前饋 block 換成：
 
-1. **$E$ experts**— 獨立 FFN（通常為 SwiGLU）：$\text{expert}_e(h) = W^{down}_e\,\big(\text{SiLU}(W^{gate}_e h)\odot (W^{up}_e h)\big)$。
-2. **router/gate**— 線性映射 $h \mapsto W_r h \in \mathbb{R}^{E}$，每個 expert 產生一個 logit。
-3. **頂級 $k$ 選擇**— 選擇每個 token 得分最高的 $k$ experts。
-4. **組合**— 透過 $k$ experts 運作 token 並對它們的輸出求和，
-   由（標準化）門分數加權。
+1. **$E$ 個 expert**——各自獨立的 FFN（通常是 SwiGLU）：$\text{expert}_e(h) = W^{down}_e\,\big(\text{SiLU}(W^{gate}_e h)\odot (W^{up}_e h)\big)$。
+2. **router/gate**——一個線性映射 $h \mapsto W_r h \in \mathbb{R}^{E}$，為每個 expert 產生一個 logit。
+3. **top-$k$ 選擇**——為每個 token 挑出得分最高的 $k$ 個 expert。
+4. **合併**——把 token 送過這 $k$ 個 expert，再用（歸一化後的）gate 分數加權求和它們的輸出。
 
-對於 token 表示 $h\in\mathbb{R}^d$，閘權重為 $g_e$：
+對一個 token 表示 $h\in\mathbb{R}^d$、gate 權重 $g_e$：
 
-$$ y = \sum\_{e \in \text{TopK}(h)} g_e \cdot \text{expert}\_e(h), \qquad g = \text{normalize}\big(\text{score}(W_r h)\big). $$
+$$ y = \sum_{e \in \text{TopK}(h)} g_e \cdot \text{expert}_e(h), \qquad g = \text{normalize}\big(\text{score}(W_r h)\big). $$
 
 ## 閘控：softmax 與 sigmoid
 
-門得分函數比它看起來更重要。
+gate 的計分函數，比它表面上看起來更關鍵。
 
-**Softmax 閘控**（GShard、Switch、Mixtral）：對所有 $E$ logits 進行 softmax，然後
-取頂部的 $k$ 並將這些 $k$ 重新歸一化，使其總和為 1。
+**Softmax gating**（GShard、Switch、Mixtral）：對全部 $E$ 個 logit 做 softmax，取 top-$k$，
+再把這 $k$ 個重新歸一化成總和為 1。
 
-$$ p = \text{softmax}(W*r h), \quad g_e = \frac{p_e}{\sum*{j\in\text{TopK}} p_j}\ \text{for } e\in\text{TopK}. $$
+$$ p = \text{softmax}(W_r h), \quad g_e = \frac{p_e}{\sum_{j\in\text{TopK}} p_j}\ \text{for } e\in\text{TopK}. $$
 
-重量具有*競爭力*：experts 共享固定預算，因此增加一個
-壓制別人。乾淨，但將 experts 的門連接在一起（
-[training stability](training-stability.md) 中的不穩定性）。
+權重彼此*競爭*：expert 共用一份固定預算，抬高一個就會壓低其他。乾淨，但這把各 expert 的
+gate 綁在一起（也是 [訓練穩定性](training-stability.md)裡不穩定的來源之一）。
 
-**Sigmoid 門控**（DeepSeek-V3、一些最新型號）：對每個 expert 進行評分
-*獨立地*使用 sigmoid，取 top-$k$，然後將所選的進行標準化。
+**Sigmoid gating**（DeepSeek-V3 與一些較新模型）：用 sigmoid *獨立*為每個 expert 計分，取
+top-$k$，再把選中的歸一化。
 
-$$ s*e = \sigma(W_r h), \quad g_e = \frac{s_e}{\sum*{j\in\text{TopK}} s_j}. $$
+$$ s_e = \sigma(W_r h), \quad g_e = \frac{s_e}{\sum_{j\in\text{TopK}} s_j}. $$
 
-獨立評分解耦 experts（無固定預算競賽），這對
-自然地具有**細粒度 experts**和**aux-loss-free**平衡偏差
-（請參閱 [負載平衡](load-balancing.md)）— 偏移可以加入到 $s_e$
-不扭曲 softmax 歸一化。現代大型 MoE 越來越多使用
-sigmoid 門控正是因為這個原因。
+獨立計分把各 expert 解耦（沒有固定預算的零和競爭），這跟**細粒度 expert**與
+**aux-loss-free** 的平衡偏差天生契合（見 [負載平衡](load-balancing.md)）——偏差可以直接加到
+$s_e$ 上，而不會扭曲 softmax 的歸一化。現代大型 MoE 越來越愛用 sigmoid gating，正是這個原因。
 
-!!! note "*後*top-k 標準化"
-    兩種變體都將**選定的**$k$ 閘重新歸一化，使其總和為 1，因此
-    層的輸出比例不取決於發射哪一個/多少個 experts。是否
-    重新規範化是一個真正的設計選擇；開關（$k=1$）跳過它，大多數
-    $k\ge2$ 型號可以做到。
+!!! note "top-k *之後*再歸一化"
+    兩種變體都會把**選中的** $k$ 個 gate 重新歸一化成總和為 1，這樣層的輸出尺度就不取決於
+    哪些／多少個 expert 被啟用。要不要重新歸一化是一個真實的設計選擇：Switch（$k=1$）略過它，
+    大多數 $k\ge2$ 的模型則會做。
 
 ## 參考實作#1：可讀循環
 
-最清晰正確的 MoE — 易於驗證，故意「不」快：
+最清楚、最正確的 MoE——容易驗證，而且刻意*不*追求快：
 
 ```python
 import torch, torch.nn as nn, torch.nn.functional as F
@@ -100,17 +93,15 @@ class MoELayerNaive(nn.Module):
         return y
 ```
 
-帶有屏蔽的 `for e in experts` 循環是概念核心：**每個 expert
-僅在路由到它的 tokens 上運行。**這是正確的，並且在 CPU 上運行良好
-學習，但在 GPU 上，Python 循環和不規則的 per-expert 批次速度很慢 —
-這就是後來分組 GEMM 並派遣 kernels 的全部動機。
+帶遮罩的 `for e in experts` 迴圈就是概念核心：**每個 expert 只在被 routing 到它的 token 上
+執行。** 這是正確的、在 CPU 上拿來學也很好；但在 GPU 上，Python 迴圈加上不規則的 per-expert
+批次很慢——這正是後面 grouped GEMM 與 dispatch kernel 的全部動機。
 
 ## 參考實作#2：調度/排列形式
 
-生產形狀按 expert 對 tokens 進行排序，因此每個 expert 都會看到一個*連續的*
-block — 正是分組 GEMM 想要的佈局。這個「排列 → 分組 matmul →
-unpermute」模式是什麼 [MoE kernels](kernels.md) 加速什麼
-[expert parallelism](systems-ep.md) 透過網路發送。
+生產版本會按 expert 把 token 排序，於是每個 expert 看到的是一段*連續*的區塊——正是 grouped
+GEMM 想要的排佈。這個「permute → grouped matmul → unpermute」的模式，就是 [MoE kernels](kernels.md)
+要加速、[expert parallelism](systems-ep.md) 要透過網路傳送的東西。
 
 ```python
 def moe_dispatch(x, topi, topv, experts, n_experts):
@@ -141,27 +132,25 @@ def moe_dispatch(x, topi, topv, experts, n_experts):
     return y
 ```
 
-`argsort`/`bincount`/`index_add_` 三元組是 GPU 的**排列**
-kernels 熔斷器和每個 expert 區塊是單一**分組的輸入
-GEMM**致電。我們已將「參差不齊的屏蔽循環」轉變為「排序+密集區塊」。
+`argsort`／`bincount`／`index_add_` 這三件套，在 GPU 上對應的就是融合的 **permute** kernel；
+而每個 expert 的連續區塊則餵進單一的 **grouped GEMM** 呼叫。我們已經把「參差不齊的遮罩迴圈」
+變成了「排序 + 密集區塊」。
 
-!!! tip "這兩個實現經過測試一致"
+!!! tip "兩種實作經測試一致"
     [`code/moe/test_moe.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/moe/test_moe.py)
-    斷言 `MoELayerNaive` 和調度形式產生相同的輸出
-    (`torch.allclose`) 用於隨機輸入、兩個閘和幾個 $k$ — 並且
-    單一 expert 與 $E{=}1$ 簡化為普通 FFN。運行 `pytest code/moe`。
+    斷言 `MoELayerNaive` 與 dispatch 形式在隨機輸入、兩種 gate、數種 $k$ 下產生相同輸出
+    （`torch.allclose`），並且單一 expert 在 $E{=}1$ 時退化成普通 FFN。執行 `pytest code/moe`。
 
 ## 將其放入 Transformer 塊中
 
-Drop-in：以 MoE 層取代密集的 FFN 子層，保留 attention 和
-規範。許多型號在
-路由 experts — 請參閱 [routing variants](routing-variants.md)：
+直接替換：把密集 FFN 子層換成 MoE 層，attention 與 norm 保持不動。許多模型還會在路由 expert
+之外加上一個共享 expert——見 [Routing 變體](routing-variants.md)：
 
 ```python
 class MoEBlock(nn.Module):
     def __init__(self, d_model, d_ff, n_heads, n_experts, top_k):
         super().__init__()
-        self.attn = CausalSelfAttention(d_model, n_heads)   # from Part I
+        self.attn = CausalSelfAttention(d_model, n_heads)   # 來自第一部
         self.moe  = MoELayer(d_model, d_ff, n_experts, top_k)
         self.n1, self.n2 = nn.RMSNorm(d_model), nn.RMSNorm(d_model)
     def forward(self, x):
@@ -170,39 +159,35 @@ class MoEBlock(nn.Module):
         return x
 ```
 
-完整的可訓練版本 - 具有負載平衡損耗和微小的 training 循環
-執行一項玩具任務 — 處於
-[`code/moe/train_tiny_moe.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/moe/train_tiny_moe.py)
-是 [capstone](../capstones/build-moe.md) 的起點。
+完整可訓練的版本——含負載平衡損失與一個跑玩具任務的小型 training 迴圈——放在
+[`code/moe/train_tiny_moe.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/moe/train_tiny_moe.py)，
+它也是 [capstone](../capstones/build-moe.md) 的起點。
 
 ## 要點
 
-- MoE 層 =**experts + router + 頂部 $k$ + 加權聯合收割機**。容量為
-  在 experts 中；router 是一個微小的線性地圖。 -**Softmax 門控**使 experts 爭奪固定預算；**乙狀結腸門控**
-  對它們進行獨立評分，並與細粒度 experts 更好地配對，
-  輔助無損耗平衡。
-- 可讀的「帶遮罩的 experts 循環」表格和製作
-  「排列 → 分組 GEMM→ 取消排列」形式計算**相同的東西**；的
-  後者揭露了 kernels 和 EP 利用的連續區塊。
-- 重新規範化選定的 $k$ 閘，以便輸出比例是 routing 不變的。
+- MoE 層 = **expert + router + top-$k$ + 加權合併**。容量住在 expert 裡；router 只是一個極小的
+  線性映射。
+- **Softmax gating** 讓 expert 爭搶固定預算；**Sigmoid gating** 獨立計分，和細粒度 expert 與
+  aux-loss-free 平衡更搭。
+- 可讀的「帶遮罩 expert 迴圈」與生產的「permute → grouped GEMM → unpermute」算的是**同一件事**；
+  後者顯露出 kernel 與 EP 所利用的連續區塊。
+- 把選中的 $k$ 個 gate 重新歸一化，讓輸出尺度與 routing 無關。
 
 ## 練習
 
 !!! tip "解決方案"
     參考解答位於 [解答頁](../solutions/moe.md) 上。請先嘗試每個練習，再展開解答。
 
-1. 在`MoELayerNaive`中實作 sigmoid 門控並透過測試進行驗證。
-2. 設定$k{=}1$（Switch-style）並去掉重整化；輸出有什麼變化
-   規模以及為什麼？
-3. 分析 CPU 上 $T{=}8192$、$E{=}64$ 的樸素循環與調度形式。
-   時間都去哪了？預測每個在 GPU 上的行為。
-4. 新增共享的 expert（始終應用）並確認梯度流向它
-   步驟與 routing 無關。
+1. 在 `MoELayerNaive` 裡實作 sigmoid gating，並用測試驗證。
+2. 設 $k{=}1$（Switch 風格）並拿掉重新歸一化；輸出尺度會怎麼變、為什麼？
+3. 在 CPU 上對 $T{=}8192$、$E{=}64$ 分析樸素迴圈與 dispatch 形式。時間都花在哪？預測兩者在
+   GPU 上的表現。
+4. 加上一個共享 expert（總是套用），並確認不論 routing 如何，每步都有梯度流向它。
 
 ## 參考文獻
 
-- 沙澤爾等人。 _稀疏門控 MoE。 _ 2017 年。
-- 費杜斯、佐夫、沙吉爾。 _開關 Transformer。 _ 2021 年。
-- 江等人。 _experts 的混合。 _ 2024 年。
-- DeepSeek-AI。 _DeepSeekMoE_ 和 _DeepSeek-V3。 _ 2024 年。
-- 大風等人。 _MegaBlocks：高效率稀疏 training 與 experts 的混合。 _ 2022 年。
+- Shazeer et al. _Sparsely-Gated Mixture-of-Experts._ 2017。
+- Fedus, Zoph, Shazeer. _Switch Transformer._ 2021。
+- Jiang et al. _Mixtral of Experts._ 2024。
+- DeepSeek-AI. _DeepSeekMoE_ 與 _DeepSeek-V3._ 2024。
+- Gale et al. _MegaBlocks: Efficient Sparse Training with Mixture-of-Experts._ 2022。

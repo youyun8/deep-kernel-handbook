@@ -1,8 +1,8 @@
-# 解決方案 — 第四部分·Capstone
+# 解答 — 第五部 · Capstones
 
 <div class="page-meta">
-  <span class="chip"><strong>涵蓋：</strong> 建造小型 MoE LM，將其擴展</span>
-  <span class="chip"><strong>使用：先試試</strong>，再檢查</span>
+  <span class="chip"><strong>涵蓋：</strong> 建立小型 MoE LM、擴展到更大規模</span>
+  <span class="chip"><strong>用法：</strong> 先自己試，再對照</span>
 </div>
 
 Capstone 練習是針對玩具模型的**構建和測量**任務

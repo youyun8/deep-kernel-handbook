@@ -1,4 +1,4 @@
-# MoE inference 和 serving
+# 推論與 serving
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong> 高階</span>
@@ -6,88 +6,81 @@
   <span class="chip"><strong>硬體：</strong> GPU</span>
 </div>
 
-serving MoE 與 serving 是不同的問題，serving 是同一問題的密集模型
-*活動*大小，因為**所有 experts 都必須可用，即使只有少數
-根據 token 運行。**執行 37B 活動 FLOP 的 671B 參數模型仍需要 671B
-參數*某處*可達。本頁涵蓋記憶體問題（卸載、
-放置），稀疏 routing、expert 量化下的批次動態，以及如何
-MoE 與 [paged KV cache](../foundations/attention-efficiency.md) 互動。
+serving 一個 MoE，和 serving 一個與其*活躍*大小相同的密集模型，是兩個不同的問題——因為
+**所有 expert 都必須隨時可用，即使每個 token 只跑其中幾個。** 一個跑 37B 活躍 FLOP 的 671B
+參數模型，仍然得讓那 671B 參數*在某處*能被取用。本頁談記憶體問題（offload、放置）、稀疏
+routing 下的批次動態、expert 量化，以及 MoE 如何與
+[分頁 KV cache](../foundations/attention-efficiency.md) 互動。
 
 ## 記憶體問題
 
-來自 [why sparsity](why-sparsity.md)：MoE 購買廉價記憶體的容量。在
-serving 你支付帳單的時間。選項，從最快到最便宜：
+由 [為什麼需要稀疏化](why-sparsity.md)：MoE 用便宜的記憶體買容量。serving 時，就是你結帳的
+時候。各種選項，由最快到最省：
 
--**所有 experts 均採用 HBM**（expert 在足夠多的 GPU 上並行）。最低 latency；
-需要許多 GPU 來「保持」權重。 bf16 中的 DeepSeek-V3 約為 1.3 TB
-權重－這是在考慮 KV 快取之前的多節點部署。 -**expert 卸載到 CPU/NVMe**，按需流入 HBM。 GPU 少得多，
-但每一層可能會停止等待其 experts 通過 PCIe/CXL 到達。 -**量化 experts**(int8/int4/fp8) 以縮小佔用空間，以便更適合
-HBM — 通常是第一個槓桿（如下）。
+- **所有 expert 都放 HBM**（expert 分散在足夠多的 GPU 上）。latency 最低；但需要很多 GPU 才能
+  「裝得下」權重。DeepSeek-V3 在 bf16 約 1.3 TB 權重——光權重就已是多節點部署，還沒算 KV cache。
+- **expert offload 到 CPU/NVMe**，按需串流進 HBM。GPU 少很多，但每一層都可能卡住、等它的 expert
+  經由 PCIe/CXL 抵達。
+- **量化 expert**（int8/int4/fp8）縮小足跡、好塞進 HBM——通常是第一個動的槓桿（見下文）。
 
-roofline 再次證明自己：透過卸載，限制器變成**PCIe/NVMe
-頻寬**用於串流 experts，而不是 GPU 運算。卸載是否可行
-取決於每個加載的 expert 的**重用**- 這取決於批量大小和
-routing 地點。
+roofline 再次應驗：一旦 offload，限制因素就從 GPU 算力變成串流 expert 的 **PCIe/NVMe 頻寬**。
+offload 是否划算，取決於每個載入進來的 expert 能被**重用**多少——而這又取決於 batch 大小與
+routing 的局部性。
 
 ## 稀疏 routing 下的批次
 
-批次處理是 decoding 轉義 [memory wall](../foundations/attention-efficiency.md) 的方式：
-攤銷多次讀取 tokens 的重量。MoE 讓這個問題變得複雜：
+批次是 decode 繞過 [記憶體牆](../foundations/attention-efficiency.md)的方法：把讀權重的成本攤
+到很多 token 上。MoE 把這件事弄複雜了：
 
-- 在密集模型中，更大的批量讀取所有 $B$ tokens 的每個重量一次 —
-  乾淨的攤銷。
-- 在 MoE 中，批次的 tokens**分散在 experts**。流行的 expert
-  服務於許多 tokens（良好的攤銷）；一個稀有的 expert 可能服務於一個 token
-  （其重量讀數幾乎不攤銷）。有效攤銷取決於如何
-  該批次的許多 tokens 都命中了每個加載的 expert。
+- 密集模型裡，更大的 batch 把每個權重讀一次、服務全部 $B$ 個 token——攤銷很乾淨。
+- MoE 裡，一個 batch 的 token 會**分散到各個 expert**。熱門 expert 服務很多 token（攤銷得好）；
+  冷門 expert 可能只服務一個 token（它的權重讀取幾乎沒被攤銷）。有效攤銷取決於這個 batch 有多少
+  token 打到每個被載入的 expert。
 
-影響：
+由此推論：
 
--**較大的批次比密集的批次對 MoE 的幫助更大**，因為它們提高了預期
-tokens-per-expert，提高 GEMM 效率和（帶卸載）expert
-重複使用。這就是 MoE serving 力推高並發的原因。 -**expert 受歡迎偏差**意味著一些 experts 幾乎總是常駐並且
-一些很少使用——可透過在 HBM 中快取熱 experts 並卸載來利用
-冷的。 -**prefill 與 decode**差異很大：prefill 有許多 tokens（大多數 experts
-活躍，配料良好）；單流 decode 僅觸及每個 token 的 $k$ experts
-（糟糕的重用）－批次許多並發 decode 請求的另一個原因。
+- **大 batch 對 MoE 的幫助比對密集模型更大**，因為它拉高了期望的 tokens-per-expert，提升 GEMM
+  效率，並（在 offload 下）提升 expert 重用。這正是 MoE serving 拼命推高並發的原因。
+- **expert 熱門度偏斜**意味著有些 expert 幾乎總是常駐、有些極少用到——可以靠把熱 expert 快取在
+  HBM、把冷的 offload 出去來利用。
+- **prefill 與 decode 差很多**：prefill 有很多 token（大多數 expert 都活躍、批次效果好）；單流
+  decode 每個 token 只碰 $k$ 個 expert（重用很差）——這是把許多並發 decode 請求批在一起的另一
+  個理由。
 
 ## expert 量化
 
-experts 是大部分參數，因此量化它們是最高槓桿
-壓縮。因為每個 expert 看到的 tokens 比密集的 FFN 少，而且因為
-serving 為[memory-bound](../foundations/attention-efficiency.md)、expert 重量
-量化通常是一個乾淨的勝利： -**fp8 / int8 權重**：在 decode 上讀取權重約 2× 更小，約 2× 更快，最小
-每個通道/組規模的質量損失。通常是預設的。 -**int4（GPTQ/AWQ 風格）**：約小 4 倍；需要仔細校準但是
-對於 experts 來說通常沒問題，它們單獨而言不如
-attention 或規範。 -**混合**：保持 router、attention、規範和共享 expert 處於較高水平
-精確（它們敏感且小）；量化多條路由的 experts
-很難。這反映了 [training precision discipline](training-stability.md)：
-便宜但數量多的精度較低，敏感但小則精度較高。
+expert 佔了大部分參數，所以量化它們是壓縮上槓桿最大的一招。由於每個 expert 看到的 token 比
+密集 FFN 少，又因為 serving 是 [memory-bound](../foundations/attention-efficiency.md)，量化
+expert 權重通常是乾淨的勝利：
 
-有關 PTQ/GPTQ/AWQ 機制，請參閱 [quantization](../performance/quantization.md)；
-MoE 特定點是要量化的*哪個*張量以及 routing 偏斜如何讓
-你將預算花在 tokens 的實際用途上。
+- **fp8 / int8 權重**：decode 時權重讀取約小 2 倍、快約 2 倍，配上 per-channel/per-group 縮放後
+  品質損失極小。通常是預設。
+- **int4（GPTQ/AWQ 風格）**：約小 4 倍；需要仔細校準，但對 expert 通常沒問題——它們單獨來看
+  不如 attention 或 norm 敏感。
+- **混合精度**：router、attention、norm 與共享 expert 維持較高精度（它們敏感且小），把許多路由
+  expert 大力量化。這呼應了 [training 的精度紀律](training-stability.md)：便宜又多的用低精度，
+  敏感又小的用高精度。
 
-##記憶體管理：experts+KV 快取一起
+PTQ/GPTQ/AWQ 的機制見 [量化](../performance/quantization.md)；MoE 特有的重點是*該量化哪些*張量，
+以及 routing 偏斜如何讓你把精度預算花在 token 真正會用到的地方。
 
-MoE 伺服器同時兼顧**兩個**大型動態記憶體消耗者：
+## 記憶體管理：expert 與 KV cache 一起
 
-1. **KV 快取**（隨著並發序列 × 上下文增長），由
-   [paged attention](../foundations/attention-efficiency.md)。
-2. **expert 權重**（固定總數，但在 HBM 中「熱門」是動態的
-   卸載下）。
+MoE server 要同時照顧**兩個**會動態變化的大記憶體消耗者：
 
-他們爭奪相同的 HBM。良好的 serving 堆疊（vLLM、SGLang、TensorRT-LLM、
-DeepSeek 自己的）將兩者視為分頁池並根據合併預算進行調度。
-一些技巧：
+1. **KV cache**（隨並發序列 × 上下文成長），由
+   [PagedAttention](../foundations/attention-efficiency.md) 管理。
+2. **expert 權重**（總量固定，但在 offload 下「哪些在 HBM 裡是熱的」是動態的）。
 
--**expert 快取**在卸載時具有 LRU/流行度策略 — 保持熱度
-experts 常駐，流冷的，預先取下一層可能的 experts
-而目前層進行計算（重疊，如 [EP](systems-ep.md) 中）。 -**分解 prefill/decode**：運行計算密集型 prefill 和記憶體密集型
-decode 位於單獨的 GPU 池上，其大小適合其不同的 roofline；運送 KV
-它們之間的快取。 -**expert-平行放置調整流行**：傳播熱門 experts
-設備，因此沒有一個 GPU 會成為落後者（inference 的類似物）
-[負載平衡](load-balancing.md)）。
+兩者爭奪同一塊 HBM。好的 serving 堆疊（vLLM、SGLang、TensorRT-LLM、DeepSeek 自家的）把兩者都
+當成分頁池、依合併後的預算來排程。一些手法：
+
+- **expert 快取**：offload 時用 LRU／熱門度策略——把熱 expert 留在 HBM、串流冷的，並在計算當前
+  層時預取下一層可能用到的 expert（重疊，如 [EP](systems-ep.md) 中所述）。
+- **prefill/decode 拆分**：把 compute-bound 的 prefill 與 memory-bound 的 decode 跑在各自的 GPU
+  池上、各自依其 roofline 配置，再把 KV cache 在兩者間搬運。
+- **依熱門度調整 expert-parallel 放置**：把熱門 expert 散到各 device，免得某張 GPU 變成落後者
+  （這是 inference 版的 [負載平衡](load-balancing.md)）。
 
 ```mermaid
 flowchart TD
@@ -101,45 +94,43 @@ flowchart TD
 
 ## 實用的 serving 清單
 
-- [ ] 量化路由 experts（首先是 fp8/int8；若記憶體受限則為 int4）；
-      保持 router/attention/norms 更高的精度。
-- [ ] 使用連續配料最大化 tokens-per-expert（攤銷重量
-      讀取 — 請參閱 [inference optimization](../performance/inference-optimization.md))。
-- [ ] 分頁 KV 快取（GQA/MLA 模型進一步縮小它）。
-- [ ] 若重量不適合：卸載冷 experts，預先取下一層 experts，
-      快取熱點；預計 PCIe/NVMe 頻寬將成為限制因素。
-- [ ] 考慮對 throughput 進行大規模的 prefill/decode 分解。
-- [ ] 將 experts 按受歡迎程度排列在 EP 排名中，以避免掉隊。
+- [ ] 量化路由 expert（先 fp8/int8；若記憶體吃緊再 int4），router/attention/norm 維持較高精度。
+- [ ] 用 continuous batching 拉高 tokens-per-expert（攤銷權重讀取——見
+      [推論最佳化](../performance/inference-optimization.md)）。
+- [ ] 分頁 KV cache（GQA/MLA 模型還能進一步把它縮小）。
+- [ ] 若權重塞不下：offload 冷 expert、預取下一層 expert、快取熱 expert；預期 PCIe/NVMe 頻寬會
+      成為限制因素。
+- [ ] 為了 throughput，考慮大規模的 prefill/decode 拆分。
+- [ ] 在 EP rank 之間按熱門度排佈 expert，避免落後者。
 
 ## 要點
 
-- MoE serving 必須**持有所有 experts**，即使很少運行 - 中心成本是
-  **記憶體/頻寬**，而不是計算。 -**批次對 MoE 來說更重要**，因為 tokens 分散在 experts 中；
-  大批量提高 tokens-per-expert，提升 GEMM 效率及 expert
-  重複使用。 -**積極量化許多路由的 experts**(fp8/int8/int4)，保留
-  小型敏感部件精確 — routing 偏斜告訴你這些位元應該去哪裡。
-- 伺服器針對一個 HBM 共同管理**expert 權重和分頁 KV 快取**
-  預算；卸載將限制器轉移到 PCIe/NVMe 並獎勵預取 + 熱-
-  expert 快取。
+- MoE serving 必須**握住所有 expert**，即使它們很少跑——核心成本是**記憶體／頻寬**，不是算力。
+- **批次對 MoE 更重要**，因為 token 分散在各 expert；大 batch 拉高 tokens-per-expert，提升 GEMM
+  效率與 expert 重用。
+- **大力量化大量路由 expert**（fp8/int8/int4），保留小而敏感的部件高精度——routing 偏斜會告訴
+  你這些位元該花在哪。
+- server 針對單一 HBM 預算共同管理 **expert 權重與分頁 KV cache**；offload 把限制因素移到
+  PCIe/NVMe，並讓「預取 + 熱 expert 快取」變得划算。
 
 ## 練習
 
 !!! tip "解決方案"
     參考解答位於 [解答頁](../solutions/moe.md) 上。請先嘗試每個練習，再展開解答。
 
-1. 估計在 bf16、fp8 和 int4 中保存 DeepSeek-V3 權重所需的 HBM。
-   在 KV 快取之前，每個有多少 80 GB GPU？
-2. 透過卸載，匯出條件 (tokens-per-expert vs PCIe 頻寬 vs
-   GEMM 時間），在該時間下串流 expert 被計算隱藏。
-3. 一批 256 個 decode 請求，$E{=}256$，$k{=}8$，估計預期
-   接觸的不同 experts 的數量以及 tokens-per-expert 分佈。
-4. 使用觀察到的流行度設計 expert 快取驅逐策略；什麼是
-   如果 routing 分佈在運作時發生變化，故障模式是什麼？
+1. 估計用 bf16、fp8、int4 存 DeepSeek-V3 權重各需多少 HBM。在算 KV cache 之前，各需幾張 80 GB
+   GPU？
+2. 在 offload 下，推導讓「串流 expert 的時間能被計算藏起來」的條件（tokens-per-expert vs PCIe
+   頻寬 vs GEMM 時間）。
+3. 對一個 256 筆 decode 請求、$E{=}256$、$k{=}8$ 的 batch，估計被碰到的不同 expert 期望數，以及
+   tokens-per-expert 的分佈。
+4. 用觀察到的熱門度設計一個 expert 快取淘汰策略；如果 routing 分佈在執行期間漂移，失效模式是
+   什麼？
 
 ## 參考文獻
 
-- 權等人。 _已分頁 attention / vLLM。 _ 2023 年。
-- 埃利塞耶夫和馬祖爾。 _透過卸載實現 experts 混合的快速 inference。 _ 2023 年。
-- 弗蘭塔和阿利斯塔。 _GPTQ._ 2022 · 林等人。 _AWQ。 _ 2023 年。
-- DeepSeek-AI。 _DeepSeek-V3 技術報告_ (serving)。 2024 年。
-- 鐘等人*DistServe*（prefill/decode 分解）。 2024 年。
+- Kwon et al. _PagedAttention / vLLM._ 2023。
+- Eliseev & Mazur. _Fast Inference of Mixture-of-Experts via Offloading._ 2023。
+- Frantar & Alistarh. _GPTQ._ 2022；Lin et al. _AWQ._ 2023。
+- DeepSeek-AI. _DeepSeek-V3 Technical Report_（serving）。2024。
+- Zhong et al. _DistServe_（prefill/decode 拆分）。2024。

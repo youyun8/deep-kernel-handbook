@@ -157,7 +157,7 @@ $$
 變體：Megatron sequence parallelism（把 TP 未涵蓋區域的 LayerNorm/dropout
 也分片），以及 ring attention / context parallelism（分片 attention 本身，
 沿 ring 傳遞 K/V 區塊）。它攻克的是
-[Part I](../foundations/attention-efficiency.md) 中提到的 activation 記憶體牆與
+[第一部](../foundations/attention-efficiency.md) 提到的 activation 記憶體牆與
 attention 計算牆。
 
 ## expert parallelism (EP) — MoE 維度

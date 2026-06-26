@@ -1,11 +1,11 @@
-# 解 — 第二部分 · experts 的混合物
+# 解答 — 第二部 · Mixture-of-Experts
 
 <div class="page-meta">
-  <span class="chip"><strong>封面：</strong>所有九個MoE頁面</span>
-  <span class="chip"><strong>使用：先試試</strong>，再檢查</span>
+  <span class="chip"><strong>涵蓋：</strong> 全部九個 MoE 頁面</span>
+  <span class="chip"><strong>用法：</strong> 先自己試，再對照</span>
 </div>
 
-回答了 [Part II](../moe/index.md) 中的練習。幾個參考
+解答[第二部](../moe/index.md)的練習。部分參考
 到[`code/`](https://github.com/youyun8/ml-perf-handbook/tree/main/code)中的玩具模型；
 如果推導具有乾淨的封閉形式，我們給出它，否則我們給出
 方法和預期的定性結果。
@@ -315,10 +315,10 @@ serving，不是低階 latency 單碼串流。
     $E$ 在各代車型中不斷發展的原因。
 
 ??? success "2 — 每 1k tokens 的 KV 快取：MLA、GQA 與 MHA"
-    每個 token 層：**MHA**快取 $2\,n_h d_h$；**GQA**$2\,n_{kv}d_h$（附
-    $n_{kv}\ll n_h$);**MLA**潛在的 $d_c$。對於 $n_h=128、d_h=128 的模型，
-    n_{kv}=8，d_c\約512$: MHA $=2\cdot128\cdot128=32768$ B;品質保證局
-    $=2\cdot8\cdot128=2048$ B;每個 token 層的 MLA $\approx512\cdot2=1024$ B。
+    每個 token、每層：**MHA** 快取 $2\,n_h d_h$；**GQA** $2\,n_{kv}d_h$（$n_{kv}\ll n_h$）；
+    **MLA** 只存 latent $d_c$。對 $n_h=128$、$d_h=128$、$n_{kv}=8$、$d_c\approx 512$ 的模型：
+    MHA $=2\cdot128\cdot128=32768$ B；GQA $=2\cdot8\cdot128=2048$ B；MLA 每 token 每層
+    $\approx512\cdot2=1024$ B。
     乘以 $L$ 和 1000 tokens。 MLA 比 GQA 節省約 2 倍，比 MHA 節省約 30 倍 —
     使長上下文 DeepSeek serving 價格實惠的槓桿。
 
@@ -335,9 +335,9 @@ serving，不是低階 latency 單碼串流。
     [負載平衡](../moe/load-balancing.md)；細粒度+共享 experts →
     [routing variants](../moe/routing-variants.md)； z 損失/fp32 router →
     [training stability](../moe/training-stability.md)；節點限制 routing +
-    雙管 → [systems & EP](../moe/systems-ep.md)；司法協助 →
+    DualPipe → [系統與 EP](../moe/systems-ep.md)；MLA →
     [attention efficiency](../foundations/attention-efficiency.md)； FP8 →
-    [numerics](../foundations/numerics-precision.md)。每一個製作技巧都有痕跡
+    [numerics](../foundations/numerics-precision.md)。每一項生產技巧都能在 trace 上留下痕跡
     到一頁——這就是手冊的主題。
 
 ## MoE decode 剖析

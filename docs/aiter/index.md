@@ -30,6 +30,16 @@ Chrome/Kineto trace bucket
     bf16 tuned GEMM、`--enable-aiter-allreduce-fusion`、shared-expert fusion 開啟、
     KV cache fp8_e4m3。Sweep：ISL ∈ {1024, 8192}、OSL 1024、concurrency ∈ {4,8,16,32,64}。
 
+!!! tip "這章接在哪裡"
+    本章是前三部觀念的真實落地。建議的銜接：
+    [作為系統的 Transformer](../foundations/transformer-systems.md) 的 roofline、
+    [Attention 效率](../foundations/attention-efficiency.md) 的 MLA/KV cache、
+    [數值與精度](../foundations/numerics-precision.md) 的 MXFP4/fp8，再到第二部的
+    [從零實作 MoE layer](../moe/moe-from-scratch.md)、[系統與 expert parallelism](../moe/systems-ep.md)、
+    [MoE kernels](../moe/kernels.md) 與 [MoE decode 剖析](../moe/decode-anatomy.md)。本章把這些觀念
+    對到一條*具名、可量測*的執行路徑上；§9 的 roofline 推導與 [MoE kernels](../moe/kernels.md) 的
+    grouped GEMM 數學是同一套，只是換成真實的 Kimi-K2.5 shape。
+
 ---
 
 ## 1. Kimi-K2.5 的模型組態（trace 實測）
@@ -79,10 +89,13 @@ flowchart TB
   S9 --> S10["10 · o_proj<br/>Cijk_* (Tensile)"]
   S10 --> S11a["11 · TP all-reduce ①<br/>allreduce_fusion"]
   S11a --> S12["12 · Router gate GEMM<br/>hgemm_bf16_16x64x256"]
-  S12 --> S13["13 · grouped top-k + MoE sort<br/>grouped_topk · opus_moe_sorting"]
-  S13 --> S14["14 · routed input MXFP4 quant<br/>mxfp4_quant_moe_sort"]
-  S14 --> S15["15 · routed GEMM1 gate/up + SwiGLU<br/>mfma_moe1 / flydsl_moe1"]
-  S15 --> S17["17 · routed GEMM2 down + combine<br/>mfma_moe2 / flydsl_moe2 (atomic)"]
+  S12 --> S13r["13 · routed top-k<br/>grouped_topk · 8 routed experts"]
+  S12 --> S13s["shared-expert fusion<br/>append shared expert as top-k 第 9 名"]
+  S13r --> S13m["13 · consolidated MoE sort<br/>opus_moe_sorting / shared append fused"]
+  S13s --> S13m
+  S13m --> S14["14 · routed+shared input MXFP4 quant<br/>mxfp4_quant_moe_sort"]
+  S14 --> S15["15 · fused expert GEMM1 gate/up + SwiGLU<br/>mfma_moe1 / flydsl_moe1 · 385 experts"]
+  S15 --> S17["17 · fused expert GEMM2 down + combine<br/>mfma_moe2 / flydsl_moe2 (atomic)"]
   S17 --> S18["18 · combine / finalize<br/>weighted by top-k"]
   S18 --> S11b["11 · TP all-reduce ②<br/>allreduce_fusion"]
   S11b --> S23["23 · residual add + norm<br/>add_rmsnorm_quant"]
@@ -90,6 +103,7 @@ flowchart TB
   class X,OUT accBlue;
   class S7,S8 accTeal;
   class S11a,S11b accAmber;
+  class S13s accGreen;
   class S15,S17 flagship;
 ```
 
@@ -157,7 +171,8 @@ decode step、61 層（1 dense + 60 MoE）**。後面所有百分比都是在這
 **解讀重點：**
 
 - **MoE expert GEMM 隨 batch 變主瓶頸，conc32 後在 ~52% 飽和。** 不是每個 token 變慢，
-  而是 routed GEMM 的「每層讀完整專家權重」這件固定成本支配整步（§9 會用 roofline 解釋）。
+  而是 routed GEMM 的「每層讀完整專家權重」這件固定成本支配整步（§9 會用
+  [roofline](../foundations/transformer-systems.md) 解釋）。
 - **stage-1 實測 13,467.8 / 6,580.1 = 2.05× stage-2**，跟 §1 的結構推論（512 vs 256）一致。
 - **Attention 在 8k 比 1k 重很多。** conc4 比較乾淨的兩組顯示 MLA core 從 1k 的 6.8% 漲到
   8k 的 12.0%（≈1.8×），因為 MLA 要讀長 KV cache，而且**不隨 batch 攤平**（conc64 還回升到 16.9%）。
@@ -301,19 +316,34 @@ sort/quant kernel。
 
 ## 9. MoE GEMM 1 / 2 的數學：為什麼是 decode 的主瓶頸
 
-這是本章最關鍵的量化分析。每層 routed MoE 的兩個 GEMM（per token-expert row）：
+這是本章最關鍵的量化分析。先看 **每一個被選中的 token-expert row**；實際每層總量還要
+再乘上該層的 selected rows（decode batch × top-k），但 stage-1 / stage-2 會同乘同一個 row
+數，所以比值不變：
 
 $$
-\text{stage-1:}\quad \mathbf{a}[1,7168] \times W_{13}[7168,512] \to [1,512],
-\quad \text{FLOPs} = 2\cdot 7168 \cdot 512 = 7.34\,\text{MFLOP}
-$$
-$$
-\text{stage-2:}\quad \mathbf{x}[1,256] \times W_{2}[256,7168] \to [1,7168],
-\quad \text{FLOPs} = 2\cdot 256 \cdot 7168 = 3.67\,\text{MFLOP}
+\begin{aligned}
+\text{stage-1:}\quad
+&\mathbf{a}_{1\times 7168} W_{13,\,7168\times 512}
+  \to \mathbf{y}_{1\times 512},
+&\operatorname{FLOPs}_1
+  &= 2 \cdot 7168 \cdot 512
+   = 7.34\,\text{MFLOP},\\
+\text{SwiGLU:}\quad
+&\mathbf{y}_{1\times 512}
+  \to \mathbf{x}_{1\times 256},
+&\text{其中 }512 &= 2 \times 256,\\
+\text{stage-2:}\quad
+&\mathbf{x}_{1\times 256} W_{2,\,256\times 7168}
+  \to \mathbf{o}_{1\times 7168},
+&\operatorname{FLOPs}_2
+  &= 2 \cdot 256 \cdot 7168
+   = 3.67\,\text{MFLOP}.
+\end{aligned}
 $$
 
-比值恰好 $7.34 / 3.67 = 2.0$——這就是 trace 量到 stage-1 ≈ 2.05× stage-2 的根本原因
-（gate+up 的輸出維度是 down 輸入維度的兩倍）。
+因此 $\operatorname{FLOPs}_1 / \operatorname{FLOPs}_2 = 512 / 256 = 2.0$。這就是 trace
+量到 stage-1 ≈ 2.05× stage-2 的根本原因：gate+up GEMM 先算出兩份中間向量，再由
+SwiGLU 壓回 down GEMM 的 $256$ 維輸入。
 
 **關鍵：decode 時 MoE GEMM 是 weight-bandwidth-bound，不是 compute-bound。** 每個專家
 的 fp4 權重（0.5 byte/元素）要讀進來才能算：
@@ -382,7 +412,9 @@ $$
 $$
 
 訊息小 → latency-bound → **不隨 batch 攤平**，所以穩在 ~11–15%，是 MoE GEMM 之後的固定
-尾巴。實測 conc64 時 fused all-reduce 會從 1-stage（`allreduce_fusion_1stage`）切到
+尾巴。這正是 [系統與 expert parallelism](../moe/systems-ep.md) 講的「latency-bound 的 TP all-reduce
+不會被 batch 攤平」，只是這裡是 TP（非 EP）路徑、訊息更小。實測 conc64 時 fused all-reduce 會從
+1-stage（`allreduce_fusion_1stage`）切到
 **2-stage reduce-scatter + load-rmsnorm**（`cross_device_reduce` / `reduce_scatter_*`）。
 tuning 方向（`kimi-k25-fused-ar-rms-stage-tuning`）：驗證小訊息選 1-stage、確認 1↔2 stage
 crossover 與 AR+RMSNorm 融合最佳；原始碼在 `aiter/ops/custom_all_reduce.py`、
@@ -480,3 +512,9 @@ python3 scripts/profiling/analyze_decode_trace.py \
     這裡的比例是 Kimi-K2.5-MXFP4、gfx950、TP4、SGLang + AITER MoE、KV cache fp8_e4m3
     與特定 concurrency sweep 下的結果。架構結論可遷移，但具體比例會隨模型 hidden /
     intermediate size、top-k、context length、batch、TP/EP 切法與 tuned config 而變。
+
+!!! tip "想自己量一遍"
+    本章的量測紀律——先用 roofline 算目標、再對齊 trace bucket——就是
+    [Profiling 與方法論](../performance/profiling.md) 那一套的實戰版。若要把這條 decode 路徑放回
+    更一般的脈絡，回頭看 [MoE decode 剖析](../moe/decode-anatomy.md)（同一類 MLA + 細粒度 MoE 模型，
+    但與供應商無關）。

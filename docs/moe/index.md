@@ -1,58 +1,69 @@
-#第二部分·experts 的混合體（旗艦）
+# 第二部 · Mixture-of-Experts
 
-這是手冊中最深入的系列。我們建立**生產型 MoE
-從頭開始堆疊**— 條件計算的數學，乾淨的參考
-層，使其可訓練的負載平衡機制，系統
-(expert 並行性，all-to-all)，使其規模化，kernels
-快速，以及使其可部署的 serving 技巧 - 然後剖析其真實性
-前沿模型（DeepSeek-V3、Mixtral、Qwen-MoE、Kimi K2.5）將其組合在一起。
+這是手冊的核心。Mixture-of-Experts（MoE）把一個密集 FFN 換成許多個「expert」FFN，再讓
+每個 token 只走其中幾個——藉此**把總參數量（容量）和每個 token 的計算量（FLOP）解耦**。
+前沿的開放權重模型（DeepSeek-V3、Qwen3-MoE、Kimi-K2）幾乎全是 MoE，原因正在於此。
 
-## 為什麼選擇 MoE，在一段話中
+但稀疏化不是免費的午餐。它換來一整套密集模型從來不會遇到的系統問題：負載不平衡、離散
+routing 的訓練不穩定、all-to-all 通訊、巨大的記憶體足跡，以及不規則的 GEMM。本部把 MoE
+當成一個**完整系統**來拆解——從建模到 kernel 到 serving。
 
-密集 Transformer 將*每個*參數應用於*每個*token。一個
-experts 層的混合層包含許多平行 FFN（「experts」）和一個
-小型**router**，僅將每個 token 發送給其中的少數幾個。該模型的
-_參數數量_（其容量/知識）隨著 experts 數量的增加而增長，
-而*每個 token* 的 FLOP 保持大致固定，但以少數活躍用戶為代價
-experts。透過計算，你可以獲得更大模型的質量
-較小的一個 —** 如果**你可以保持 experts 平衡並支付
-溝通和記憶成本。這個「如果」就是整個系統的故事。
+讀完本部，你將能夠：
 
-```mermaid
-flowchart TD
-    x[token h] --> R[Router / gate]
-    R -->|top-k weights| G{select experts}
-    G -->|w1| E1[Expert 1 FFN]
-    G -->|w3| E3[Expert 3 FFN]
-    E1 --> S[(weighted sum)]
-    E3 --> S
-    x -.shared expert.-> Esh[Shared FFN] --> S
-    S --> y[output]
-    E2[Expert 2 FFN]:::idle
-    E4[Expert 4 FFN]:::idle
-```
+- 量化說明 MoE 用什麼換什麼，以及稀疏率 $k/E$ 的意義。
+- 從零寫出一個 MoE 層：expert、router/gate、top-$k$ 選擇與加權合併。
+- 診斷並修復 router 崩潰：auxiliary loss、expert capacity，以及現代的 aux-loss-free 偏差控制。
+- 在 token-choice / expert-choice、共享 expert 與細粒度 expert 之間做設計取捨。
+- 把 expert 跨 GPU 切分（expert parallelism），並理解 all-to-all 為何是瓶頸、怎麼藏起來。
+- 看懂 grouped GEMM 與 permute kernel，以及它們在真實 decode trace 裡長什麼樣。
 
-## 頁面，依序排列
+## 頁面
 
-**演算法與 training**
+<div class="grid cards" markdown>
 
-1. [Why sparsity](why-sparsity.md) — 密集縮放與稀疏縮放；條件計算的數學。
-2. [MoE layer from scratch](moe-from-scratch.md) — experts、router、top-k、softmax 與 sigmoid 閘控；可運作參考。
-3. [負載平衡](load-balancing.md) — 輔助損耗、expert 容量、下降/溢出、**輔助損耗**偏壓（DeepSeek 式）。
-4. [routing variants](routing-variants.md) — token-choice 與 expert-choice、共享 experts、細粒度 experts。
-5. [training stability](training-stability.md) — router z 損失、初始化、routing 的梯度病理。
+- :material-scale-balance:&nbsp;**[為什麼需要稀疏化](why-sparsity.md)**
 
-**系統和部署**
+    容量與 FLOP 的解耦、稀疏率，以及代價的全貌。
 
-6. [Systems & expert parallelism](systems-ep.md) — EP、all-to-all 調度/組合、與計算重疊的通訊、分組 GEMM、MegaBlocks 區塊稀疏視圖、容量/填充權衡。
-7. [MoE kernels (Triton/CUDA/HIP)](kernels.md) — 排列/分散-聚集、分組/批次 GEMM 全部三個，融合 routing。
-8. [inference & serving](inference-serving.md) — expert 卸載、批次、expert 量化、記憶體管理。
-9. [Case studies](case-studies.md) — DeepSeek-V3、Mixtral、Qwen-MoE、Kimi K2.5 — 他們做什麼以及*為什麼*。
-10. [Anatomy of an MoE decode](decode-anatomy.md) — 真實的 per-kernel decode 設定檔：關鍵路徑、融合和兩個 latency 軌道。
+- :material-layers-triple-outline:&nbsp;**[從零實作 MoE layer](moe-from-scratch.md)**
 
-!!! tip "先決條件"
-    你需要 [Part I](../foundations/index.md) 中的系統詞彙
-    （roofline、算術強度、記憶體限制與計算限制）。系統
-    第（6-7）頁依賴 [kernel tracks](../performance/triton-track.md) 和
-    第三部分的 [collectives](../performance/distributed-training.md) — 你可以
-    並行閱讀這些內容。
+    expert + router + top-$k$ + 合併，可讀版與 dispatch 版兩種實作。
+
+- :material-scale:&nbsp;**[負載平衡](load-balancing.md)**
+
+    auxiliary loss、capacity、token drop，與 aux-loss-free 偏差控制器。
+
+- :material-call-split:&nbsp;**[Routing 變體](routing-variants.md)**
+
+    token-choice vs expert-choice、共享 expert、細粒度 expert。
+
+- :material-shield-check-outline:&nbsp;**[訓練穩定性](training-stability.md)**
+
+    router z-loss、精度紀律、初始化與實務護欄。
+
+- :material-lan:&nbsp;**[系統與 expert parallelism](systems-ep.md)**
+
+    all-to-all dispatch/combine、通訊重疊、grouped GEMM、capacity 取捨。
+
+- :material-chip:&nbsp;**[MoE kernels](kernels.md)**
+
+    permute 與 grouped GEMM 在 Triton / CUDA / HIP 上的實作。
+
+- :material-server-network:&nbsp;**[推論與 serving](inference-serving.md)**
+
+    expert 記憶體、offload、量化與 batch 動態。
+
+- :material-book-open-page-variant-outline:&nbsp;**[案例研究](case-studies.md)**
+
+    Mixtral、DeepSeek-V3、Qwen-MoE、Kimi-K2 的設計選擇。
+
+- :material-pulse:&nbsp;**[MoE decode 剖析](decode-anatomy.md)**
+
+    用真實逐 token decode profile 把所有元件放上時鐘來量。
+
+</div>
+
+!!! tip "和第三部一起讀"
+    本部後半（系統、kernel、serving）會直接連回[第三部 · 效能](../performance/index.md)的
+    collective、Triton/CUDA 與 profiling 章節，兩部並行閱讀效果最好。讀完之後，
+    [第四部 · AITER](../aiter/index.md) 會把這些觀念對到一條真實的 Kimi-K2.5 decode 執行路徑上。

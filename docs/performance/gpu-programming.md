@@ -3,13 +3,13 @@
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong>初級→中階</span>
   <span class="chip"><strong>先決條件：</strong> <a href="../../foundations/transformer-systems/">roofline</a></span>
-  <span class="chip"><strong>硬體：</strong> 無（GPU 有助於後面的軌道）</span>
+  <span class="chip"><strong>硬體：</strong> 無（GPU 有助於後面的路線）</span>
 </div>
 
 要快速寫出 kernels，你需要一個關於 GPU 如何執行程式碼、
 資料位於何處的正確思維模型。本頁從記憶體層次結構由下往上建構這個模型，
 並**同時並列 CUDA 與 ROCm/HIP 術語**，讓 [Triton](triton-track.md) 與
-[CUDA/HIP](cuda-hip-track.md) 兩條軌道都有穩固的基礎。
+[CUDA/HIP](cuda-hip-track.md) 兩條路線都有穩固的基礎。
 
 ### Roofline 速覽
 

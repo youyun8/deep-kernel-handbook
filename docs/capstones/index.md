@@ -1,21 +1,16 @@
-# 第四部分·Capstone
+# 第五部 · Capstones
 
-將整本手冊整合在一起的兩個端到端項目。第一個是完全
-使用可運行的程式碼；第二個是採用該模型的結構化指南
-到多 GPU 設定。
+兩個把整本手冊串起來的端到端專案。第一個有完整可執行的程式碼；第二個是把該模型搬到多 GPU
+設定的結構化指南。
 
 ## 頁面
 
-1. **[Build a small MoE LM](build-moe.md)**— 組裝一個微型 MoE 語言模型
-   從第二部分的組件中，在玩具語料庫上進行訓練，然後對其進行最佳化並
-   **使用以下方法報告測量的加速**
-   [profiling methodology](../performance/profiling.md)。
-2. **[Scaling it up](scaling.md)**— 應用
-   [parallelism techniques](../performance/distributed-training.md)（DP/ZeRO、TP、
-   PP 和 [EP](../moe/systems-ep.md)）到你建立的模型，並進行規劃
-   將其映射到真實硬體的指南。
+1. **[建立小型 MoE LM](build-moe.md)**——用第二部的元件拼出一個微型 MoE 語言模型，在玩具語料庫
+   上訓練它，再優化、並用 [profiling 方法論](../performance/profiling.md) **回報量測到的加速**。
+2. **[擴展到更大規模](scaling.md)**——把
+   [並行技術](../performance/distributed-training.md)（DP/ZeRO、TP、PP 與 [EP](../moe/systems-ep.md)）
+   套用到你建好的模型，並給出一份把它對映到真實硬體的規劃指南。
 
-!!! tip "這些是檢查點，而不僅僅是閱讀"
-Capstone 參考了真實的、經過測試的程式碼
-[`code/`](https://github.com/youyun8/ml-perf-handbook/tree/main/code)。這
-目標是你可以運行、修改和測量——而不僅僅是閱讀。
+!!! tip "這些是檢查點，不只是讀物"
+    Capstone 參照 [`code/`](https://github.com/youyun8/ml-perf-handbook/tree/main/code) 裡真實、
+    已測試的程式碼。目標是讓你能跑、能改、能量測——而不只是讀過。

@@ -1,223 +1,194 @@
-# 術語表
+# 詞彙表
 
-手冊中使用的術語的簡明定義。連結指向
-每個開發的頁面。
+手冊中用到的術語的簡明定義。連結指向各自詳述的頁面。
 
 ## 系統和效能
 
 **算術強度 ($I$)**
-：從記憶體中移動的每個位元組執行的 FLOP 數，$I = W/Q$。確定 roofline
-政權。參見 [transformer as a system](foundations/transformer-systems.md)。
+：每從記憶體搬一個 byte 所執行的 FLOP 數，$I = W/Q$。決定你落在 roofline 的哪個機制。見
+[作為系統的 Transformer](foundations/transformer-systems.md)。
 
-**roofline 型號**
-：峰值計算 $\pi$ 和頻寬的效能限制 $P=\min(\pi, \beta I)$
-$\beta$。整本手冊的組織思路。
+**roofline 模型**
+：由峰值算力 $\pi$ 與頻寬 $\beta$ 給出的效能上限 $P=\min(\pi, \beta I)$。整本手冊的組織主軸。
 
-**計算限制/記憶體限制**
-：受數學單位限制（roofline 脊右側）與 記憶體頻寬 限制
-（它的左邊）。 decoding 受記憶體限制；大批量 matmul 是受計算限制的。
+**compute-bound / memory-bound**
+：被數學單元卡住（脊點右側）vs 被記憶體頻寬卡住（脊點左側）。decode 受記憶體限制；大 batch
+的 matmul 受計算限制。
 
 **MFU（模型 FLOP 利用率）**
-：達到的模型 FLOP 數 ÷ 峰值 FLOP 數； $\approx 6P\cdot\text{tok/s}/\pi$ 為
-training。標題效率指標。參見 [profiling](performance/profiling.md)。
+：達到的模型 FLOP ÷ 峰值 FLOP；training 時 $\approx 6P\cdot\text{tok/s}/\pi$。招牌效率指標。見
+[profiling](performance/profiling.md)。
 
 **HBM**
-：高頻寬記憶體－GPU 的主 DRAM；頻寬$\beta$中
-roofline。
+：高頻寬記憶體——GPU 的主 DRAM；就是 roofline 裡的頻寬 $\beta$。
 
-**SRAM/共享記憶體/LDS**
-：快速片上暫存器。 「共享記憶體」(NVIDIA) =「LDS」(AMD)。暫存磁磚
-這是 kernels 如何提高強度的。
+**SRAM / 共享記憶體 / LDS**
+：快速的晶片內暫存。「共享記憶體」（NVIDIA）=「LDS」（AMD）。把 tile 暫存在這裡，正是 kernel
+提高算術強度的手段。
 
-**扭曲/波前**
-：鎖步 SIMT 執行群組 — NVIDIA 上的**32 個執行緒**（扭曲），**64**
-AMD CDNA（波前）。常見的可移植性陷阱。參見
-[GPU programming](performance/gpu-programming.md)。
+**warp / wavefront**
+：鎖步的 SIMT 執行群組——NVIDIA 上是 **32 個 thread**（warp），AMD CDNA 上是 **64**（wavefront）。
+常見的可移植性陷阱。見 [GPU 程式設計](performance/gpu-programming.md)。
 
-**入住率**
-：每個 SM/CU 的駐留扭曲/波前； latency-隱藏手段，而不是目標。
+**占用率（occupancy）**
+：每個 SM/CU 上常駐的 warp/wavefront 數；它是藏 latency 的手段，不是目標。
 
-**合併**
-：連續通道存取連續位址，以便記憶體事務合併。
+**coalescing（合併存取）**
+：相鄰 lane 存取相鄰位址，使記憶體交易能被合併。
 
 **算子融合**
-：組合作業以避免 HBM 往返（例如 Flashattention、融合 MLP）- 提高
-強度。
+：把多個操作合在一起以避免 HBM 往返（例如 FlashAttention、融合 MLP）——提高算術強度。
 
-**失敗次數**
-：浮點運算； matmul $(m{\times}k)(k{\times}n)$ 的成本為 $2mkn$。
+**FLOP**
+：浮點運算次數；matmul $(m{\times}k)(k{\times}n)$ 成本為 $2mkn$。
 
 ## 精度
 
 **bf16 / fp16 / fp8**
-：16/16/8 位元浮點數。 bf16 保留了 fp32 的指數範圍（8 位）並贏得了 training；
-fp16 尾數較多，但範圍較窄； fp8（E4M3/E5M2）是前緣。參見
-[numerics](foundations/numerics-precision.md)。
+：16/16/8 位元浮點。bf16 保留 fp32 的指數範圍（8 位）因而在 training 上勝出；fp16 mantissa 較多
+但範圍較窄；fp8（E4M3/E5M2）是前沿。見 [數值與精度](foundations/numerics-precision.md)。
 
 **mixed precision**
 ：低精度儲存/matmul+fp32 累加+fp32 主權重。
 
-**損失縮放**
-：乘以損失以將 fp16 梯度保持在範圍內；基本上不需要
-BF16。
+**loss scaling（損失縮放）**
+：把損失乘上一個因子，讓 fp16 梯度落在可表示範圍內；bf16 基本上不需要。
 
 ## attention
 
-**KV 緩存**
-：儲存過去 tokens 的鍵/值，因此 decoding 是$O(N)$而不是$O(N^2)$；常常是
-主導的 inference 記憶體。參見 [attention efficiency](foundations/attention-efficiency.md)。
+**KV cache**
+：儲存過去 token 的 key/value，使 decode 變成 $O(N)$ 而非 $O(N^2)$；常常是 inference 記憶體的
+主角。見 [Attention 效率](foundations/attention-efficiency.md)。
 
 **MQA / GQA / MLA**
-：多查詢/分組查詢/多頭潛在 attention — 架構方式
-縮小 KV 快取（減少或壓縮 KV 頭）。
+：Multi-Query / Grouped-Query / Multi-head Latent Attention——從架構層面縮小 KV cache（減少或壓縮
+KV 頭）。
 
-**Flashattention**
-：IO 感知 attention，平鋪$Q,K,V$並使用線上 softmax 來避免
-具體化 $N{\times}N$ 分數矩陣。參見
-[Flashattention](foundations/flashattention.md)。
+**FlashAttention**
+：IO-aware 的 attention，把 $Q,K,V$ 分塊、用 online softmax 避免具現化 $N{\times}N$ 分數矩陣。見
+[FlashAttention](foundations/flashattention.md)。
 
-**線上 softmax**
-：透過運行最大值和校正的單通道、數值穩定的 softmax
-係數 $e^{m_{old}-m_{new}}$。
+**online softmax**
+：靠 running max 與校正因子 $e^{m_{old}-m_{new}}$，單趟傳遞就算出數值穩定的 softmax。
 
-**已分頁 attention**
-：基於區塊的 KV 快取分配（如虛擬記憶體分頁），消除了
-碎片化並實現共享。
+**PagedAttention**
+：以區塊為單位配置 KV cache（如虛擬記憶體分頁），消除碎片並支援共享。
 
 ## experts 的混合物
 
-**MoE（experts 的混合）**
-：具有許多 expert FFN 和一個 router 的層，每個 token 激活一些，
-將總參數與每個 token FLOP 解耦。參見 [Part II](moe/index.md)。
+**MoE（Mixture-of-Experts）**
+：含許多 expert FFN 與一個 router 的層，每個 token 只啟動其中幾個，把總參數和每 token FLOP 解耦。
+見[第二部](moe/index.md)。
 
 **expert**
-：MoE 層中的平行 FFN 之一（通常是 SwiGLU）。
+：MoE 層裡並列的其中一個 FFN（通常是 SwiGLU）。
 
-**router / 門**
-：產生每 expert 分數的小型網路； top-$k$ 選擇 experts。
-**Softmax 門控**使 experts 競爭；**sigmoid 門控**對它們進行評分
-獨立。
+**router / gate**
+：產生 per-expert 分數的小網路；由 top-$k$ 選出 expert。**softmax gating** 讓 expert 互相競爭；
+**sigmoid gating** 則獨立為它們計分。
 
-**頂部-$k$ routing**
-：每個 token 都使用其 $k$ 最高得分的 experts。
+**top-$k$ routing**
+：每個 token 使用自己分數最高的 $k$ 個 expert。
 
-**token-選擇與 expert-選擇**
-：tokens 選擇 experts（保證覆蓋，不平衡） vs experts 選擇他們的
-頂部-$C$ tokens（保證餘額，不承保）。參見
-[routing variants](moe/routing-variants.md)。
+**token-choice vs expert-choice**
+：token 挑 expert（保證覆蓋、不保證平衡）vs expert 挑自己的 top-$C$ token（保證平衡、不保證覆蓋）。
+見 [Routing 變體](moe/routing-variants.md)。
 
 **共享 expert**
-：路由 experts 中新增了始終在線的 FFN，以吸收常識和
-穩定 training。
+：在路由 expert 之外再加一個總是啟用的 FFN，用來吸收常識並穩定 training。
 
-**細粒度 experts**
-：許多小的 experts 而不是幾個大的，擴大了組合混合
-固定活動計算的空間。
+**細粒度 expert**
+：用許多小 expert 取代少數大 expert，在固定活躍計算下放大 expert 組合空間。
 
-**輔助（負載平衡）損耗**
-：處罰 $\alpha E\sum_e f_e P_e$ 鼓勵制服 routing。參見
-[負載平衡](moe/load-balancing.md)。
+**auxiliary（負載平衡）損失**
+：懲罰項 $\alpha E\sum_e f_e P_e$，鼓勵均勻 routing。見 [負載平衡](moe/load-balancing.md)。
 
-**輔助無損耗平衡**
-：透過控制器更新的 per-expert**選擇偏差**（不是
-門權重），避免梯度失真（DeepSeek 式）。
+**aux-loss-free 平衡**
+：靠控制器更新的 per-expert **選擇偏差**（不是 gate 權重）來平衡，避免扭曲梯度（DeepSeek 風格）。
 
-**expert 容量/容量係數**
-：每批次每個 expert 的最大 tokens；因子交易下降了 tokens（品質）與
-填滿/緩衝區大小（throughput/記憶體）。
+**expert capacity / 容量係數**
+：每個 batch 每個 expert 的 token 上限；此係數在丟 token（品質）與 padding/緩衝區大小
+（throughput/記憶體）之間做取捨。
 
-**token 掉落/溢出**
-：tokens 超出容量跳過 MoE 層（由殘差攜帶）。
+**token drop / overflow**
+：超出 capacity 的 token 略過 MoE 層（由殘差帶過去）。
 
-**router z 損耗**
-：$\beta(\log\sum_e e^{x_e})^2$ 懲罰大 router 的穩定性。參見
-[training stability](moe/training-stability.md)。
+**router z-loss**
+：$\beta(\log\sum_e e^{x_e})^2$，懲罰過大的 router logit 以求穩定。見
+[訓練穩定性](moe/training-stability.md)。
 
-**expert 並行度 (EP)**
-：跨 GPU 分片 experts； tokens 透過 all-to-all 到達 expert。參見
-[systems & EP](moe/systems-ep.md)。
+**expert parallelism（EP）**
+：把 expert 跨 GPU 切分；token 經由 all-to-all 抵達它的 expert。見 [系統與 EP](moe/systems-ep.md)。
 
-**分組 GEMM**
-：一台 kernel 執行許多不同大小的矩陣乘法（每個 expert 一個），無需填滿。
+**grouped GEMM**
+：單一 kernel 執行許多個不同大小的矩陣乘法（每個 expert 一個），無需 padding。
 
-**巨型塊/塊稀疏 MoE**
-：將 MoE FFN 重新表述為區塊稀疏 matmul，以避免 token 丟棄和
-填充。
+**MegaBlocks / 區塊稀疏 MoE**
+：把 MoE FFN 改寫成區塊稀疏 matmul，藉此避免 token drop 與 padding。
 
 ## 分散式 training
 
-**集體**
-：all-reduce，全聚集，減少分散，all-to-all，廣播/P2P（NCCL/RCCL）。
-參見 [distributed training](performance/distributed-training.md)。
+**collective（集合通訊）**
+：all-reduce、all-gather、reduce-scatter、all-to-all、broadcast/P2P（NCCL/RCCL）。見
+[分散式訓練](performance/distributed-training.md)。
 
-**資料/張量/管道/序列/expert 並行性(DP/TP/PP/SP/EP)**
-：training 分割的尺寸；組成 N 維並行。
+**data / tensor / pipeline / sequence / expert 並行（DP/TP/PP/SP/EP）**
+：切分 training 的各個維度；可組合成 N 維並行。
 
-**零/FSDP**
-：整個 DP 的分片優化器狀態 (1)、梯度 (2) 和參數 (3)
-組來削減記憶。
+**ZeRO / FSDP**
+：在 DP 群組間切分 optimizer 狀態（1）、梯度（2）與參數（3）以省記憶體。
 
 **all-to-all**
-：每個等級向每個其他等級發送不同區塊的集體 -
-MoE 調度/組合原語。
+：每個 rank 向其他每個 rank 各送一塊不同資料的 collective——MoE dispatch/combine 的原語。
 
-**節點限制 routing**
-：限制 token 的 experts 跨度的節點數，以綁定跨節點 all-to-all。
+**node-limited routing**
+：限制一個 token 的 expert 能跨多少節點，以約束跨節點 all-to-all。
 
 ## inference & 壓縮
 
 **prefill / decode**
-：處理提示（許多 tokens，受計算限制）與在某個時間產生一個 token
-時間（受記憶體限制）。
+：處理 prompt（很多 token、compute-bound）vs 一次生成一個 token（memory-bound）。
 
-**連續（飛行中）配料**
-：迭代級調度，將已完成的序列交換為等待的序列，
-保持 GPU 滿載。參見 [inference optimization](performance/inference-optimization.md)。
+**continuous（in-flight）batching**
+：以迭代為單位排程，隨時把跑完的序列換成等待中的序列，讓 GPU 保持滿載。見
+[推論最佳化](performance/inference-optimization.md)。
 
-**投機 decoding**
-：一個廉價的草案提出了 tokens，目標一次性驗證它們；無損,
-利用 decode 的備用計算。
+**speculative decoding**
+：用一個便宜的 draft 模型提出 token，再由目標模型一次驗證；無損，利用 decode 閒置的算力。
 
 **PTQ / QAT**
-：training 後量化（僅校準）與量化感知 training。
-參見 [quantization](performance/quantization.md)。
+：訓練後量化（只做校準）vs 量化感知訓練。見 [量化](performance/quantization.md)。
 
 **GPTQ / AWQ / SmoothQuant**
-：PTQ 方法：糾錯權重量化/激活感知權重
-將激活異常值縮放/遷移到權重中。
+：PTQ 方法——誤差修正的權重量化／activation-aware 權重縮放／把 activation 離群值搬進權重。
 
-**修剪**
-：去除重量或結構（非結構化、結構化或 2:4
-半結構化）進行壓縮。
+**剪枝（pruning）**
+：移除權重或結構（非結構化、結構化，或 2:4 半結構化）以壓縮模型。
 
-**蒸餾**
-：training 小學生模仿大老師。
+**蒸餾（distillation）**
+：訓練一個小的 student 模型去模仿大的 teacher。
 
-**TTFT / TPOT (ITL)**
-：首次 token (prefill latency) 的時間/每次輸出 token (decode latency) 的時間。
+**TTFT / TPOT（ITL）**
+：產生第一個 token 的時間（prefill latency）／每個輸出 token 的時間（decode latency）。
 
 ## 硬體快速參考
 
-用於粗略估計的整數（練習和
-[solutions](solutions/index.md) 使用這些）。峰值 FLOP/s 密集 bf16；真實的
-kernels 達到了分數 (MFU)。頻寬是 HBM。**山脊**$\pi/\beta$ 是
-算術強度，其中晶片從記憶體限制轉變為計算限制。
+用來做粗略估計的整數（練習與 [解答](solutions/index.md) 都用這些）。峰值 FLOP/s 為密集 bf16；真實
+kernel 只達到其中一部分（MFU）。頻寬指 HBM。**脊點** $\pi/\beta$ 是晶片由 memory-bound 轉成
+compute-bound 的那個算術強度。
 
-| 圖形處理器    | bf16 峰值 ($\pi$) | HBM BW ($\beta$) | HBM 尺寸 | 山脊 $\pi/\beta$        |
-| ------------- | ----------------- | ---------------- | -------- | ----------------------- |
-| A100（80 GB） | ~312 TFLOP/秒     | ~2.0 TB/秒       | 80GB     | ~156 FLOP/位元組        |
-| H100 (SXM)    | ~990 TFLOP/秒     | ~3.35 TB/秒      | 80GB     | ~295 FLOP/位元組        |
-| H200          | ~990 TFLOP/秒     | ~4.8 TB/秒       | 141 GB   | 141 GB ~206 FLOP/位元組 |
-| 小米 300X     | ~1.3 PFLOP/s      | ~5.3 TB/秒       | 192 GB   | 192 GB ~245 FLOP/位元組 |
+| GPU           | bf16 峰值 ($\pi$) | HBM BW ($\beta$) | HBM 大小 | 脊點 $\pi/\beta$ |
+| ------------- | ----------------- | ---------------- | -------- | ---------------- |
+| A100（80 GB） | ~312 TFLOP/s      | ~2.0 TB/s        | 80 GB    | ~156 FLOP/byte   |
+| H100 (SXM)    | ~990 TFLOP/s      | ~3.35 TB/s       | 80 GB    | ~295 FLOP/byte   |
+| H200          | ~990 TFLOP/s      | ~4.8 TB/s        | 141 GB   | ~206 FLOP/byte   |
+| MI300X        | ~1.3 PFLOP/s      | ~5.3 TB/s        | 192 GB   | ~245 FLOP/byte   |
 
-互連（適用於 [distributed training](performance/distributed-training.md)）：
-MI300 上的節點內**NVLink**~0.9 TB/s/GPU (NVLink 4) 或**Infinity Fabric**；
-跨節點**InfiniBand/RoCE**~25–50 GB/s/GPU；主機**PCIe Gen5**~64 GB/s。的
-從 HBM → NVLink → IB → PCIe 下降了 1-2 個數量級，這就是為什麼並行性變得如此重要的原因
-進行映射，以便最健談的集體乘坐最快的鏈接。
+互連（用於 [分散式訓練](performance/distributed-training.md)）：節點內 **NVLink** ~0.9 TB/s/GPU
+（NVLink 4）或 MI300 上的 **Infinity Fabric**；跨節點 **InfiniBand/RoCE** ~25–50 GB/s/GPU；主機
+**PCIe Gen5** ~64 GB/s。從 HBM → NVLink → IB → PCIe 每一級掉 1–2 個數量級——這正是為什麼要把並行
+小心對映，好讓最多話的 collective 走最快的連結。
 
-!!! note "使用這些"
-    數字因 SKU、時鐘和稀疏性聲明而異（供應商經常引用
-    2× 結構稀疏－減半為稠密）。你的哪些內容應該是穩健的
-    估計是**制度**和**數量級**，而不是第三個
-    重要數字。
+!!! note "怎麼用這些數字"
+    數字會隨 SKU、時脈與稀疏性宣稱而變（廠商常引用 2× 結構稀疏——對密集要減半）。你的估計裡該
+    穩健的是**機制**與**數量級**，而不是第三位有效數字。

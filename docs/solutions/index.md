@@ -1,38 +1,35 @@
-# 解決方案
+# 解答
 
 <div class="page-meta">
-  <span class="chip"><strong>適用範圍：</strong>手冊中的每個練習</span>
-  <span class="chip"><strong>格式：</strong> 可折疊工作答案</span>
+  <span class="chip"><strong>涵蓋：</strong> 手冊中每一道練習</span>
+  <span class="chip"><strong>格式：</strong> 可折疊的詳解</span>
 </div>
 
-解答了手冊中所有練習的答案，按部分組織。每個答案
-是一個可折疊的塊 -**首先嘗試練習**，然後展開以檢查你的
-推理和數字。完整給出了封閉形式的推導；建構和測量
-練習給了預期的結果、正確的方法和陷阱
-避免。
+手冊裡所有練習的解答，依各部組織。每個答案都是一個可折疊區塊——**請先自己試做**，再展開對照
+你的推理與數字。封閉形式的推導會完整給出；建構與量測類的題目則給出預期結果、正確方法，以及該
+避開的陷阱。
 
 <div class="grid cards" markdown>
 
-- :material-cube-outline:**[Part I · Foundations](foundations.md)**
+- :material-cube-outline:&nbsp;**[第一部 · 基礎](foundations.md)**
 
-  FLOP/位元組計數、KV 快取、Flashattention、數字。
+    FLOP/bytes 計數、KV cache、FlashAttention、數值。
 
-- :material-set-split:**[Part II · Mixture-of-experts](moe.md)**
+- :material-set-split:&nbsp;**[第二部 · Mixture-of-Experts](moe.md)**
 
-  稀疏數學、平衡、routing、穩定性、EP、kernels、serving。
+    稀疏數學、平衡、routing、穩定性、EP、kernel、serving。
 
-- :material-speedometer:**[Part III · Performance](performance.md)**
+- :material-speedometer:&nbsp;**[第三部 · 效能](performance.md)**
 
-  GPU 模型、Triton/CUDA/HIP、分散式 training、Quant、inference、分析。
+    GPU 模型、Triton/CUDA/HIP、分散式訓練、量化、inference、profiling。
 
-- :material-rocket-launch-outline:**[Part IV · Capstones](capstones.md)**
+- :material-rocket-launch-outline:&nbsp;**[第五部 · Capstones](capstones.md)**
 
-  小型 MoE LM 的端到端建置和測量。
+    小型 MoE LM 的端到端建立與量測。
 
 </div>
 
-!!! tip "如何充分利用這些"
-    這些數字使用圓形硬體規格（例如 A100 ≈ 312 TFLOP/s bf16 / 2 TB/s；
-    H100 ≈ 990 TFLOP/秒/3.35 TB/秒； MI300X ≈ 1.3 PFLOP/秒/5.3 TB/秒）。你的確切
-    數字會隨著你假設的晶片而變化——應該匹配的是
-    **制度**（記憶體限制與計算限制）和**數量級**。
+!!! tip "怎麼用這些解答"
+    這些數字用的是整數化的硬體規格（例如 A100 ≈ 312 TFLOP/s bf16 / 2 TB/s；H100 ≈ 990 TFLOP/s /
+    3.35 TB/s；MI300X ≈ 1.3 PFLOP/s / 5.3 TB/s）。你的確切數字會隨假設的晶片而變——該對得上的是
+    **機制**（memory-bound vs compute-bound）與**數量級**。

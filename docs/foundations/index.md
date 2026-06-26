@@ -1,38 +1,31 @@
-# 第一部份·現代機器學習系統的基礎
+# 第一部 · 現代機器學習系統的基礎
 
-在讓模型變得更快之前，你需要能夠**預測**它的速度
-*應該*是 — 並了解給定的操作是否受到 GPU 的限制
-算術單元或其記憶體匯流排。第一部分建立流暢性。
+要讓模型跑得更快，你得先能**預測**它*應該*多快，並判斷某個操作是被 GPU 的算術單元卡住、
+還是被它的記憶體匯流排卡住。第一部建立這種流暢度。
 
-在本部分結束時，你將能夠：
+讀完本部，你將能夠：
 
-- 從第一原理解釋 Transformer**是什麼**- tokens、attention、
-  多頭、FFN 和完整區塊 — 並端到端追蹤 token。
-- 計算 Transformer 前向/後向傳遞的 FLOP 和位元組數，並計算
-  將其**算術強度**放置在**roofline**上。
-- 準確解釋為什麼 LLM**decoding 受記憶體限制**，而 training/prefill
-  （大部分）是計算密集型的，使用 KV 快取。
-- 從第一原理推導出**Flashattention**— 平鋪 + 線上 softmax，
-  並解釋為什麼它將 $O(N^2)$ 記憶體問題轉變為 $O(N)$ 問題。
-- 在**fp32 / bf16 / fp16 / fp8**之間進行選擇，並解釋溢出的原因，
-  下溢和損失縮放。
+- 從第一原理講清楚 Transformer **是什麼**——token、attention、多頭、FFN、完整 block——並
+  端到端追蹤一個 token。
+- 數出 Transformer 前向／反向傳播的 FLOP 與 bytes，把它的**算術強度**放上 **roofline**。
+- 精確說明為什麼 LLM 的 **decode 是 memory-bound**、而 training/prefill（大多）是 compute-bound，
+  以及 KV cache 的角色。
+- 從第一原理推導 **FlashAttention**——tiling + online softmax——並解釋它如何把 $O(N^2)$ 的記憶體
+  問題變成 $O(N)$。
+- 在 **fp32 / bf16 / fp16 / fp8** 之間做選擇，並解釋溢位、下溢與 loss scaling。
 
 ## 頁面
 
-1. **[The transformer from scratch](transformer-from-scratch.md)**— Transformer*是*，一次建造一張圖：tokens、attention、多頭、
-   FFN，完整區塊。如果 Transformer 是新的，請從這裡開始。
-2. **[The transformer as a system](transformer-systems.md)**— roofline
-   模型、FLOP/位元組計數以及時間實際去向。
-3. **[attention efficiency](attention-efficiency.md)**— KV 緩存，
-   decoding 中的記憶體頻寬牆和分頁 attention。
-4. **[Flashattention from scratch](flashattention.md)**— 線上 softmax 和
-   平鋪，帶有 numpy 參考實作。
-5. **[Numerics & precision](numerics-precision.md)**— 浮點格式，
-   mixed precision，數值穩定性。
+1. **[從零實作 Transformer](transformer-from-scratch.md)**——Transformer 到底是什麼，一次一張圖：
+   token、attention、多頭、FFN、完整 block。第一次接觸 Transformer 就從這裡開始。
+2. **[作為系統的 Transformer](transformer-systems.md)**——roofline 模型、FLOP/bytes 計數，以及
+   時間實際花在哪。
+3. **[Attention 效率](attention-efficiency.md)**——KV cache、decode 的記憶體頻寬牆，以及
+   PagedAttention。
+4. **[從零實作 FlashAttention](flashattention.md)**——online softmax 與 tiling，附 numpy 參考實作。
+5. **[數值與精度](numerics-precision.md)**——浮點格式、mixed precision、數值穩定性。
 
-!!! tip "整本手冊的先決條件"
-    第一部分中最有用的想法是**算術強度**和
-    **roofline**。幾乎後來的每一次優化－Flashattention，分組
-    GEMM，融合了 MoE router，量化－最終是對
-    roofline。如果你只閱讀一頁，請閱讀
-    [the transformer as a system](transformer-systems.md)。
+!!! tip "整本手冊的先備觀念"
+    第一部最有用的兩個觀念是**算術強度**和 **roofline**。後面幾乎每一個優化——FlashAttention、
+    grouped GEMM、融合 MoE router、量化——最終都是對 roofline 的出招。如果你只讀一頁，請讀
+    [作為系統的 Transformer](transformer-systems.md)。

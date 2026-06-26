@@ -16,26 +16,28 @@
 :root {
   --md-code-font: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
-  --ml-accent-warm: #f59e0b;
-  --ml-accent-cool: #4f46e5;
-  --ml-accent-blue: #6366f1;
-  --ml-accent-teal: #0d9488;
-  --ml-accent-soft: #eef2ff;
+  /* Engineering palette: a confident blue lead, teal partner, amber highlight.
+     Purple is intentionally kept out so the page does not read as one-note. */
+  --ml-accent-warm: #ea8a0b;
+  --ml-accent-cool: #2563eb;   /* primary lead (blue-600) */
+  --ml-accent-blue: #3b82f6;   /* lighter blue */
+  --ml-accent-teal: #0d9488;   /* partner accent */
+  --ml-accent-soft: #eff5ff;
 
   --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 94%, var(--ml-accent-cool) 6%);
   --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 88%, var(--ml-accent-blue) 12%);
   --ml-border: color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
   --ml-border-strong: color-mix(in srgb, var(--md-default-fg-color) 22%, transparent);
 
-  --ml-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-  --ml-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 18px rgba(15, 23, 42, 0.07);
-  --ml-shadow-strong: 0 2px 6px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.13);
+  --ml-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --ml-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.08);
+  --ml-shadow-strong: 0 2px 6px rgba(15, 23, 42, 0.06), 0 20px 48px rgba(15, 23, 42, 0.14);
 
-  --ml-radius: 14px;
-  --ml-radius-sm: 9px;
-  --ml-radius-lg: 22px;
+  --ml-radius: 12px;
+  --ml-radius-sm: 8px;
+  --ml-radius-lg: 18px;
 
-  --ml-gradient: linear-gradient(135deg, var(--ml-accent-cool), var(--ml-accent-teal));
+  --ml-gradient: linear-gradient(120deg, var(--ml-accent-cool), var(--ml-accent-teal));
 
   /* Diagram palette (light) */
   --ml-diagram-bg: color-mix(in srgb, var(--md-default-bg-color) 96%, white 4%);
@@ -49,8 +51,8 @@
   --ml-diagram-label-bg: color-mix(in srgb, var(--md-default-bg-color) 92%, white 8%);
   --ml-diagram-cluster-bg: rgba(15, 118, 110, 0.08);
   --ml-diagram-cluster-stroke: rgba(15, 118, 110, 0.42);
-  --ml-diagram-accent-bg: #ede9fe;
-  --ml-diagram-accent-stroke: #7c3aed;
+  --ml-diagram-accent-bg: #dbeafe;
+  --ml-diagram-accent-stroke: #2563eb;
   --ml-diagram-accent-text: #111827;
   --ml-roofline-start: #0f766e;
   --ml-roofline-mid: #2563eb;
@@ -59,8 +61,8 @@
 
 [data-md-color-scheme="slate"] {
   --ml-accent-warm: #fbbf24;
-  --ml-accent-cool: #818cf8;
-  --ml-accent-blue: #a5b4fc;
+  --ml-accent-cool: #60a5fa;
+  --ml-accent-blue: #93c5fd;
   --ml-accent-teal: #2dd4bf;
   --ml-accent-soft: #1e293b;
 
@@ -85,8 +87,8 @@
   --ml-diagram-label-bg: #111827;
   --ml-diagram-cluster-bg: rgba(45, 212, 191, 0.12);
   --ml-diagram-cluster-stroke: rgba(94, 234, 212, 0.5);
-  --ml-diagram-accent-bg: #6d28d9;
-  --ml-diagram-accent-stroke: #c4b5fd;
+  --ml-diagram-accent-bg: #1d4ed8;
+  --ml-diagram-accent-stroke: #93c5fd;
   --ml-diagram-accent-text: #ffffff;
   --ml-roofline-start: #2dd4bf;
   --ml-roofline-mid: #60a5fa;
@@ -96,13 +98,13 @@
 /* Brand-tinted primary so the header/links match the new accent. */
 :root,
 [data-md-color-scheme="default"] {
-  --md-primary-fg-color: #4f46e5;
-  --md-primary-fg-color--light: #6366f1;
-  --md-primary-fg-color--dark: #4338ca;
+  --md-primary-fg-color: #1e3a8a;
+  --md-primary-fg-color--light: #2563eb;
+  --md-primary-fg-color--dark: #172554;
   --md-accent-fg-color: #0d9488;
 }
 [data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #4f46e5;
+  --md-primary-fg-color: #2563eb;
   --md-accent-fg-color: #2dd4bf;
 }
 
@@ -119,8 +121,8 @@
   --ml-diagram-label-bg: #0f172a;
   --ml-diagram-cluster-bg: rgba(45, 212, 191, 0.1);
   --ml-diagram-cluster-stroke: rgba(94, 234, 212, 0.45);
-  --ml-diagram-accent-bg: #4c1d95;
-  --ml-diagram-accent-stroke: #a78bfa;
+  --ml-diagram-accent-bg: #1d4ed8;
+  --ml-diagram-accent-stroke: #93c5fd;
   --ml-diagram-accent-text: #f8fafc;
 }
 
@@ -179,7 +181,7 @@
 
 .md-typeset p,
 .md-typeset li {
-  max-width: 72ch;
+  max-width: none;
 }
 
 .md-typeset a {
@@ -510,6 +512,12 @@ figure > figcaption {
   background: var(--ml-surface);
   border: 1px solid var(--ml-border);
   font-size: 0.85rem;
+  color: var(--ml-accent-cool);
+}
+
+.home-points li span svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 /* Hero side panel — a "spec sheet" card. */
@@ -525,7 +533,7 @@ figure > figcaption {
   color: #f8fafc;
   overflow: hidden;
   background:
-    linear-gradient(155deg, #1e1b4b, #0f172a 60%, #042f2e);
+    linear-gradient(155deg, #0b2a5e, #0b1220 58%, #052e2b);
   box-shadow: var(--ml-shadow-strong);
 }
 
@@ -548,7 +556,7 @@ figure > figcaption {
 }
 
 .home-panel__eyebrow {
-  color: #a5b4fc;
+  color: #93c5fd;
   font-size: 0.64rem;
   font-weight: 800;
   letter-spacing: 0.1em;

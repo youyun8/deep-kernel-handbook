@@ -1,35 +1,32 @@
-# 海衛一軌道
+# Triton 路線
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong>中階</span>
-  <span class="chip"><strong>先備知識：</strong> <a href="../gpu-programming/">GPU程式設計模型</a></span>
-  <span class="chip"><strong>代碼：</strong> <code>code/kernels/</code>（需GPU）</span>
+  <span class="chip"><strong>先備知識：</strong> <a href="../gpu-programming/">GPU 程式設計模型</a></span>
+  <span class="chip"><strong>程式碼：</strong> <code>code/kernels/</code>（需 GPU）</span>
 </div>
 
-Triton 可讓你用 Python 編寫 GPU kernels，編譯成接近峰值機器
-程式碼，同時它處理痛苦的部分（合併、SMEM 分段、向量化、
-大部分時間安排）。你認為**瓦片**（張量塊）而不是
-單獨的線程。該軌道從簡單的 kernel 到融合的 softmax 構建
-和 matmul，然後指向手冊中其他地方的 attention/MoE kernels。
+Triton 讓你用 Python 寫 GPU kernel，編譯成接近峰值的機器碼，同時替你處理那些痛苦的細節
+（coalescing、SMEM 分段、向量化、大部分排程）。你以 **tile（張量塊）** 的角度思考，而不是
+單個 thread。本路線從最簡單的 kernel 一路堆到融合 softmax 與 matmul，再指向手冊其他地方的
+attention / MoE kernel。
 
-!!! info "為什麼先選擇 Triton"
-    對於大多數 kernels Triton 而言，可達到手動調整 CUDA 效能的 80-95%
-    工作量的一小部分，並且*相同的來源在 AMD 上運行*（Triton 有一個 ROCm
-    後端映射到 wavefront-64 和 MFMA）。掉落至[CUDA/HIP](cuda-hip-track.md)
-    只有當你需要控制時 Triton 才不會暴露。
+!!! info "為什麼先學 Triton"
+    對大多數 kernel，Triton 能以一小部分的工作量達到手調 CUDA 80–95% 的效能，而且*同一份原始碼
+    也能在 AMD 上跑*（Triton 有 ROCm 後端，對映到 wavefront-64 與 MFMA）。只有當你需要 Triton
+    沒暴露出來的控制權時，才往下掉到 [CUDA/HIP](cuda-hip-track.md)。
 
 ## Triton 心智模型
 
-一個 Triton kernel 是從**一個程式實例**的角度寫的
-（大約一個街區）。你：
+一個 Triton kernel 是站在**單一 program 實例**（大致對應一個 block）的視角寫的。你會：
 
-1. 取得你的程式 ID (`tl.program_id`) → 你擁有哪個圖塊。
-2. 計算該圖塊 (`tl.arange`) 的偏移量。
-3. `tl.load` 將 HBM 中的圖塊（帶有邊界遮罩）放入片上記憶體中。
-4. 對其進行計算（`tl.dot`，依元素，`tl.max`/`tl.sum` 歸約）。
-5. `tl.store` 回傳結果。
+1. 取得自己的 program id（`tl.program_id`）→ 確定你負責哪個 tile。
+2. 算出該 tile 的偏移（`tl.arange`）。
+3. 用 `tl.load` 把 HBM 裡的 tile（帶邊界遮罩）載進晶片上記憶體。
+4. 在上面計算（`tl.dot`、element-wise、`tl.max`/`tl.sum` 之類的 reduction）。
+5. 用 `tl.store` 把結果寫回去。
 
-Triton 在圖塊內進行向量化並為你管理 SMEM/暫存器。
+Triton 會在 tile 內幫你做向量化、並替你管理 SMEM／暫存器。
 
 ## 等級 1 — 向量相加
 
@@ -52,14 +49,13 @@ def add(x, y):
     return out
 ```
 
-這是記憶體限制的（每 1 FLOP 移動 3 個位元組）——它唯一的工作是教導
-載入/計算/儲存模式和屏蔽。
+這是 memory-bound 的（每 1 FLOP 搬 3 個 byte）——它唯一的用途就是示範 load／compute／store 的
+模式與遮罩。
 
-## Level 2 — fused softmax（第一個真正的勝利）
+## 等級 2 — fused softmax（第一個真正的勝利）
 
-行上的樸素 softmax 讀取行，找出最大值，再次讀取以求冪
-和求和，再次讀取以除 - 多次 HBM 傳遞。裝有保險絲的 Triton kernel 負載
-每行**一次**進入 SRAM 並在那裡執行 max/exp/sum/divide 操作：
+對一列做樸素 softmax，要讀一次列找最大值、再讀一次做 exp 與求和、再讀一次做除法——多趟 HBM
+往返。融合版的 Triton kernel 把每列**只載入一次**進 SRAM，然後在那裡做完 max/exp/sum/divide：
 
 ```python
 @triton.jit
@@ -74,15 +70,14 @@ def softmax_kernel(x_ptr, out_ptr, row_stride, n_cols, BLOCK: tl.constexpr):
     tl.store(out_ptr + row * row_stride + cols, out, mask=mask)
 ```
 
-這是 [online-softmax / Flashattention](../foundations/flashattention.md)
-想法的縮影：透過保留資料將多個記憶體傳遞折疊為一個
-在晶片上。可運作的、經過 PyTorch 檢查的版本位於
+這是 [online softmax / FlashAttention](../foundations/flashattention.md) 想法的縮影：靠把資料
+留在晶片上，把多趟記憶體往返摺成一趟。可執行、經 PyTorch 驗證的版本在
 [`code/kernels/softmax_triton.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/kernels/softmax_triton.py)。
 
-## Level 3 — 平鋪和自動調整的 matmul
+## 等級 3 — 分塊與自動調參的 matmul
 
-規範的 Triton matmul 將 $C=AB$ 平鋪到 `BM×BN` 輸出區塊中，每個區塊
-在 fp32 中累積 K 維度的 `BK` 區塊：
+標準的 Triton matmul 把 $C=AB$ 分塊成 `BM×BN` 的輸出區塊，每個區塊沿 K 維逐 `BK` 區塊、以 fp32
+累積：
 
 ```python
 @triton.autotune(
@@ -106,55 +101,52 @@ def matmul_kernel(a_ptr, b_ptr, c_ptr, M, N, K,
     tl.store(c_ptr + rm[:,None]*N + rn[None,:], acc, mask=(rm[:,None]<M)&(rn[None,:]<N))
 ```
 
-`tl.dot` 在 NVIDIA 上降低為 Tensor 核心，在 AMD 上降低為**MFMA 矩陣核心**
-自動。 `@triton.autotune` 搜尋圖塊尺寸和每個形狀的 `num_warps` —
-**在 AMD 上重新自動調整**，因為 wavefront-64 會改變最佳配置。這個矩陣相乘
-是[MoE grouped GEMM](../moe/kernels.md)的主幹，即「這個
-kernel，但每個圖塊都會選擇其 expert 的重量板。 」
+`tl.dot` 會自動在 NVIDIA 上降階成 Tensor Core、在 AMD 上降階成 **MFMA 矩陣核心**。
+`@triton.autotune` 會為每個 shape 搜尋 tile 尺寸與 `num_warps`——**在 AMD 上要重新自動調參**，
+因為 wavefront-64 會改變最佳配置。這個 matmul 就是 [MoE grouped GEMM](../moe/kernels.md) 的骨幹，
+也就是「同一個 kernel，只是每個 tile 各自挑出它那個 expert 的權重板」。
 
-## 4 級 — attention 和分組 GEMM
+## 等級 4 — attention 與 grouped GEMM
 
-有了 softmax + matmul 的理解，[Flashattention](../foundations/flashattention.md)
-kernel 是「tiles 中的 matmul $QK^\top$，online-softmax SRAM 中的分數，matmul 由
-$V$，永遠不要寫分數矩陣。 」還有[MoE grouped GEMM](../moe/kernels.md)
-是「具有每個圖塊 expert 尋找和打包可變大小的 3 級 matmul
-排塊，將聚集融合到序言中。 」這些頁麵包含完整的
-kernels；現在你已經有了閱讀它們的詞彙了。
+理解了 softmax + matmul 之後，[FlashAttention](../foundations/flashattention.md) kernel 就是
+「分塊算 $QK^\top$、分數在 SRAM 裡做 online softmax、再乘上 $V$，全程不寫出分數矩陣」。而
+[MoE grouped GEMM](../moe/kernels.md) 則是「等級 3 的 matmul，加上每個 tile 各自查它的 expert、
+打包可變大小的 tile，並把 gather 融進 prologue」。那些頁面有完整 kernel；現在你已經有讀懂它們的
+詞彙了。
 
-## 實用技巧
+## 實用要訣
 
--**在基準測試之前，請務必使用 `torch.allclose` 檢查 PyTorch**—
-快錯了 kernel 毫無價值。我們的 `code/kernels` 測試就是這樣做的。 -**`num_warps`/`num_stages`**是你的主要 throughput 旋鈕；自動調整它們。 -**屏蔽邊界處的所有內容**，否則你將越界讀/寫。 -**使用 `triton.testing.do_bench`**進行基準測試（它處理預熱 + CUDA 事件）—
-參見 [profiling](profiling.md)。 -**在 AMD 上**：確認已安裝 ROCm Triton 後端；重新執行自動調諧；
-由於波前寬度和 LDS 尺寸的不同，預計會有不同的最佳配置。
+- **在 benchmark 之前一定先用 `torch.allclose` 對照 PyTorch**——又快又錯的 kernel 毫無價值。
+  我們的 `code/kernels` 測試就是這麼做的。
+- **`num_warps`／`num_stages`** 是你主要的 throughput 旋鈕；用 autotune 來調。
+- **邊界處一律加遮罩**，否則會越界讀／寫。
+- **用 `triton.testing.do_bench`** 來做 benchmark（它會處理 warmup + CUDA event）——見
+  [profiling](profiling.md)。
+- **在 AMD 上**：確認裝了 ROCm Triton 後端；重跑 autotune；因為 wavefront 寬度與 LDS 大小不同，
+  最佳配置通常也不一樣。
 
 ## 要點
 
-- Triton kernels 是按**tile**編寫的：取得程式 id → 計算偏移量 →
-  `tl.load` → 計算（`tl.dot`，縮減）→ `tl.store`，含掩碼。
-- 將多個 HBM 通道融合為一個片上通道（softmax、attention）是
-  核心勝利——再次是 roofline 劇本。
-- `tl.dot` 自動瞄準 Tensor Cores / MFMA；**自動調諧每
-  架構**因為 wavefront-64 改變了 AMD 上的最佳圖塊。
-- Triton 讓你可移植地獲得 CUDA 的大部分效能；伸手去拿
-  [CUDA/HIP](cuda-hip-track.md) 僅在必要時使用。
+- Triton kernel 以 **tile** 為單位寫：取得 program id → 算偏移 → `tl.load` → 計算（`tl.dot`、
+  reduction）→ `tl.store`，全部帶遮罩。
+- 把多趟 HBM 往返融成一趟晶片內運算（softmax、attention）是核心勝利——又是 roofline 劇本。
+- `tl.dot` 自動瞄準 Tensor Core / MFMA；**每種架構都要重新 autotune**，因為 wavefront-64 改變了
+  AMD 上的最佳 tile。
+- Triton 讓你可移植地拿到 CUDA 大部分的效能；只有必要時才伸手去碰 [CUDA/HIP](cuda-hip-track.md)。
 
 ## 練習
 
 !!! tip "解決方案"
     參考解答位於 [解答頁](../solutions/performance.md) 上。請先嘗試每個練習，再展開解答。
 
-1. 運行向量加法和 softmax kernels；對照 PyTorch 和基準進行驗證
-   與本機操作相比。
-2. 將面向 AMD 的自動調諧配置新增至 matmul（嘗試使用 `num_warps` 4/8
-   記住 wavefront-64）並比較你擁有的 GPU 之間的最佳配置。
-3. 使用下列指令擴充 softmax kernel 以處理比 1 `BLOCK` 寬的行
-   線上 softmax 組合器。
-4. 分析融合 softmax 與三聲道 softmax 並解釋位元組移動
-   差異。
+1. 跑向量加法與 softmax kernel；對照 PyTorch 驗證，並與原生操作比 benchmark。
+2. 為 matmul 加上面向 AMD 的 autotune 配置（試 `num_warps` 4/8，記得 wavefront-64），比較你手上
+   不同 GPU 的最佳配置。
+3. 用 online softmax 組合器，擴充 softmax kernel 以處理比 1 個 `BLOCK` 還寬的列。
+4. 對融合 softmax 與三趟式 softmax 做 profiling，並解釋兩者搬移 byte 數的差異。
 
 ## 參考文獻
 
-- 蒂萊、孔、考克斯。 *海衛一。 *2019； Triton 官方教學。
-- 道等人。 _Flashattention_（這是針對 kernel 建置的）。 2022 年。
+- Tillet, Kung, Cox. _Triton._ 2019；以及 Triton 官方教學。
+- Dao et al. _FlashAttention_（本頁的 kernel 就是為它鋪路）。2022。
 - AMD ROCm Triton 後端文件。

@@ -2,45 +2,43 @@
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong> 初學者</span>
-  <span class="chip"><strong>先備知識：</strong> matmul，基本Transformer</span>
+  <span class="chip"><strong>先備知識：</strong> matmul、基本 Transformer</span>
   <span class="chip"><strong>硬體：</strong>無（筆和紙）</span>
 </div>
 
-你將在此頁面中查看模型配置和 GPU 規格表，並
-比如說，_在運行任何東西之前_，一個層應該運行的大致速度以及**什麼
-正在限制它**。這是手冊中最重要的技能：每隔一段時間
-優化是對**roofline**的刻意之舉。
+這一頁教你看著模型組態和 GPU 規格表，就能*在跑任何東西之前*估出一層大概要跑多快、
+以及**是什麼在限制它**。這是整本手冊裡最重要的一項技能：之後每一個優化，都是針對
+**roofline** 的一次刻意出手。
 
 ## 兩個數字決定一切
 
-每個 GPU 都有兩個標題 throughput：
+每個 GPU 都有兩個招牌 throughput 數字：
 
--**計算**：每秒峰值浮點運算，$\pi$（FLOP/s）。 -**記憶體頻寬**：HBM 和晶片之間每秒移動的峰值位元組數，$\beta$ (B/s)。
+- **算力（compute）**：每秒峰值浮點運算數 $\pi$（FLOP/s）。
+- **記憶體頻寬（memory bandwidth）**：HBM 與晶片之間每秒可搬移的峰值位元組數 $\beta$（B/s）。
 
-| 加速器                 | BF16 密集 (TFLOP/s)    | HBM 頻寬（TB/秒）            | 脊點 $\pi/\beta$（FLOP/位元組） |
-| ---------------------- | ---------------------- | ---------------------------- | ------------------------------- | ----- |
-| NVIDIA A100 80GB (SXM) | NVIDIA A100 80GB (SXM) | NVIDIA A100 80GB (SXM) 〜312 | 〜2.0                           | 〜156 |
-| NVIDIA H100 (SXM)      | ~990                   | 〜3.35                       | 〜296                           |
-| AMD Instinct MI300X    | AMD Instinct MI300X    | AMD Instinct MI300X 〜1300   | 〜5.3                           | 〜245 |
+| 加速器                 | BF16 密集算力 (TFLOP/s) | HBM 頻寬 (TB/s) | 脊點 $\pi/\beta$ (FLOP/byte) |
+| ---------------------- | ----------------------: | --------------: | ---------------------------: |
+| NVIDIA A100 80GB (SXM) |                    ~312 |            ~2.0 |                         ~156 |
+| NVIDIA H100 (SXM)      |                    ~990 |           ~3.35 |                         ~296 |
+| AMD Instinct MI300X    |                   ~1300 |            ~5.3 |                         ~245 |
 
-!!! note "這些是行銷表的峰值數字"
-    真正的 kernels 可能達到峰值計算的 50-80% 和峰值的 70-90%
-    頻寬。使用峰值作為*比率和直覺*；使用
-    [profiler](../performance/profiling.md) 為真理。稀疏/結構化 FLOP
-    規格表上的數字通常是密集數字的 2 倍——忽略它們，除非
-    你實際上正在使用稀疏性。
+!!! note "這些是規格表上的峰值數字"
+    真實 kernel 大概能拿到峰值算力的 50–80%、峰值頻寬的 70–90%。峰值只拿來算*比率、
+    建立直覺*；要看真相請用 [profiler](../performance/profiling.md)。規格表上的稀疏／
+    結構化 FLOP 數字通常是密集值的 2 倍——除非你真的在用稀疏性，否則直接忽略。
 
-執行 $W$ FLOP 並移動 $Q$ 位元組的 kernel 具有**算術強度**
+一個執行 $W$ 個 FLOP、搬移 $Q$ 個 bytes 的 kernel，其**算術強度（arithmetic intensity）**為
 
 $$ I = \frac{W}{Q} \quad \text{[FLOP/byte]}. $$
 
-**roofline**可實現的效能：
+**roofline** 給出可達到的效能：
 
 $$ P = \min(\pi,\; \beta \cdot I). $$
 
-如果 $I$ 低於**山脊點**$\pi/\beta$，則你**受記憶體限制**—
-效能為 $\beta \cdot I$，並且在達到峰值之前可以免費添加 FLOP。
-在它上面，你是**計算限制**——只有更少的失敗或更快的數學幫助。
+如果 $I$ 落在**脊點（ridge point）** $\pi/\beta$ 左邊，你就是 **memory-bound**——
+效能等於 $\beta \cdot I$，而且在撞到峰值之前，多加 FLOP 是「免費」的。落在右邊，你是
+**compute-bound**——這時只有減少 FLOP 或用更快的精度才有用。
 
 <figure class="roofline-figure">
 <svg viewBox="0 0 760 430" role="img" aria-labelledby="roofline-title roofline-desc" xmlns="http://www.w3.org/2000/svg">
@@ -75,141 +73,132 @@ $$ P = \min(\pi,\; \beta \cdot I). $$
   <path class="roofline-cap" d="M365 115 H650" />
   <line class="roofline-ridge" x1="365" y1="115" x2="365" y2="320" />
   <circle class="roofline-ridge-dot" cx="365" cy="115" r="5" />
-  <text class="roofline-label roofline-y" x="44" y="62">效能（FLOP/s，日誌）</text>
-  <text class="roofline-label roofline-x" x="462" y="365">算術強度 I（日誌）</text>
+  <text class="roofline-label roofline-y" x="44" y="62">效能 (FLOP/s, log)</text>
+  <text class="roofline-label roofline-x" x="462" y="365">算術強度 I (log)</text>
   <text class="roofline-tick" x="86" y="121">π</text>
-  <text class="roofline-label" x="424" y="98"> 計算綁定：P = π</text>
-  <text class="roofline-label" x="198" y="194"> 記憶體限制：P = β · I</text>
-  <text class="roofline-label roofline-slope-label" x="232" y="153"> 斜率 = β</text>
-  <text class="roofline-label" x="323" y="350">脊 = π/β</text>
+  <text class="roofline-label" x="424" y="98">compute-bound：P = π</text>
+  <text class="roofline-label" x="198" y="194">memory-bound：P = β · I</text>
+  <text class="roofline-label roofline-slope-label" x="232" y="153">斜率 = β</text>
+  <text class="roofline-label" x="323" y="350">脊點 = π/β</text>
 </svg>
-<figcaption>roofline。在山脊的左側，你會受到頻寬的限制；在山脊的左側，你會受到頻寬的限制。它右邊的數學單位。 </figcaption>
+<figcaption>roofline：脊點左側受頻寬限制，右側受數學單元（算力）限制。</figcaption>
 </figure>
 
-機器學習效能工程的整個遊戲是：**(1) 找出哪一種機制
-(2) 如果記憶體受限，則提高 $I$（熔斷操作，重複使用 SRAM 中的數據，
-量化），(3) 如果受計算限制，則減少 FLOP 或使用更快的精確度。**
+ML 效能工程的整個遊戲就是：**(1) 判斷自己在哪一種機制；(2) 若 memory-bound，就提高 $I$
+（融合操作、在 SRAM 內重用資料、量化）；(3) 若 compute-bound，就減少 FLOP 或改用更快的
+精度。**
 
 ## 計算 Transformer 中的 FLOP 次數
 
-取一個僅 decoder 的 Transformer：$L$ 層，隱藏大小 $d$，FFN 隱藏
-$d_{ff}$（通常是 $4d$），序列長度 $N$，批次 $B$，詞彙 $V$。
+取一個 decoder-only 的 Transformer：$L$ 層、隱藏維度 $d$、FFN 隱藏維度 $d_{ff}$
+（通常為 $4d$）、序列長度 $N$、batch $B$、詞彙量 $V$。
 
-$(m\times k)\cdot(k\times n)$ 的 matmul 成本為 $2mkn$ FLOP（2 = 1）
-乘法+每個內積項一次加法）。
+一個 $(m\times k)\cdot(k\times n)$ 的 matmul 成本是 $2mkn$ FLOP（係數 2 = 每個內積項一次
+乘法加一次加法）。
 
-**每層，每 token**（暫時忽略 $O(N^2)$ attention 分數術語）：
+**每層、每 token**（先忽略 $O(N^2)$ 的 attention 分數項）：
 
-| 子區塊             | Matmul 形狀    | 失敗/token                  |
-| ------------------ | -------------- | --------------------------- |
-| QKV 投影           | $d \to 3d$     | $2 \cdot d \cdot 3d = 6d^2$ |
-| attention 輸出專案 | $d \to d$      | $2d^2$                      |
-| FFN 上             | $d \to d_{ff}$ | $2 d\, d_{ff}$              |
-| FFN 下降           | $d_{ff} \to d$ | $2 d\, d_{ff}$              |
+| 子區塊        | Matmul 形狀    | FLOP/token                  |
+| ------------- | -------------- | --------------------------- |
+| QKV 投影      | $d \to 3d$     | $2 \cdot d \cdot 3d = 6d^2$ |
+| attention 輸出投影 | $d \to d$ | $2d^2$                      |
+| FFN up        | $d \to d_{ff}$ | $2 d\, d_{ff}$              |
+| FFN down      | $d_{ff} \to d$ | $2 d\, d_{ff}$              |
 
-對於 $d_{ff}=4d$，FFN 是 $16d^2$，attention 投影是 $8d^2$，因此
-對於**線性**部分，每個 token 層約為 $24d^2$ FLOP。超過 $L$ 層
-和 $BN$ tokens 的前向傳播大致為
+當 $d_{ff}=4d$ 時，FFN 是 $16d^2$、attention 投影是 $8d^2$，所以**線性**部分每個 token
+每層約 $24d^2$ FLOP。涵蓋 $L$ 層、$BN$ 個 token，前向傳播大致為
 
-$$ W\_{\text{fwd}} \approx 24\, L\, d^2 \cdot BN. $$
+$$ W_{\text{fwd}} \approx 24\, L\, d^2 \cdot BN. $$
 
-有一個經典的快捷方式：使用 $P \approx 12 L d^2$ 非嵌入參數，
-這是 $W_{\text{fwd}} \approx 2 P \cdot BN$ —**每個參數每個 2 次浮點運算
-token**。向後傳球的成本大約是向前傳球的兩倍，給出了著名的
+有一個經典捷徑：非嵌入參數約為 $P \approx 12 L d^2$，於是
+$W_{\text{fwd}} \approx 2 P \cdot BN$——**每個參數、每個 token 約 2 個 FLOP**。反向傳播
+成本大約是前向的兩倍，於是得到那條著名的公式
 
-$$ \boxed{\;W\_{\text{train}} \approx 6\, P \cdot (\text{tokens})\;} $$
+$$ \boxed{\;W_{\text{train}} \approx 6\, P \cdot (\text{tokens})\;} $$
 
-用於計算預算（例如 Chinchilla）。把這個記在心裡——就是這樣
-你可以在幾秒鐘內檢查 training 運行的 MFU（模型 FLOP 使用率）。
+用來估計算力預算（例如 Chinchilla）。把它記起來——這樣你幾秒鐘就能檢查一次 training
+的 MFU（模型 FLOP 利用率）。
 
 ### $N^2$ attention 術語
 
-得分矩陣 $QK^\top$ 是 $(N\times d)\cdot(d\times N)$ 並且
-$\text{softmax}\cdot V$步驟是$(N\times N)\cdot(N\times d)$，每個
-每個頭組的 $2N^2 d$ FLOP 數，因此 attention 分數會消耗 $\approx 4 L N^2 d \cdot B$
-總計。與線性$24 L d^2 BN$比較：
+分數矩陣 $QK^\top$ 是 $(N\times d)\cdot(d\times N)$，而 $\text{softmax}\cdot V$ 步驟是
+$(N\times N)\cdot(N\times d)$，各約 $2N^2 d$ FLOP（合計所有頭），因此 attention 分數項
+總共消耗 $\approx 4 L N^2 d \cdot B$。和線性項 $24 L d^2 BN$ 相比：
 
 $$ \frac{\text{attention}}{\text{linear}} \approx \frac{4 N^2 d}{24 d^2 N} = \frac{N}{6d}. $$
 
-因此，attention 的 FLOP 份額隨著 $N/d$ 的成長而成長。在 $N=2048, d=4096$ 中，約為 8%
-失敗；在$N=128\text{k}$，它佔據主導地位。這就是*為什麼*對長情境工作的執著
-關於 attention，以及為什麼 Flashattention 很重要。
+所以 attention 占的 FLOP 比例會隨 $N/d$ 增長。在 $N=2048, d=4096$ 時約佔 8% 的 FLOP；
+到 $N=128\text{k}$ 就反客為主。這正是*為什麼*長上下文的工作幾乎都圍著 attention 打轉，
+也是 FlashAttention 為何重要的原因。
 
 ## 計算位元組：人們忘記的部分
 
-FLOP 僅為 roofline 的一半。考慮單一 FFN-up matmul
-**training**批次 × 序列 = $BN$ tokens，重量 $W \in \mathbb{R}^{d\times d_{ff}}$
-在 bf16（2 位元組）中：
+FLOP 只是 roofline 的一半。考慮 **training** 時的單一 FFN-up matmul，batch × 序列
+= $BN$ 個 token、權重 $W \in \mathbb{R}^{d\times d_{ff}}$、以 bf16（2 bytes）：
 
-- 移動的位元組：讀取啟動 $BN\cdot d \cdot 2$、讀取權重 $d\, d_{ff}\cdot 2$、寫入輸出 $BN\, d_{ff}\cdot 2$。
-- 失敗次數：$2\, BN\, d\, d_{ff}$。
+- 搬移的 bytes：讀 activation $BN\cdot d \cdot 2$、讀權重 $d\, d_{ff}\cdot 2$、寫輸出 $BN\, d_{ff}\cdot 2$。
+- FLOP 數：$2\, BN\, d\, d_{ff}$。
 
-當$BN \gg d$（大批量）時，讀取的重量攤銷且強度接近
+當 $BN \gg d$（大 batch）時，讀權重的成本被攤平，強度趨近於
 $I \approx \tfrac{2 BN d\, d_{ff}}{2(BN d + BN d_{ff})} \approx \tfrac{BN d\, d_{ff}}{BN(d+d_{ff})}$,
-對於 $d_{ff}=4d$ 來說是 $\approx 0.8\,d$ — 數百個 FLOP/字節，輕鬆自如
-**計算限制**。具有大批量的大型 matmul 是 GPU 的樂土。
+在 $d_{ff}=4d$ 時約為 $0.8\,d$——數百 FLOP/byte，輕鬆 **compute-bound**。大 batch 的
+大型 matmul 是 GPU 的快樂天堂。
 
-現在在**decoding**期間使用批次 $B=1$ 執行相同的 matmul，一個新的 token
-($N=1$)：你讀取整個權重矩陣以產生單一 token
-激活。強度大幅下降至 $\approx 1$ FLOP/位元組
-**記憶體限制**。相同的數學，相反的機制，純粹是因為批量大小。
+現在把同一個 matmul 換到 **decode**：batch $B=1$、只有一個新 token（$N=1$）。你得讀進
+整個權重矩陣，只為了算一個 token 的激活。強度暴跌到 $\approx 1$ FLOP/byte，
+變成 **memory-bound**。一樣的數學、相反的機制，純粹因為 batch 大小不同。
 
-!!! important "LLM serving 的中心張力"
-    **training / prefill**一次處理多個 tokens → 受計算限制 → 你
-    希望 kernels 能夠達到峰值 FLOPs。**decoding**一次產生一個 token
-    → 記憶體限制 → 你想要移動更少的位元組（量化權重、批次處理）
-    一起請求，快取 KV）。幾乎所有 serving 技巧
-    （[continuous batching](../performance/inference-optimization.md)，
-    [weight quantization](../performance/quantization.md),
-    [speculative decoding](../performance/inference-optimization.md)）是一個
-    對這一事實的攻擊。
+!!! important "LLM serving 的核心張力"
+    **training / prefill** 一次處理很多 token → compute-bound → 你希望 kernel 逼近峰值
+    FLOPs。**decode** 一次生成一個 token → memory-bound → 你希望搬移更少的 bytes
+    （量化權重、把請求批在一起、快取 KV）。幾乎每個 serving 技巧——
+    [continuous batching](../performance/inference-optimization.md)、
+    [權重量化](../performance/quantization.md)、
+    [speculative decoding](../performance/inference-optimization.md)——都是針對這個事實的
+    出招。
 
 ## 一個有效的 roofline 範例
 
-H100：$\pi = 990$ TFLOP/秒、$\beta = 3.35$ TB/秒、脊 $= 296$ FLOP/位元組。
+H100：$\pi = 990$ TFLOP/s、$\beta = 3.35$ TB/s、脊點 $= 296$ FLOP/byte。
 
-帶有 $m=n=k=8192$ 的 bf16 GEMM：$W = 2\cdot8192^3 \approx 1.1\times10^{12}$ FLOP；
-位元組 $= 3\cdot 8192^2 \cdot 2 \approx 4.0\times10^8$ B；強度
-$I \approx 2730$ FLOP/位元組 $\gg 296$ → 計算密集型。最佳情況時間
-$\approx 1.1\times10^{12} / 9.9\times10^{14} \approx 1.1$女士。如果你的探查器
-表示 2.2 毫秒，你的 MFU 約為 50% — 現在你有一個*目標*，而不是氛圍。
+一個 $m=n=k=8192$ 的 bf16 GEMM：$W = 2\cdot8192^3 \approx 1.1\times10^{12}$ FLOP；
+bytes $= 3\cdot 8192^2 \cdot 2 \approx 4.0\times10^8$ B；強度
+$I \approx 2730$ FLOP/byte $\gg 296$ → compute-bound。最佳情況時間
+$\approx 1.1\times10^{12} / 9.9\times10^{14} \approx 1.1$ ms。如果你的 profiler 顯示 2.2 ms，
+MFU 約 50%——現在你有一個*目標*，而不是憑感覺。
 
-相同張量上的 bf16 按元素 GELU：~$10\cdot8192^2$ FLOP 但是
-$2\cdot 8192^2\cdot 2$ 位元組 → $I\approx 2.5$ → 記憶體限制，時間由
-頻寬。這正是我們將 GELU 融合到 matmul 尾聲中的原因：
-獨立的，它是純粹的記憶體流量。
+同一張量上的 bf16 element-wise GELU：約 $10\cdot8192^2$ FLOP，但要搬 $2\cdot 8192^2\cdot 2$
+bytes → $I\approx 2.5$ → memory-bound，時間由頻寬決定。這正是我們把 GELU 融進 matmul
+epilogue 的原因：單獨跑時，它純粹是記憶體流量。
 
 ## 要點
 
-- 兩個 GPU 編號 — 峰值 FLOP/s $\pi$ 和頻寬 $\beta$ — 以及一個 kernel
-  數字 — 算術強度 $I = W/Q$ — 透過預測效能
-  $P=\min(\pi, \beta I)$。
-- 每個 token Transformer training 的成本為 $\approx 6 P$ FLOP；向前是
-  $\approx 2P$。 attention 的 FLOP 份額與 $N/6d$ 相當。 -**大批量 matmuls 受計算限制；單-token decoding 是
-  內存限制。**本手冊的大部分內容是關於向右移動操作
-  在 roofline 上。
-- 在信任測量值之前，請務必根據 roofline 計算「目標」時間
-  一。
+- 兩個 GPU 數字——峰值 FLOP/s $\pi$ 與頻寬 $\beta$——加上一個 kernel 數字——算術強度
+  $I = W/Q$——就能透過 $P=\min(\pi, \beta I)$ 預測效能。
+- Transformer training 每個 token 成本約 $6 P$ FLOP，前向約 $2P$；attention 的 FLOP 比例
+  約為 $N/6d$。
+- **大 batch 的 matmul 是 compute-bound；單 token 的 decode 是 memory-bound。** 本手冊
+  大半在講怎麼把操作往 roofline 的右邊推。
+- 在相信任何量測值之前，先用 roofline 算出「目標」時間。
 
 ## 練習
 
 !!! tip "解決方案"
     參考解答位於 [解答頁](../solutions/foundations.md) 上。請先嘗試每個練習，再展開解答。
 
-1. 對於 7B 參數模型 ($P\approx7\times10^9$)，估計前向 FLOPs
-   對於 4096 tokens 的一個序列。 MI300X 電量達到 60% 需要多長時間
-   MFU？
-2. $N$ 在什麼序列長度下，attention-score FLOPs 等於線性層
-   $d=5120$ 的失敗？這對於上下文長度縮放意味著什麼？
-3. $[B{=}32, N{=}2048, d{=}4096]$ 張量上的 bf16 LayerNorm：估計 FLOP
-   和字節，計算 $I$，並確定 A100 上的狀態。應該融合嗎？
-4. 重新推導$6P$規則並辨識每個地方的因子 2（fwd vs bwd）
-   並輸入係數 3 (fwd + 2× bwd)。
+1. 對一個 7B 參數模型（$P\approx7\times10^9$），估計一段 4096 token 序列的前向 FLOP。
+   在 MI300X 上以 60% MFU 計算需要多久？
+2. 在哪個序列長度 $N$ 下，attention 分數的 FLOP 會等於 $d=5120$ 時線性層的 FLOP？這對
+   上下文長度的擴展意味著什麼？
+3. 對 $[B{=}32, N{=}2048, d{=}4096]$ 張量做 bf16 LayerNorm：估計 FLOP 與 bytes、算出 $I$、
+   判斷它在 A100 上屬於哪種機制。該不該融合？
+4. 重新推導 $6P$ 規則，指出每個係數 2 來自何處（前向 vs 反向），以及係數 3 是怎麼來的
+   （前向 + 2× 反向）。
 
 ## 參考文獻
 
-- 威廉斯、沃特曼、帕特森。 _roofline：多核心架構的富有洞察力的視覺效能模型。 _ CACM 2009。
-- 卡普蘭等。 _神經語言模型的縮放定律。 _ 2020。
-- 霍夫曼等人。 _training 計算最佳大型語言模型_ (Chinchilla)。 2022 年。
-- 科蒂坎蒂等人。 _減少大型 Transformer 模型中的啟動重新計算。 _ 2022。
-- NVIDIA H100 和 AMD CDNA3 (MI300) 架構白皮書。
+- Williams, Waterman, Patterson. _Roofline: An Insightful Visual Performance Model for Multicore Architectures._ CACM 2009。
+- Kaplan et al. _Scaling Laws for Neural Language Models._ 2020。
+- Hoffmann et al. _Training Compute-Optimal Large Language Models（Chinchilla）._ 2022。
+- Korthikanti et al. _Reducing Activation Recomputation in Large Transformer Models._ 2022。
+- NVIDIA H100 與 AMD CDNA3（MI300）架構白皮書。

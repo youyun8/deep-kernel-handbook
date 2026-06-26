@@ -1,4 +1,4 @@
-# 從頭開始的 Transformer
+# 從零實作 Transformer
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong> 初學者</span>
@@ -6,24 +6,19 @@
   <span class="chip"><strong>硬體：</strong>無（筆和紙）</span>
 </div>
 
-本手冊的其餘部分使 Transformer**快速**。此頁面可確保你
-首先確切地知道 Transformer 是什麼－一次建造一個 Transformer，
-每一步都有一張圖片。最後，你將能夠從原始資料中追蹤 token
-文字到下一個 token 預測，命名每個權重矩陣，並了解為什麼 attention
-是大家優化的部分。無需事先了解 Transformer 知識；如果你
-可以將兩個矩陣相乘，你可以遵循這個。
+本手冊其餘部分談的是怎麼讓 Transformer **跑得快**。這一頁先確保你清楚知道 Transformer
+**到底是什麼**——一次加一個機制，每步配一張圖。讀完之後，你能從原始文字一路追到下一個 token
+預測，叫得出每個權重矩陣的名字，並理解為什麼大家都在優化 attention。不需要任何 Transformer
+先備知識；只要你會把兩個矩陣相乘，就跟得上。
 
-!!! tip "如何閱讀此頁"
-    每個部分都向運行畫面添加**一個**機制。讀圖，
-    然後是方程式，然後是“為什麼它是這樣形成的”註釋。形狀
-    （維度）與數學一樣重要 ── 它們才是後面幾頁的內容
-    失敗次數和位元組數超過。
+!!! tip "怎麼讀這一頁"
+    每一節只往這張流動的畫面上**加一個**機制。先看圖，再看式子，最後讀「它為什麼長這樣」的
+    註解。**形狀（維度）和數學一樣重要**——後面幾頁數 FLOPs 和 bytes，數的就是這些形狀。
 
 ## 工作：預測下一個 token
 
-語言模型只做一件事：給定 tokens 序列，輸出
-**下一個**token 的機率分佈。其他一切——
-聊天、編碼、翻譯——就是重複應用的單一操作。
+語言模型只做一件事：給定一段 token 序列，輸出**下一個** token 的機率分佈。其他所有功能——
+聊天、寫程式、翻譯——都只是把這個單一操作反覆套用而已。
 
 ```mermaid
 flowchart LR
@@ -34,18 +29,16 @@ flowchart LR
     class M accViolet;
 ```
 
-此回饋循環 - 附加預測的 token 並再次運行 - 是
-**自回歸生成**。這就是為什麼「寫」的模型實際上只是
-一次預測一個 token，以及為什麼 [decoding is the memory-bound regime](attention-efficiency.md)
-我們花了很多精力在後面。
+這個回饋迴圈——把預測出的 token 接到尾端、再跑一次——就是 **autoregressive 生成（自回歸
+生成）**。這也解釋了為什麼會「寫作」的模型其實只是一次預測一個 token，以及為什麼
+[decode 是記憶體受限的階段](attention-efficiency.md)，那是後面我們花最多力氣的地方。
 
 ## 步驟 1 — tokens 和嵌入
 
-文本首先被 tokenizer 分割成**tokens**（子詞塊）；每個 token
-是大小為 $V$（通常為 32k–256k）的固定**詞彙表**中的整數 id。
-該模型無法對整數進行數學運算，因此每個 id 都對學習到的行進行索引
-**嵌入矩陣**$E \in \mathbb{R}^{V \times d}$，將其轉換為向量
-尺寸 $d$（**模型寬度**，例如 4096）。
+文字先被 tokenizer 切成 **tokens（子詞片段）**；每個 token 是一個整數 id，取自固定大小為 $V$
+（通常 32k–256k）的**詞彙表**。模型沒辦法直接對整數做運算，所以每個 id 會去索引**嵌入矩陣**
+$E \in \mathbb{R}^{V \times d}$ 的某一列，把它轉成一個維度為 $d$ 的向量（$d$ 是**模型寬度**，
+例如 4096）。
 
 ```mermaid
 flowchart LR
@@ -54,36 +47,32 @@ flowchart LR
     class VEC accTeal;
 ```
 
-$N$ tokens 的序列變成矩陣 $X \in \mathbb{R}^{N \times d}$ — 一個
-每個 token 的行。**這個$[N, d]$矩陣是流經整個
-網路**；每層讀取一個$[N,d]$並寫入一個相同形狀的$[N,d]$。
+一段 $N$ 個 token 的序列就變成矩陣 $X \in \mathbb{R}^{N \times d}$——每個 token 一列。**這個
+$[N, d]$ 矩陣就是流經整個網路的東西**：每一層讀進一個 $[N,d]$，再寫出一個形狀完全相同的
+$[N,d]$。
 
-!!! note "位置必須單獨添加"
-    無論「cat」出現在何處，「cat」的嵌入都是相同的，但詞序不同
-    很重要（「貓坐」≠「坐貓」）。因此模型加入了**位置資訊**—
-    傳統上，$X$ 中添加了位置嵌入，在現代模型中，**旋轉
-    嵌入 (RoPE)**應用在 attention 內部。無論哪種方式，網路都被告知
-    每個 token 位於*何處*，而不僅僅是它*是什麼*。
+!!! note "位置資訊必須另外加進去"
+    不管「cat」出現在句子哪裡，它的嵌入都一樣，但詞序是有意義的（「貓坐」≠「坐貓」）。所以
+    模型要額外注入**位置資訊**——傳統做法是在 $X$ 上加位置嵌入，現代模型則多半用**旋轉位置
+    嵌入（RoPE）**，在 attention 內部施加。無論哪種，目的都是告訴網路每個 token 在*哪裡*，
+    而不只是它*是什麼*。
 
-## 步驟 2 — 核心思想：attention 作為軟查找
+## 步驟 2 — 核心思想：把 attention 看成軟性查表
 
-這裡是 Transformer 的心臟。要理解一個單詞，你需要**上下文**：
-「it」指較早的事物； 「銀行」在「河流」與「河流」附近的意義不同
-「錢」。 attention 讓每個 token**從其他 tokens 收集資訊**，
-根據它們的相關程度進行加權。
+這是 Transformer 的核心。要理解一個詞，你需要**上下文**：「it」指的是前面提過的某樣東西；
+「bank」在「river」旁邊和在「money」旁邊意思不同。attention 讓每個 token **從其他 token 蒐集
+資訊**，並依彼此的相關程度加權。
 
-機制是**軟字典查找**。每個 token 產生三個向量
-將其嵌入 $x$ 乘以三個學習矩陣：
+機制是一種**軟性字典查表**。每個 token 把自己的嵌入 $x$ 乘上三個可學習矩陣，產生三個向量：
 
-| 向量               | 矩陣                               | 直覺                       |
-| ------------------ | ---------------------------------- | -------------------------- |
-| **查詢**$q = xW_Q$ | $W_Q \in \mathbb{R}^{d\times d_h}$ | 「我在找什麼？」           |
-| **鑰匙**$k = xW_K$ | $W_K \in \mathbb{R}^{d\times d_h}$ | 「我能提供什麼？」         |
-| **價值**$v = xW_V$ | $W_V \in \mathbb{R}^{d\times d_h}$ | “如果匹配的話我會傳遞什麼” |
+| 向量                 | 矩陣                               | 直覺                   |
+| -------------------- | ---------------------------------- | ---------------------- |
+| **query** $q = xW_Q$ | $W_Q \in \mathbb{R}^{d\times d_h}$ | 「我在找什麼？」       |
+| **key** $k = xW_K$   | $W_K \in \mathbb{R}^{d\times d_h}$ | 「我能提供什麼？」     |
+| **value** $v = xW_V$ | $W_V \in \mathbb{R}^{d\times d_h}$ | 「若匹配，我傳出什麼」 |
 
-token 的查詢與**每個**token 的金鑰進行比較（點積 =
-相關性得分）；分數透過 softmax 變成權重；輸出是
-**值**的加權和。
+某個 token 的 query 會和**每一個** token 的 key 做比較（點積 = 相關性分數）；這些分數經過
+softmax 變成權重；輸出則是各 token **value** 的加權和。
 
 ```mermaid
 flowchart TD
@@ -99,19 +88,18 @@ flowchart TD
     class SM accBlue;
 ```
 
-一次為整個序列編寫（你隨處可見的形式）：
+寫成整個序列一次到位的形式（也就是你到處會看到的那個式子）：
 
-$$ \text{Attn}(Q,K,V) = \underbrace{\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d*h}}\right)}*{\text{attention weights } A\ [N\times N]} V. $$
+$$ \text{Attn}(Q,K,V) = \underbrace{\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_h}}\right)}_{\text{attention weights } A\ [N\times N]} V. $$
 
-兩個 matmul 之間有一個 softmax。讓我們從視覺上拆開這兩個部分。
+兩個 matmul 中間夾一個 softmax。我們把這兩段拆開來看。
 
 ### 2a — 分數矩陣 $QK^\top$
 
-$Q$ 是 $[N, d_h]$，$K^\top$ 是 $[d_h, N]$，因此 $QK^\top$ 是 $[N, N]$ 矩陣：
-條目 $(i,j)$ 是 token $i$ 參與 token $j$ 的程度。**此$N\times N$
-矩陣是 attention 二次成本**的來源 - 它隨著*平方*而增長
-序列長度，[Flashattention](flashattention.md) 背後的單一事實
-和長背景研究。
+$Q$ 是 $[N, d_h]$，$K^\top$ 是 $[d_h, N]$，所以 $QK^\top$ 是一個 $[N, N]$ 矩陣：第 $(i,j)$ 項
+表示 token $i$ 對 token $j$ 的關注程度。**這個 $N\times N$ 矩陣正是 attention 二次成本的來源**
+——它隨序列長度的*平方*增長，也是 [FlashAttention](flashattention.md) 與整個長上下文研究背後的
+那一個關鍵事實。
 
 ```mermaid
 flowchart LR
@@ -121,16 +109,14 @@ flowchart LR
     class S accCyan;
 ```
 
-$\sqrt{d_h}$ 除數可防止點積隨維度成長
-（大分數會使 softmax 飽和為沒有梯度的硬 argmax —
-同樣的 [numerics](numerics-precision.md) 問題也會導致 router z 損失
-在 MoE）。
+除以 $\sqrt{d_h}$ 是為了避免點積隨維度變大而失控（過大的分數會讓 softmax 飽和成幾乎是硬
+argmax、沒有梯度——這跟 MoE 裡 router z-loss 要處理的是同一類[數值](numerics-precision.md)
+問題）。
 
-### 2b — 因果面具
+### 2b — 因果遮罩
 
-對於語言模型，token $i$ 可能僅在**時或之前**處理 tokens —
-它無法窺視它試圖預測的未來。我們透過設定來強制執行此操作
-Softmax 之前 $S$ 到 $-\infty$ 的上三角（因此這些權重變成 0）：
+在語言模型裡，token $i$ 只能關注**它自己以及更早**的 token——它不能偷看自己正要預測的未來。
+我們在 softmax 之前把 $S$ 的上三角設成 $-\infty$ 來強制這件事（於是那些權重變成 0）：
 
 ```mermaid
 flowchart LR
@@ -143,17 +129,15 @@ flowchart LR
     end
 ```
 
-這種下三角結構就是為什麼生成時我們可以**快取**過去
-鍵和值並且永遠不會重新計算它們 - 的基礎
-[KV cache](attention-efficiency.md)。
+正是這個下三角結構，讓我們在生成時可以**快取**過去的 key 與 value、永遠不必重算——這就是
+[KV cache](attention-efficiency.md) 的基礎。
 
 ## 步驟 3 — 多頭 attention
 
-attention 的一個「頭」學習一種關係。真正的 Transformer 運作很多
-頭**平行**，每個頭都有自己的小$W_Q, W_K, W_V$（尺寸
-$d_h = d / h$ 對於 $h$ 頭），然後連接輸出並將它們與
-輸出投影 $W_O$。一個頭可能跟踪語法，另一個頭可能跟踪語法，
-另一個本地位置－模型同時獲得多個關係「管道」。
+attention 的一個「頭（head）」學一種關係。真正的 Transformer 會**並行**跑很多個頭，每個頭有
+自己的小 $W_Q, W_K, W_V$（$h$ 個頭時維度 $d_h = d / h$），再把各頭輸出接起來、乘上輸出投影
+$W_O$。一個頭可能在追語法、另一個在追指代、再一個在追局部位置——模型因此同時擁有多條關係
+「通道」。
 
 ```mermaid
 flowchart TD
@@ -167,21 +151,18 @@ flowchart TD
     class C accIndigo;
 ```
 
-!!! note "頭部是 MQA / GQA / MLA 行動的地方"
-    每個頭通常保留自己的鍵和值，因此 KV 快取可以隨
-    人數。 attention 變體全系列 —
-    [MQA, GQA, MLA](attention-efficiency.md) — 是關於**共享或壓縮
-    跨頭的鍵/值**以縮小快取。你將在以下時間與他們見面
-    下一頁；只知道槓桿住在這裡。
+!!! note "頭，就是 MQA / GQA / MLA 動手腳的地方"
+    每個頭通常各自保留自己的 key 與 value，所以 KV cache 會隨頭數成長。整個 attention 變體
+    家族——[MQA、GQA、MLA](attention-efficiency.md)——做的事就是**跨頭共享或壓縮 key/value**，
+    把快取縮小。下一頁會正式介紹它們；現在只要知道這個槓桿就在這裡。
 
 ## 步驟 4 — 前饋網路 (FFN)
 
-attention 在 tokens 上混合訊息**。Transformer 的另一半
-塊通過小型兩層 MLP**獨立**處理每個 token — 這
-是大多數模型參數（和原始 FLOP）所在的位置。它擴大了寬度
-~4×，施加非線性，並投影回來：
+attention 負責在 token 之間**混合**資訊。Transformer block 的另一半則用一個小型的兩層 MLP
+**獨立**處理每個 token——這裡放著模型大部分的參數（與原始 FLOP）。它先把寬度放大約 4 倍，
+施加一個非線性，再投影回來：
 
-$$ \text{FFN}(x) = W*{\text{down}}\,\sigma(W*{\text{up}}\,x), \qquad W*{\text{up}}\in\mathbb{R}^{d*{ff}\times d},\; d\_{ff}\approx 4d. $$
+$$ \text{FFN}(x) = W_{\text{down}}\,\sigma(W_{\text{up}}\,x), \qquad W_{\text{up}}\in\mathbb{R}^{d_{ff}\times d},\; d_{ff}\approx 4d. $$
 
 ```mermaid
 flowchart LR
@@ -191,22 +172,19 @@ flowchart LR
     class A accGreen;
 ```
 
-!!! tip "這正是 MoE 所做的稀疏"
-    FFN 是 token 中最昂貴的零件。一個
-    [Mixture-of-experts](../moe/index.md) 層將這個單一 FFN 替換為
-    _許多_ FFN（“experts”）並將每個 token 路由到幾個 — 總體解耦
-    來自每個 token 計算的參數。第二部分中的所有內容都是以下內容的變體
-    *這個*盒子。
+!!! tip "這正是 MoE 要稀疏化的對象"
+    FFN 是每個 token 上最貴的零件。一個 [Mixture-of-Experts](../moe/index.md) 層把這個單一 FFN
+    換成*許多個* FFN（「experts」），並把每個 token 只路由到其中幾個——藉此把總參數量和每個
+    token 的計算量解耦。第二部講的一切，都是這個方塊的變形。
 
 ## 步驟 5 — 組裝 Transformer 塊
 
-塊將 attention 和 FFN 與兩個黏合機構連接在一起，使
-可訓練的深度網路：
+一個 block 用兩個「黏合」機制把 attention 和 FFN 接起來，讓深層網路得以訓練：
 
--**剩餘連接**- 將每個子層的輸入加回其輸出
-($x + \text{sublayer}(x)$)，為漸層提供直接路徑並讓圖層
-改進而不是取代。 -**層歸一化**- 將活化重新調整為先前的穩定分佈
-每個子層（現代模型使用**RMSNorm**，一種更便宜的變體）。
+- **殘差連接（residual connection）**：把每個子層的輸入加回它的輸出（$x + \text{sublayer}(x)$），
+  給梯度一條直達路徑，讓每一層做的是「改良」而非「取代」。
+- **層正規化（layer norm）**：在每個子層前把激活重新縮放成穩定的分佈（現代模型用 **RMSNorm**，
+  一種更便宜的變體）。
 
 ```mermaid
 flowchart TD
@@ -223,14 +201,14 @@ flowchart TD
     class FFN accGreen;
 ```
 
-關鍵不變量：**一個區塊採用 $[N,d]$ 並傳回 $[N,d]$**。這就是讓
-我們像樂高一樣堆砌積木。
+關鍵不變量：**一個 block 吃進 $[N,d]$、吐出 $[N,d]$**。正因如此，我們才能像疊樂高一樣把 block
+一層層堆起來。
 
 ## 步驟 6 — 完整模型
 
-完整的模型是：嵌入 → $L$ 相同區塊的堆疊 → 最終規格 → 投影到
-詞彙 Logits → softmax。最終的**LM 頭**（$W_{\text{LM}}\in\mathbb{R}^{V\times d}$）
-將最後一個 token 的向量轉換為詞彙表中每個單字的分數。
+完整模型就是：嵌入 → $L$ 個相同 block 的堆疊 → 最終 norm → 投影到詞彙 logits → softmax。最後的
+**LM head**（$W_{\text{LM}}\in\mathbb{R}^{V\times d}$）把最後一個 token 的向量轉成詞彙表裡每個
+字的分數。
 
 ```mermaid
 flowchart TD
@@ -247,15 +225,13 @@ flowchart TD
     class BL accRose;
 ```
 
-模型由幾個數字指定：寬度 $d$、層數 $L$、
-頭數 $h$、FFN 寬度 $d_{ff}$、詞彙 $V$ 和最大上下文 $N$。
-「7B」模型只是其中的一個選擇，乘以約 70 億
-參數 — [next page](transformer-systems.md) 向你展示如何計算這些參數。
+一個模型由幾個數字決定：寬度 $d$、層數 $L$、頭數 $h$、FFN 寬度 $d_{ff}$、詞彙量 $V$ 與最大
+上下文長度 $N$。所謂「7B」模型，只是其中一組選擇剛好乘出約 70 億個參數——
+[下一頁](transformer-systems.md)會教你怎麼算這些參數量。
 
-## 兩種模式：training (prefill) 與一代 (decode)
+## 兩種模式：training（prefill）與生成（decode）
 
-同一個網路在兩種截然不同的製度下運行，並且**整個**
-本手冊的效能故事取決於差異：
+同一個網路會在兩種截然不同的模式下運作，而**整本手冊的效能故事都建立在兩者的差異上**：
 
 ```mermaid
 flowchart TD
@@ -273,45 +249,45 @@ flowchart TD
     class D2 accTeal;
 ```
 
--**prefill / training**一起處理許多 tokens：矩陣乘法很大且
-硬體的數學單元保持忙碌 →**受計算限制**。 -**decode**產生 token-by-token：每個步驟幾乎不需要數學運算，但必須重新讀取
-模型權重和記憶體中不斷增長的 KV 快取 →**記憶體限制**。
+- **prefill / training** 一次處理很多 token：矩陣乘法很大、能讓硬體的數學單元持續忙碌 →
+  **compute-bound（計算受限）**。
+- **decode** 一個一個 token 地生成：每步幾乎沒什麼數學量，卻必須重新讀進模型權重和不斷變大的
+  KV cache → **memory-bound（記憶體受限）**。
 
-單一分割 - 以及將其形式化的 [roofline](transformer-systems.md) -
-是接下來一切的鏡頭。現在你可以看到整個物體；
-第一部分的其餘部分學習如何「測量」它。
+這一道分界——以及把它形式化的 [roofline](transformer-systems.md)——就是看待後面一切的鏡頭。現在
+你已經能看見整個物件了；第一部接下來要學的，是怎麼「量測」它。
 
 ## 要點
 
-- Transformer 將 token 向量的 $[N,d]$ 矩陣對應到 $[N,d]$ 矩陣，
-  $L$ 次，然後投影到詞彙 logits 來預測下一個 token。 -**attention**是軟體查找：針對鍵的查詢 → softmax 權重 →
-  值的加權和。 $QK^\top$ 分數形成一個 $[N,N]$ 矩陣 —
-  每個人都優化的二次成本。 -**多頭**並行運行許多小型 attention；**FFN**進程
-  每個 token 獨立並保存大部分參數；**殘差+範數**
-  堆疊可訓練。
-- 此模型在 prefill/training 中運行**計算限制**，在**記憶體限制中運行
-  decode**— 本手冊的其餘部分都是圍繞著這一區別而建造的。
+- Transformer 把一個 $[N,d]$ 的 token 向量矩陣反覆映射成 $[N,d]$ 共 $L$ 次，最後投影到
+  詞彙 logits 來預測下一個 token。
+- **attention** 是軟性查表：query 對 key → softmax 權重 → value 的加權和。$QK^\top$ 分數
+  構成一個 $[N,N]$ 矩陣——也就是大家都在優化的那個二次成本。
+- **多頭**並行跑許多個小 attention；**FFN** 獨立處理每個 token、握有大部分參數；
+  **殘差 + norm** 讓深層堆疊得以訓練。
+- 模型在 prefill/training 時 **compute-bound**、在 decode 時 **memory-bound**——本手冊
+  其餘內容都圍繞這道區別展開。
 
 ## 練習
 
 !!! tip "解決方案"
     參考解答位於 [解答頁](../solutions/foundations.md) 上。請先嘗試每個練習，再展開解答。
 
-1. 追蹤形狀：從 token ids $[N]$開始，列出張量的形狀
-   嵌入後、$QK^\top$ 後、softmax 後、$\times V$ 後、
-   $W_O$、後 LM 頭。 $N$ 中哪一個是二次的？
-2. 型號有$d=4096$、$h=32$頭。 $d_h$是什麼？如果換成 8KV 頭
-   （GQA），每個 token KV 快取與完整多頭相比要小多少？
-3. 用一句話解釋為什麼**殘差連結**和**層範數**
-   需要訓練深層籌碼。如果沒有每個，什麼會破壞？
-4. 為什麼 decode 可以重複使用快取的鍵/值，但*不能*快取的查詢？係好你的
-   因果掩模的三角形結構的答案。
-5. FFN 為 ~$8d^2$ 參數，attention 的投影為每層 ~$4d^2$。
-   對於主導的 $d=4096$，MoE 層如何改變局面？
+1. 追蹤形狀：從 token id $[N]$ 開始，列出張量在這些步驟後的形狀——嵌入後、$QK^\top$ 後、
+   softmax 後、$\times V$ 後、乘 $W_O$ 後、LM head 後。其中哪一個對 $N$ 是二次的？
+2. 一個模型有 $d=4096$、$h=32$ 個頭。$d_h$ 是多少？若改用 8 個 KV 頭（GQA），每個 token
+   的 KV cache 比完整多頭小多少？
+3. 用一句話說明為什麼訓練深層網路需要**殘差連接**和**層 norm**。少了其中任一個，分別會
+   壞在哪裡？
+4. 為什麼 decode 可以重用快取的 key/value，卻*不能*快取 query？把答案扣回因果遮罩的
+   三角形結構。
+5. FFN 約佔 $8d^2$ 參數，attention 的投影每層約 $4d^2$。在 $d=4096$ 由 FFN 主導的情況下，
+   一個 MoE 層如何改變這個版圖？
 
 ## 參考文獻
 
-- 瓦斯瓦尼等人。 _attention 就是你所需要的。 _ 2017 年（原廠 Transformer）。
-- 芳和哈特。 _變形金剛的正式演算法。 _ 2022（精確的偽代碼）。 -埃爾哈格等。 _Transformer 電路的數學框架。 _ 2021（attention 作為資訊運動）。
-- 蘇等人。 _RoFormer：旋轉位置嵌入。 _ 2021。
-- 張和森里奇。 _均方根層歸一化 (RMSNorm)。 _ 2019。
+- Vaswani et al. _Attention Is All You Need._ 2017（原始 Transformer）。
+- Phuong & Hutter. _Formal Algorithms for Transformers._ 2022（精確的偽代碼）。
+- Elhage et al. _A Mathematical Framework for Transformer Circuits._ 2021（把 attention 視為資訊搬移）。
+- Su et al. _RoFormer: Rotary Position Embedding._ 2021。
+- Zhang & Sennrich. _Root Mean Square Layer Normalization (RMSNorm)._ 2019。
