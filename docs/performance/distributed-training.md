@@ -1,4 +1,4 @@
-# 分散式 training
+# 分散式訓練
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong>中階→高階</span>
@@ -46,7 +46,7 @@ $$
 頻寬項 $2\frac{N-1}{N}\frac{M}{\beta}\to 2\frac{M}{\beta}$ 在 $N$ 變大時趨於與
 $N$ 無關 — 這正是 ring all-reduce（以及建立其上的 DP）能在頻寬上良好擴展的原因。
 
-## data parallelism (DP) 與 ZeRO
+## Data parallelism (DP) 與 ZeRO
 
 **data parallelism**：在每個 GPU 上複製模型、切分*批次*，並對梯度做
 all-reduce，使每份副本更新到一致的權重。實作簡單、通訊量輕，
@@ -101,7 +101,7 @@ flowchart LR
 
 每往後一個階段就多分片一類狀態，以通訊換取記憶體。
 
-## tensor parallelism（TP）
+## Tensor parallelism（TP）
 
 跨 GPU 切分每個**matmul**（Megatron-LM）。對 FFN，把上投影按列切、
 下投影按行切；每個 GPU 算一個切片，再用一個 all-reduce 合併每層的結果。
@@ -127,14 +127,14 @@ all-reduce，TP 是**頻寬密集**的。
   NVLink / Infinity Fabric (xGMI) 把它**限制在節點內**。典型 TP 度數 =
   每節點的 GPU 數（例如 8）。
 
-## pipeline parallelism（PP）
+## Pipeline parallelism（PP）
 
 **按層**把模型拆成放在不同 GPU 上的階段；activation 沿
 階段 → 階段流動（P2P）。天真版本會讓大多數 GPU 閒置（「bubble」）；
 **microbatch**(GPipe) 與交錯排程（1F1B、Megatron interleaved）藉由
 讓多個 microbatch 同時在管線中飛行來縮小 bubble。
 
-### bubble 比例
+### Bubble 比例
 
 設管線有 $p$ 個階段、每步餵入 $m$ 個 microbatch。填滿與排空管線分別
 需要 $p-1$ 個 microbatch 的時間，因此閒置時間占比為
@@ -150,7 +150,7 @@ $$
 - ❌ 管線 **bubble** 浪費算力；需要足夠多的 microbatch 來攤銷。
   DeepSeek 的 **DualPipe** 是一種專為隱藏 MoE all-to-all 而設計的 PP 排程。
 
-## sequence/context parallelism（SP）
+## Sequence/context parallelism（SP）
 
 把**序列維度**切到多個 GPU 上，使每個 GPU 只持有一部分 tokens —
 對於 activation 與 attention 計算量隨序列長度增長的長上下文至關重要。
@@ -160,7 +160,7 @@ $$
 [第一部](../foundations/attention-efficiency.md) 提到的 activation 記憶體牆與
 attention 計算牆。
 
-## expert parallelism (EP) — MoE 維度
+## Expert parallelism (EP) — MoE 維度
 
 在 [Systems & EP](../moe/systems-ep.md) 中深入介紹：把**experts**分片到
 不同 GPU 上；透過 **all-to-all** 把 tokens 路由到持有對應 expert 的 GPU。

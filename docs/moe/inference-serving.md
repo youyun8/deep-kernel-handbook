@@ -47,7 +47,7 @@ routing 的局部性。
   decode 每個 token 只碰 $k$ 個 expert（重用很差）——這是把許多並發 decode 請求批在一起的另一
   個理由。
 
-## expert 量化
+## Expert 量化
 
 expert 佔了大部分參數，所以量化它們是壓縮上槓桿最大的一招。由於每個 expert 看到的 token 比
 密集 FFN 少，又因為 serving 是 [memory-bound](../foundations/attention-efficiency.md)，量化
@@ -84,7 +84,7 @@ MoE server 要同時照顧**兩個**會動態變化的大記憶體消耗者：
 
 ```mermaid
 flowchart TD
-    req[incoming requests] --> sched[scheduler / continuous batching]
+    req[incoming requests] --> sched[scheduler / Continuous Batching]
     sched --> kv[(paged KV cache pool)]
     sched --> ep[expert pool]
     ep --> hot[hot experts in HBM]
@@ -95,7 +95,7 @@ flowchart TD
 ## 實用的 serving 清單
 
 - [ ] 量化路由 expert（先 fp8/int8；若記憶體吃緊再 int4），router/attention/norm 維持較高精度。
-- [ ] 用 continuous batching 拉高 tokens-per-expert（攤銷權重讀取——見
+- [ ] 用 Continuous Batching 拉高 tokens-per-expert（攤銷權重讀取——見
       [推論最佳化](../performance/inference-optimization.md)）。
 - [ ] 分頁 KV cache（GQA/MLA 模型還能進一步把它縮小）。
 - [ ] 若權重塞不下：offload 冷 expert、預取下一層 expert、快取熱 expert；預期 PCIe/NVMe 頻寬會

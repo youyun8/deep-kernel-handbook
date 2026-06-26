@@ -159,7 +159,7 @@ EP 讓每個 expert 的權重 *不被切分*（GEMM 效率較佳），但要付 
 代價，且對 load imbalance 敏感；TP 則切分權重、每層都要 all-reduce。
 選擇取決於在你的 batch size 下，哪種訊息大小、哪個 bottleneck 主導。
 
-## grouped GEMM：計算端
+## Grouped GEMM：計算端
 
 dispatch 之後，每個 expert 拿到「可變」數量的 tokens——一個參差不齊的批次。
 三種計算方式，由差到好：
@@ -187,7 +187,7 @@ block-sparse view:      [tokens] × [block-diagonal expert weights]
                         only the nonzero blocks (token's expert) compute
 ```
 
-## capacity factor 與 padding 的權衡
+## Capacity factor 與 padding 的權衡
 
 延續 [load balancing](load-balancing.md)：capacity factor $C$ 為每個 expert 的
 tokens 數設定上限。設 $E$ 為 expert 總數、$T$ 為每個 device 的本地 token 數、
@@ -208,7 +208,7 @@ $C$ 同時決定 **all-to-all 緩衝區大小** 與 **grouped GEMM padding**：
 因此 capacity factor 是一個*聯合*的品質–throughput–記憶體旋鈕，
 同時出現在建模與系統預算中。
 
-### load imbalance
+### Load imbalance
 
 even 有了 capacity，實際的 routing 也很少是均勻的。設 expert $i$ 收到
 全部路由 tokens 中的比例 $p_i$（$\sum_i p_i = 1$）。由於一層要等到最忙的

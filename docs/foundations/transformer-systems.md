@@ -1,4 +1,4 @@
-# Transformer 作為一個系統
+# 作為系統的 Transformer
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong> 初學者</span>
@@ -152,7 +152,7 @@ $I \approx \tfrac{2 BN d\, d_{ff}}{2(BN d + BN d_{ff})} \approx \tfrac{BN d\, d_
     **training / prefill** 一次處理很多 token → compute-bound → 你希望 kernel 逼近峰值
     FLOPs。**decode** 一次生成一個 token → memory-bound → 你希望搬移更少的 bytes
     （量化權重、把請求批在一起、快取 KV）。幾乎每個 serving 技巧——
-    [continuous batching](../performance/inference-optimization.md)、
+    [Continuous Batching](../performance/inference-optimization.md)、
     [權重量化](../performance/quantization.md)、
     [speculative decoding](../performance/inference-optimization.md)——都是針對這個事實的
     出招。

@@ -11,7 +11,7 @@
 攤開的機制。本頁涵蓋經典的 **auxiliary loss**、**expert capacity** 與 token drop，以及現代的
 **aux-loss-free**（以偏差為基礎、DeepSeek 風格）做法。
 
-## router 為何崩潰
+## Router 為何崩潰
 
 routing 是個贏者全拿的回饋迴圈。早期稍微好一點的 expert 拿到更多 token → 更多梯度 → 進步更快
 → 又拿到更多 token。沒有反向壓力，分佈就會越來越集中。這帶來兩種不同的傷害：
@@ -60,7 +60,7 @@ aux-loss-free 做法。
     的 batch，仍會在熱 GPU 上丟 token。DeepSeek 額外加了 device 級與通訊平衡的項；大型模型也
     會套用 per-microbatch／per-sequence 的損失，以避免 batch 內部的熱點。
 
-## expert 容量、下降和溢出
+## Expert 容量、下降和溢出
 
 為了讓批次計算高效、通訊緩衝區固定，每個 expert 每個 batch 最多只收固定數量的 token——這就是
 它的**容量（capacity）**：

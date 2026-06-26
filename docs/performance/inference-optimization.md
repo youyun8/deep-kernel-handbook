@@ -1,4 +1,4 @@
-# inference 優化
+# Inference 優化
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong>中階→高階</span>
@@ -9,7 +9,7 @@
 inference 是一個 throughput 與 latency 的最佳化問題，其根基是
 [memory wall](../foundations/attention-efficiency.md)：decode 受頻寬限制，
 因此整個賽局就是攤銷權重讀取並避免浪費工作。本頁
-涵蓋 **continuous batching**、**speculative decoding**、**KV cache 管理**，
+涵蓋 **Continuous Batching**、**speculative decoding**、**KV cache 管理**，
 以及 serving 系統如何將它們串接起來。MoE 專屬的 serving 已在
 [MoE inference & serving](../moe/inference-serving.md) 討論。
 
@@ -41,11 +41,11 @@ paged attention 與 KV 量化都直接作用於此式：fp8 KV 把 $c$ 減半。
 MLA（multi-head latent attention）則改為每個 token 只儲存單一個低秩
 latent，而非完整的 $H_{kv}$ 份 K/V，因而把上式縮小一個很大的因子。
 
-## continuous batching
+## Continuous Batching
 
 靜態批次（等待、湊滿一批、跑到全部完成）會浪費 GPU：較短的
 序列提早完成，其時槽閒置直到最長的序列結束，而新到的
-請求必須等下一批。**continuous batching（in-flight batching）**改以
+請求必須等下一批。**Continuous Batching（in-flight batching）**改以
 **迭代（token）等級**排程：
 
 - 每個 decode 步驟之後，完成的序列離開，等待中的請求即刻加入。
@@ -93,9 +93,9 @@ $$
 其中 $\beta$ 為 HBM 頻寬（bytes/s）。這就是 decode 的頻寬牆：在轉為
 compute-bound 之前，單步時間無法低於此值。
 
-### throughput 與 latency
+### Throughput 與 latency
 
-在 continuous batching 下，throughput 為
+在 Continuous Batching 下，throughput 為
 
 $$
 \text{throughput} = \frac{b}{t_{\text{step}}},
@@ -111,7 +111,7 @@ $$
 
 因此 serving 的調參本質是在固定的 latency SLO 下，盡量把 $b$ 推大。
 
-## speculative decoding
+## Speculative decoding
 
 decode 受記憶體限制，因此 GPU 在等待記憶體時有閒置的計算能力。
 speculative decoding 花費這份計算，在每次昂貴的驗證步驟中一次
@@ -158,7 +158,7 @@ KV cache 是 serving 的動態記憶體消耗者（參見
 $\text{bytes} = 2\,L\,H_{kv}\,d_h\,s\,c$）。可用的槓桿：
 
 - **paged attention**：以區塊為單位配置 → 無碎片，支援共享
-  （prefix caching、平行取樣）。它是 continuous batching 的基底。
+  （prefix caching、平行取樣）。它是 Continuous Batching 的基底。
 - **prefix/prompt caching**：對共享系統 prompt 的請求重複使用其 KV
   （copy-on-write 區塊）— 對具有固定前導的聊天場景效益巨大。
 - **架構收縮**：GQA/MQA/MLA 從源頭（降低 $H_{kv}$ 或改存 latent）縮小 cache。
@@ -201,7 +201,7 @@ flowchart TD
 
 - decode **受記憶體限制**；serving 的核心是攤銷權重讀取而非
   浪費工作（$I \approx 2b/c$，下界 $t_{\text{step}} \gtrsim P c/\beta$）。
-- **continuous batching**（paged KV cache 上的迭代級調度）是
+- **Continuous Batching**（paged KV cache 上的迭代級調度）是
   throughput 最大的勝利。
 - **speculative decoding** 以備用計算換取更少的 target forward pass，
   且**無損** — 正因 decode 受記憶體限制才有效。
@@ -216,7 +216,7 @@ flowchart TD
 
 1. 將 speculative decoding 的期望加速推導為 draft 接受率 $\alpha$
    與提案長度 $k$ 的函數。
-2. 估計 continuous batching 相對於靜態批次的 throughput 增益，工作負載
+2. 估計 Continuous Batching 相對於靜態批次的 throughput 增益，工作負載
    的序列長度在 $[64, 1024]$ 間均勻分佈。
 3. 以 prefix caching，計算 100 個共享同一個 2k-token 系統 prompt 的
    請求所節省的 KV 記憶體（用 $\text{bytes} = 2\,L\,H_{kv}\,d_h\,s\,c$）。

@@ -183,7 +183,7 @@
     int4 繼續 experts（大多數參數，最寬容），而 router 和
     attention 保持更高的精度 — 標準 MoE serving 配方。
 
-## inference 最佳化
+## Inference 最佳化
 
 ??? success "1 — 推測 decoding 加速"
     根據草案接受率 $\alpha$ 和提案長度 $\gamma$，預期
@@ -196,7 +196,7 @@
     返回；作為 $\alpha\to1$，你每次驗證都會接近 $\gamma+1$ tokens。驗收
     主導的是頻寬速率，不是裸頻寬。
 
-??? success "2 — continuous batching vs 靜態 batching，長度在 [64,1024] 均勻"
+??? success "2 — Continuous Batching vs 靜態 batching，長度在 [64,1024] 均勻"
     靜態批次將每個請求填入**批次中最長的**並等待
     對於完成速度最慢的，因此短請求會浪費計算/插槽；有長度
     在 [64,1024] 中均勻，平均長度 ≈ 544，但批次運行速度為 ≈ 1024 → ~40–50%

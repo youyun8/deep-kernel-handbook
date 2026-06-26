@@ -1,4 +1,4 @@
-# 量化和壓縮
+# 量化與壓縮
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong>中階</span>

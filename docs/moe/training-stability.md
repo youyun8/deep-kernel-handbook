@@ -23,7 +23,7 @@ MoE 比密集模型更難訓練，因為 **routing 既離散又會自我強化**
 
 不處理的後果：損失尖峰、NaN、「死」expert，以及很早就鎖死、再也回不來的 routing。
 
-## router z 損失
+## Router z 損失
 
 router z-loss（出自 ST-MoE）直接懲罰過大的 router logits，讓 softmax 保持清醒。對每個 token 的
 logits $x \in \mathbb{R}^{E}$：
@@ -51,7 +51,7 @@ $$ \mathcal{L} = \mathcal{L}_{\text{LM}} + \alpha\,\mathcal{L}_{\text{aux}} + \b
 （$\mathcal{L}_{\text{aux}}$ 可選擇換成 [aux-loss-free 偏差](load-balancing.md)）。即使在
 aux-loss-free 的配方裡，z-loss 仍會保留——它處理的是 logit 大小，這跟平衡是兩個不同的問題。
 
-## router 的精確紀律
+## Router 的精確紀律
 
 這是 [數值與精度](../foundations/numerics-precision.md)和 MoE 正面相撞的地方。routing 是一個由
 logit 之間「微小差距」驅動的「離散」決策，所以捨入雜訊會翻轉分配、破壞回饋迴路的穩定。

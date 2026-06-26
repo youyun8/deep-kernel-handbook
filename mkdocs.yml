@@ -71,6 +71,7 @@ extra:
   generator: false
 
 extra_css:
+  - https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;700;900&display=swap
   - https://unpkg.com/katex@0/dist/katex.min.css
   - stylesheets/extra.css
 
@@ -142,7 +143,7 @@ nav:
       - Routing 變體: moe/routing-variants.md
       - 訓練穩定性: moe/training-stability.md
       - 系統與 expert parallelism: moe/systems-ep.md
-      - MoE kernels (Triton/CUDA/HIP): moe/kernels.md
+      - MoE kernels (Triton / CUDA / HIP): moe/kernels.md
       - 推論與 serving: moe/inference-serving.md
       - 案例研究: moe/case-studies.md
       - MoE decode 剖析: moe/decode-anatomy.md
@@ -153,7 +154,7 @@ nav:
       - CUDA / HIP 路線: performance/cuda-hip-track.md
       - 分散式訓練: performance/distributed-training.md
       - 量化與壓縮: performance/quantization.md
-      - 推論最佳化: performance/inference-optimization.md
+      - Inference 優化: performance/inference-optimization.md
       - Profiling 與方法論: performance/profiling.md
   - "第四部 · AITER":
       - AITER decode 深入解析: aiter/index.md

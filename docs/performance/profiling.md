@@ -1,4 +1,4 @@
-# 分析和方法
+# Profiling 與方法論
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong> 全部</span>

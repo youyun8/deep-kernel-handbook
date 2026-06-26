@@ -106,7 +106,7 @@ roofline 目標的正確量測去檢驗，而不是憑感覺。
 
 確認它真的學到了東西：用訓練好的模型生成文字（greedy 或 temperature 取樣）。對小語料上的
 char-LM，你應該在本地就能拿到通順的文字。這個生成迴圈也是加上
-[inference 優化](../performance/inference-optimization.md)（KV cache——你會連同 CUDA graph 一起加）
+[Inference 優化](../performance/inference-optimization.md)（KV cache——你會連同 CUDA graph 一起加）
 的下手處。
 
 ## 擴充

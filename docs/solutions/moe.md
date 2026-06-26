@@ -124,7 +124,7 @@
     平衡與質量之間的拉鋸戰。並列報告最終損失和 CV
     側面——配對就是重點。
 
-## routing 變體
+## Routing 變體
 
 ??? success "1 — expert 組合和細粒度增益"
     組合 $= \binom{E}{k}$：
@@ -162,7 +162,7 @@ expert 參數 (DeepSeekMoE)。組合能力，恆定計算。
     experts 跨度，保持訊息足夠大以保持頻寬限制
     比 latency 綁定。
 
-## training 穩定性
+## Training 穩定性
 
 ??? success "1 — $\mathcal{L}_z$ 縮小了 $\|x\|$ 並將 softmax 限制為 one-hot"
     $\mathcal{L}_z = \beta(\log\sum_e e^{x_e})^2$。 log-sum-exp 隨
@@ -269,7 +269,7 @@ expert 參數 (DeepSeekMoE)。組合能力，恆定計算。
     中（$T\times d\times 2$ B），確認獲勝是*流量*，而不是
     FLOPs — 正是你根據排列的記憶體限制性質所預測的。
 
-## inference 和 serving
+## Inference 和 serving
 
 ??? success "1 — DeepSeek-V3 權重的 HBM：bf16 / fp8 / int4"
     671B 參數：**bf16**$= 671\times2 = 1342$ GB;**fp8**$= 671$ GB;**int4**

@@ -214,7 +214,7 @@ DeepseekV2MoE.forward                      branch=forward_normal（非 mega/A2A/
 - **走 AITER MXFP4**：`moe_runner_backend=auto` 被 Quark scheme 解析成 AITER；不是 CUDA、
   FlashInfer TRT-LLM 或 Triton MoE。
 
-### config lookup 怎麼決定 kernel
+### Config lookup 怎麼決定 kernel
 
 `get_2stage_cfgs(...)` 的 lookup key（決定 `kernelName1/2`、`block_m`、`ksplit`、
 `run_1stage`、`flat`）包含：
@@ -426,6 +426,64 @@ crossover 與 AR+RMSNorm 融合最佳；原始碼在 `aiter/ops/custom_all_reduc
 
 本組態 shared-expert fusion 開啟，所以 shared expert 不再是獨立 kernel，而是 routed path
 的第 9 名（`top_k=9 = 8 + 1`）。若關閉 fusion，taxonomy 會出現獨立的 stage 19–22：
+
+下圖對比 fusion 開／關兩條路徑：關閉時 shared expert 自己走一條 quant → GEMM → reduce →
+SiLU 的 standalone 鏈（stage 19–22），開啟後它被當成「第 9 個 expert」append 進 routing，
+與 384 個 routed experts 一起在同一組 grouped GEMM（stage 15/17）算完。
+
+```mermaid
+flowchart LR
+  subgraph OFF["fusion 關閉（standalone shared）"]
+    direction TB
+    H1["hidden h · 1×7168"] --> G1["router gate<br/>hgemm_bf16_16x64x256"]
+    G1 --> TK1["routed top-k<br/>8 experts"]
+    TK1 --> RS1["routed sort + quant<br/>stage 13/14"]
+    RS1 --> RG1["routed grouped GEMM<br/>stage 15/17"]
+    H1 --> SQ["19 · shared quant<br/>dynamic_mxfp4_quant"]
+    SQ --> SG["20 · shared MLP GEMM<br/>_gemm_afp4wfp4"]
+    SG --> SR["21 · shared reduce<br/>_gemm_afp4wfp4_reduce"]
+    SR --> SS["22 · shared SiLU<br/>act_and_mul"]
+    RG1 --> ADD1["combine<br/>routed + shared"]
+    SS --> ADD1
+  end
+
+  subgraph ONF["fusion 開啟（append 第 9 名）"]
+    direction TB
+    H2["hidden h · 1×7168"] --> G2["router gate<br/>hgemm_bf16_16x64x256"]
+    G2 --> TK2["routed top-k<br/>8 experts"]
+    TK2 --> AP["shared append as top-k #9<br/>aiter-shared-expert-topk"]
+    AP --> CS["13 · consolidated sort + quant<br/>opus_moe_sorting · 385 experts"]
+    CS --> FG["15/17 · fused grouped GEMM<br/>mfma_moe1 / mfma_moe2"]
+    FG --> ADD2["combine<br/>weighted top-k"]
+  end
+
+  class H1,G1,TK1,H2,G2,TK2 accBlue;
+  class SQ,SG,SR,SS accAmber;
+  class AP,CS,FG accGreen;
+```
+
+把它寫成數學就很清楚。記 routed experts 集合為 $\mathcal{R}$（$|\mathcal{R}|=8$），routing 權
+重 $g_i$，shared expert 為 $E_s$。fusion 關閉時 shared 是一條獨立加法分支：
+
+$$
+\mathbf{o}_{\text{off}}
+  = \underbrace{\sum_{i\in\mathcal{R}} g_i\, E_i(\mathbf{h})}_{\text{routed grouped GEMM}}
+  + \underbrace{E_s(\mathbf{h})}_{\text{standalone stage 19–22}} .
+$$
+
+fusion 開啟時，shared 被指定為固定權重 $g_s=1$ 的「第 9 名」，併入同一個 top-k 集合
+$\mathcal{R}^{+}=\mathcal{R}\cup\{s\}$，於是整層塌縮成單一 grouped GEMM：
+
+$$
+\mathbf{o}_{\text{on}}
+  = \sum_{j\in\mathcal{R}^{+}} g_j\, E_j(\mathbf{h}),
+  \qquad g_s = 1,\;\; |\mathcal{R}^{+}| = 9 .
+$$
+
+兩者數值等價（$\mathbf{o}_{\text{on}}=\mathbf{o}_{\text{off}}$），但 fusion 把 stage 19–22 四個
+standalone kernel 換成 0 個額外 launch：shared 只是讓 grouped GEMM 的 expert 維度從 384
+變 385、每 token 處理的 row 數從 8 變 9。decode 低 M 時 kernel launch 佔比高，省掉這四個
+standalone kernel 的效益最明顯。
 
 | stage | 名稱                      | kernel                          |
 | ----: | ------------------------- | ------------------------------- |

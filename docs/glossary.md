@@ -54,7 +54,7 @@
 **loss scaling（損失縮放）**
 ：把損失乘上一個因子，讓 fp16 梯度落在可表示範圍內；bf16 基本上不需要。
 
-## attention
+## Attention
 
 **KV cache**
 ：儲存過去 token 的 key/value，使 decode 變成 $O(N)$ 而非 $O(N^2)$；常常是 inference 記憶體的
@@ -74,7 +74,7 @@ KV 頭）。
 **PagedAttention**
 ：以區塊為單位配置 KV cache（如虛擬記憶體分頁），消除碎片並支援共享。
 
-## experts 的混合物
+## Experts 的混合物
 
 **MoE（Mixture-of-Experts）**
 ：含許多 expert FFN 與一個 router 的層，每個 token 只啟動其中幾個，把總參數和每 token FLOP 解耦。
@@ -144,7 +144,7 @@ KV 頭）。
 **node-limited routing**
 ：限制一個 token 的 expert 能跨多少節點，以約束跨節點 all-to-all。
 
-## inference & 壓縮
+## Inference & 壓縮
 
 **prefill / decode**
 ：處理 prompt（很多 token、compute-bound）vs 一次生成一個 token（memory-bound）。

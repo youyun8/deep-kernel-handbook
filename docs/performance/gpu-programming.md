@@ -144,22 +144,26 @@ matmul tile），它可能在*較低*佔用率下反而更快，因為每條 thr
 ## 兩種方言的 kernel 啟動
 
 === "CUDA"
-`cpp
+
+    ```cpp
     __global__ void add(const float* a, const float* b, float* c, int n) {
         int i = blockIdx.x * blockDim.x + threadIdx.x;
         if (i < n) c[i] = a[i] + b[i];
     }
     add<<<(n + 255) / 256, 256>>>(a, b, c, n);   // grid, block
-    `
+    ```
+
 === "ROCm/HIP"
-`cpp
+
+    ```cpp
     #include <hip/hip_runtime.h>
     __global__ void add(const float* a, const float* b, float* c, int n) {
         int i = blockIdx.x * blockDim.x + threadIdx.x;   // identical body
         if (i < n) c[i] = a[i] + b[i];
     }
     hipLaunchKernelGGL(add, dim3((n+255)/256), dim3(256), 0, 0, a, b, c, n);
-    `
+    ```
+
 kernel 本體完全相同；HIP 是疊在 CUDA 概念之上的一層薄可移植層。真正的
 *效能*工作——tile 尺寸、wavefront 感知的 reduction、LDS 與 SMEM 的容量調校、
 MFMA 與 Tensor Core——才是你的專長所在。這正是

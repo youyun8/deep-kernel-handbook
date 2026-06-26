@@ -20,7 +20,7 @@ critical path 實際長什麼樣**、**kernel fusion 如何改變它**，以及*
     積極重疊 kernel 並融合 routing pipeline；Stack B 較為循序、在別處做融合。重點不是
     「誰到處都快」——那正是這裡要打破的迷思。
 
-## decode step，逐一 kernel
+## Decode step，逐一 kernel
 
 一個 decoded token 會把整個模型跑一遍。因為每層結構相同，每層的 kernel 會重複，所以
 profile 最關鍵的一欄是 **calls/iter**——某個 stage 在一步裡被呼叫的層數（attention

@@ -1,4 +1,4 @@
-# 數字和精度
+# 數值與精度
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong>初級→中階</span>

@@ -16,6 +16,9 @@
 :root {
   --md-code-font: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
+  /* Serif (宋體) display family for site title and page headings. */
+  --ml-serif: "Noto Serif TC", "Songti TC", "Songti SC", "SimSun", "STSong", serif;
+
   /* Engineering palette: a confident blue lead, teal partner, amber highlight.
      Purple is intentionally kept out so the page does not read as one-note. */
   --ml-accent-warm: #ea8a0b;
@@ -158,6 +161,7 @@
   max-width: 26ch;
   margin-bottom: 0.5rem;
   color: var(--md-default-fg-color);
+  font-family: var(--ml-serif);
   font-weight: 800;
   letter-spacing: -0.01em;
 }
@@ -166,12 +170,14 @@
   margin-top: 2.6em;
   padding-top: 0.8rem;
   border-top: 1px solid var(--ml-border);
+  font-family: var(--ml-serif);
   font-weight: 750;
   letter-spacing: -0.005em;
 }
 
 .md-typeset h3 {
   color: var(--md-default-fg-color);
+  font-family: var(--ml-serif);
   font-weight: 700;
 }
 
@@ -249,6 +255,7 @@
 }
 
 .md-header__title {
+  font-family: var(--ml-serif);
   font-weight: 750;
   letter-spacing: -0.01em;
 }
@@ -291,7 +298,7 @@
 
 /* Top-level section labels in the sidebar read as quiet group headers. */
 .md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link {
-  font-weight: 700;
+  font-weight: 400;
   color: var(--md-default-fg-color);
 }
 
@@ -327,6 +334,21 @@
 
 .md-typeset .grid.cards > :is(ul, ol) > li > :first-child {
   color: var(--ml-accent-cool);
+}
+
+/* Card heading row: give the leading icon room and a gap before the label. */
+.md-typeset .grid.cards > :is(ul, ol) > li > :first-child .twemoji,
+.md-typeset .grid.cards > :is(ul, ol) > li > :first-child > svg {
+  display: inline-flex;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-right: 0.45rem;
+  vertical-align: -0.2em;
+}
+
+.md-typeset .grid.cards > :is(ul, ol) > li > :first-child .twemoji svg {
+  width: 100%;
+  height: 100%;
 }
 
 .md-typeset .md-button {
@@ -443,6 +465,7 @@ figure > figcaption {
 .home-title {
   max-width: 18ch;
   margin: 0 0 0.9rem;
+  font-family: var(--ml-serif);
   font-size: clamp(1.85rem, 1rem + 2.6vw, 3rem);
   font-weight: 850;
   line-height: 1.08;
@@ -565,6 +588,7 @@ figure > figcaption {
 
 .home-panel__title {
   margin: 0.35rem 0 0;
+  font-family: var(--ml-serif);
   font-size: 1.3rem;
   font-weight: 800;
   line-height: 1.15;
@@ -653,6 +677,21 @@ figure > figcaption {
 .curriculum-card h3 {
   margin: 0.4rem 0 0.4rem;
   color: var(--md-default-fg-color);
+}
+
+/* Leading icon in a curriculum-card heading: size it and add a gap. */
+.curriculum-card h3 .twemoji {
+  display: inline-flex;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-right: 0.5rem;
+  vertical-align: -0.2em;
+  color: var(--ml-accent-cool);
+}
+
+.curriculum-card h3 .twemoji svg {
+  width: 100%;
+  height: 100%;
 }
 
 .curriculum-card > p {
