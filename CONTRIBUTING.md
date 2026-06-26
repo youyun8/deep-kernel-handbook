@@ -75,7 +75,7 @@ If you scaffold a page, put this right under the title so nothing looks more
 finished than it is:
 
 ```markdown
-!!! warning "Scaffolded — contributions welcome"
+!!! warning "部分實作 — 歡迎貢獻"
     This page is an outline. The sections below are stubs.
 ```
 

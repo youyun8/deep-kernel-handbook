@@ -1,4 +1,4 @@
-# Capstone：擴展到更大規模
+# 實戰專案：擴展到更大規模
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong> 高階</span>
@@ -6,13 +6,13 @@
   <span class="chip"><strong>硬體：</strong> 多 GPU 才能完整執行</span>
 </div>
 
-[上一個 Capstone](build-moe.md) 建好並優化了單 GPU 的 MoE LM。這一篇是把
+[上一個實戰專案](build-moe.md) 建好並優化了單 GPU 的 MoE LM。這一篇是把
 [並行技術](../performance/distributed-training.md)與
 [expert-parallel all-to-all](../moe/systems-ep.md)套到多 GPU 的**規劃與實作指南**，結構安排成一條
 你可以套用到任何模型/叢集的決策流程。
 
-!!! warning "部分實作"
-    <span class="status-badge wip">SCAFFOLDED</span> 要完整跑這套，需要一個多 GPU（最好多節點）的
+!!! warning "部分實作 — 歡迎貢獻"
+    要完整跑這套，需要一個多 GPU（最好多節點）的
     叢集。下面的*推理、規劃與程式碼骨架*是完整的、可以骨架形式執行；量測到的多節點數字留給你在
     硬體上填。這裡沒有任何東西藏在「TODO」後面——只有叢集規模的 benchmark 表要由你填上。
 
@@ -84,7 +84,7 @@ MFU 的成敗就在這裡（[系統與 EP](../moe/systems-ep.md)）：
 
 | GPU | 並行設定              | tokens/s | MFU | 備註                       |
 | --- | --------------------- | -------: | --: | -------------------------- |
-| 1   | 單卡                  |   _基線_ |   — | 來自上一個 Capstone        |
+| 1   | 單卡                  |   _基線_ |   — | 來自上一個實戰專案        |
 | 8   | EP=8（1 節點）        |        — |   — | 節點內 all-to-all（快）    |
 | 16  | EP=8 × DP=2           |        — |   — | + 跨節點 DP                |
 | 16  | PP=2 × TP=2 × EP=4     |        — |   — | 完整 3D + EP               |
@@ -121,6 +121,6 @@ MFU 的成敗就在這裡（[系統與 EP](../moe/systems-ep.md)）：
 ## 參考文獻
 
 - [分散式訓練](../performance/distributed-training.md)與[系統與 EP](../moe/systems-ep.md)
-  （本 Capstone 的基礎）。
+  （本實戰專案的基礎）。
 - Rajbhandari et al. _DeepSpeed-MoE._ 2022；Shoeybi et al. _Megatron-LM._ 2019。
 - DeepSeek-AI. _DeepSeek-V3 / DeepEP / DualPipe._ 2024。

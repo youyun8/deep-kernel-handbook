@@ -158,7 +158,7 @@ nav:
       - Profiling 與方法論: performance/profiling.md
   - "第四部 · AITER":
       - AITER decode 深入解析: aiter/index.md
-  - "第五部 · Capstones":
+  - "第五部 · 實戰專案":
       - capstones/index.md
       - 建立小型 MoE LM: capstones/build-moe.md
       - 擴展到更大規模: capstones/scaling.md
@@ -167,7 +167,7 @@ nav:
       - "第一部 · 基礎": solutions/foundations.md
       - "第二部 · Mixture-of-Experts": solutions/moe.md
       - "第三部 · 效能": solutions/performance.md
-      - "第五部 · Capstones": solutions/capstones.md
+      - "第五部 · 實戰專案": solutions/capstones.md
   - 參考資料:
       - 詞彙表: glossary.md
       - 書目與連結: references.md

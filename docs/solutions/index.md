@@ -23,7 +23,7 @@
 
     GPU 模型、Triton/CUDA/HIP、分散式訓練、量化、inference、profiling。
 
-- :material-rocket-launch-outline:&nbsp;**[第五部 · Capstones](capstones.md)**
+- :material-rocket-launch-outline:&nbsp;**[第五部 · 實戰專案](capstones.md)**
 
     小型 MoE LM 的端到端建立與量測。
 

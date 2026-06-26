@@ -1,4 +1,4 @@
-# 第五部 · Capstones
+# 第五部 · 實戰專案
 
 兩個把整本手冊串起來的端到端專案。第一個有完整可執行的程式碼；第二個是把該模型搬到多 GPU
 設定的結構化指南。
@@ -12,5 +12,5 @@
    套用到你建好的模型，並給出一份把它對映到真實硬體的規劃指南。
 
 !!! tip "這些是檢查點，不只是讀物"
-    Capstone 參照 [`code/`](https://github.com/youyun8/ml-perf-handbook/tree/main/code) 裡真實、
+    實戰專案參照 [`code/`](https://github.com/youyun8/ml-perf-handbook/tree/main/code) 裡真實、
     已測試的程式碼。目標是讓你能跑、能改、能量測——而不只是讀過。

@@ -9,7 +9,7 @@ flowchart TD
     A --> C[第三部：效能]
     C -.kernels & parallelism.-> B
     B --> E[第四部：AITER]
-    B --> D[第五部：Capstones]
+    B --> D[第五部：實戰專案]
     C --> D
     class B flagship;
 ```
@@ -56,7 +56,7 @@ flowchart TD
 3. 部署：[量化](performance/quantization.md) → [推論最佳化](performance/inference-optimization.md)
 4. 永遠：[Profiling 與方法論](performance/profiling.md)——趁早讀、常常回頭重讀。
 
-## 第 4 階段 — Capstone（進階）
+## 第 4 階段 — 實戰專案（進階）
 
 把整套首尾接起來。
 

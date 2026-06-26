@@ -1339,24 +1339,6 @@ figure > figcaption {
   stop-color: var(--ml-roofline-end);
 }
 
-/* Status badges for scaffolded pages. */
-.status-badge {
-  display: inline-block;
-  font-size: 0.7rem;
-  font-weight: 700;
-  border-radius: 999rem;
-  padding: 0.05rem 0.55rem;
-  vertical-align: middle;
-}
-.status-badge.wip {
-  background: #ffb300;
-  color: #1a1a1a;
-}
-.status-badge.done {
-  background: #2e7d32;
-  color: #fff;
-}
-
 /* Floating local-settings launcher + panel (driven by site-settings.js). */
 .ml-settings-launcher {
   position: fixed;

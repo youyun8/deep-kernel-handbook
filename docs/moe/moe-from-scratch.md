@@ -161,7 +161,7 @@ class MoEBlock(nn.Module):
 
 完整可訓練的版本——含負載平衡損失與一個跑玩具任務的小型 training 迴圈——放在
 [`code/moe/train_tiny_moe.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/moe/train_tiny_moe.py)，
-它也是 [capstone](../capstones/build-moe.md) 的起點。
+它也是[實戰專案](../capstones/build-moe.md)的起點。
 
 ## 要點
 

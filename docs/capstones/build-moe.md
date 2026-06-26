@@ -1,4 +1,4 @@
-# Capstone：端到端建立小型 MoE LM
+# 實戰專案：端到端建立小型 MoE LM
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong> 中階 → 高階</span>
@@ -6,7 +6,7 @@
   <span class="chip"><strong>程式碼：</strong> <code>code/moe/train_tiny_moe.py</code>（CPU/GPU）</span>
 </div>
 
-這個 Capstone 把[第二部](../moe/index.md)的所有東西拼成一個小但完整的 MoE 語言模型，在玩具
+這個實戰專案把[第二部](../moe/index.md)的所有東西拼成一個小但完整的 MoE 語言模型，在玩具
 任務上訓練它，再優化、並用 [profiling 方法論](../performance/profiling.md) **回報量測到的加速**。
 參考實作是
 [`code/moe/train_tiny_moe.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/moe/train_tiny_moe.py)，
@@ -99,7 +99,7 @@ for step, (xb, yb) in enumerate(loader):
 | + 融合 gather/scatter |             — |     — |   — | 省下一次 HBM 往返            |
 | + bf16 + 融合 attention |           — |     — |   — |                              |
 
-這個 Capstone 的重點是**紀律**：每一行都是一個假設（「expert 迴圈是 launch-bound」），用對照
+這個實戰專案的重點是**紀律**：每一行都是一個假設（「expert 迴圈是 launch-bound」），用對照
 roofline 目標的正確量測去檢驗，而不是憑感覺。
 
 ## 第 4 步 — 從模型取樣
