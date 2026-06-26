@@ -3,33 +3,34 @@
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong> 高階</span>
   <span class="chip"><strong>先備知識：</strong> <a href="../systems-ep/">系統與 EP</a>、<a href="../kernels/">kernels</a>、<a href="../../foundations/attention-efficiency/">attention 效率</a></span>
-  <span class="chip"><strong>硬體：</strong> 無（讀取真實設定檔）</span>
+  <span class="chip"><strong>硬體：</strong> 無（讀取真實 profile）</span>
 </div>
 
-前面的第二部分頁面都建構了一個元件。此頁面將它們放在時鐘上。我們
-取得萬億參數 MLA + MoE 模型的**真實的每 token decode 設定檔**
-（DeepSeek-V3 級：MLA attention，1 個緻密層+60 個細粒度 MoE 層，
-384 路由 + 1 個共享 expert、top-8、sigmoid 閘、FP4 expert 權重、張量
-並行 = 4) 並讓 GPU kernel 逐一 kernel 通過單一 decode 步驟。
-然後我們使用相同的追蹤來具體化三個系統課程：**什麼是
-decode 關鍵路徑實際上是**，**kernel 融合如何改變它**，以及**如何改變它
-相同的數學運算在兩個加速器堆疊上以截然不同的速度運行**。
+第二部前面的頁面各自建好一個元件；這一頁把它們放上時鐘來量。我們取一個
+兆參數級 MLA + MoE 模型的**真實逐 token decode profile**（DeepSeek-V3 級：MLA
+attention、1 個 dense 層 + 60 個 fine-grained MoE 層、384 routed + 1 shared expert、
+top-8、sigmoid gate、FP4 expert 權重、tensor parallel = 4），讓 GPU 一個 kernel 接
+一個 kernel 走完單一 decode step。再用同一份 trace 帶出三個系統課題：**decode 的
+critical path 實際長什麼樣**、**kernel fusion 如何改變它**，以及**同一組數學在兩個
+不同加速器堆疊上為何跑出截然不同的速度**。
 
-!!! note "設計上與供應商無關"
-    這些數字來自兩個真實的加速器堆疊。我們稱它們為**Stack A**
-    和**Stack B**而不是命名硬體 - 這裡的重點是
-    decode 的*結構*以及各個最佳化的*機制*，即
-    便攜式。堆疊 A 積極重疊 kernels 並融合 routing
-    管道；堆疊 B 更連續地運作並在其他地方融合。也不是“
-    到處都快」——這就是教訓。
+!!! note "刻意與供應商無關"
+    這些數字來自兩個真實的加速器堆疊，我們稱為 **Stack A** 與 **Stack B** 而不指名
+    硬體——重點是 decode 的*結構*與各項最佳化的*機制*（這些是可移植的）。Stack A
+    積極重疊 kernel 並融合 routing pipeline；Stack B 較為循序、在別處做融合。重點不是
+    「誰到處都快」——那正是這裡要打破的迷思。
 
-## decode 步驟，一步一步
+## decode step，逐一 kernel
 
-一台 decoded token 運行整個模型一次。因為每一層都是相同的，
-每層 kernels 重複 — 設定檔的關鍵列是**calls/iter**，
-一個階段運行的層數（attention 為 61，MoE 區塊為 60，MoE 區塊為 1）
-密集第 0 層 MLP）。每階段成本=呼叫次數 × 每次呼叫成本，所以高頻
-即使每次呼叫都很便宜，階段仍占主導地位。管道，依執行順序：
+一個 decoded token 會把整個模型跑一遍。因為每層結構相同，每層的 kernel 會重複，所以
+profile 最關鍵的一欄是 **calls/iter**——某個 stage 在一步裡被呼叫的層數（attention
+為 61，MoE block 為 60，dense 第 0 層 MLP 為 1）。每個 stage 的成本可寫成
+
+$$ t_{\text{stage}} = (\text{calls/iter}) \times \bar t_{\text{call}}, \qquad
+t_{\text{decode}} = \sum_{\text{stages}} t_{\text{stage}}, $$
+
+其中 $\bar t_{\text{call}}$ 是該 stage 單次呼叫的平均時間。關鍵推論：**即使每次呼叫
+很便宜，高 calls/iter 的 stage 仍可能支配整步**。pipeline 依執行順序如下：
 
 ```mermaid
 flowchart TD
@@ -58,51 +59,58 @@ flowchart TD
     class M4 flagship;
 ```
 
-時間都去哪裡了（單流配置文件，兩個大型 GEMM 重型階段）
-突出顯示）：
+時間都去哪了（單流 profile、低 batch decode；兩個大型 GEMM stage 標為重點）：
 
-| 舞台                                     | 呼叫/iter | decode 的分享 | 筆記                             |
-| ---------------------------------------- | --------- | ------------- | -------------------------------- | ---------------------- |
-| 路由 GEMM1（門+上）                      | 60        | ~15%          | 分組 expert GEMM，FP4 配重       |
-| 上排-$k$ 選擇 + token 排序               | 60        | ~5–12%        | routing + 排列；**對融合最敏感** |
-| 核心 MLA attention                       | 61        | 61 〜8%       | 已分頁 MLA decode                |
-| 路由 GEMM2（下）+聯合                    | 60        | ~6–13%        | 分組 GEMM + 加權組合             |
-| 分享-expert / 密集 MLP GEMM              | 61        | 61 ~8–10%     | 總是在線的密集路徑               |
-| TP all-reduce（收件人+MoE）              | 121       | 121 〜10%     | 每層兩個，通信                   |
-| router/閘 GEMM                           | 60        | ~4–6%         | 384 路邏輯                       |
-| 其他一切（規範、RoPE、定量、吸收、殘差） | —         | 餘數          | kernels                          | 許多便宜的高頻 kernels |
+| stage                              | calls/iter | decode 佔比 | 備註                               |
+| ---------------------------------- | ---------: | ----------- | ---------------------------------- |
+| routed GEMM1（gate+up）            |         60 | ~15%        | grouped expert GEMM、FP4 權重      |
+| top-$k$ select + token sort        |         60 | ~5–12%      | routing + permute；**對 fusion 最敏感** |
+| core MLA attention                 |         61 | ~8%         | paged MLA decode                   |
+| routed GEMM2（down）+ combine      |         60 | ~6–13%      | grouped GEMM + 加權 combine        |
+| shared-expert / dense MLP GEMM     |         61 | ~8–10%      | 永遠在線的 dense 路徑              |
+| TP all-reduce（attention + MoE）   |        121 | ~10%        | 每層兩次，communication            |
+| router / gate GEMM                 |         60 | ~4–6%       | 384-way 邏輯                       |
+| 其他（norm、RoPE、quant、absorb、residual） |    — | 餘額        | 許多便宜的高頻 kernel              |
 
-有兩件事跳出來，都是純粹的第二部分材料：
+兩件事浮現出來，且都是純粹的第二部系統觀念：
 
--**MoE 塊是 decode。**routing + 兩個分組的 expert GEMM +
-分享 expert 在一起大約是步驟的一半。這是
-[memory-bound decode](../foundations/attention-efficiency.md) 狀態：批次
-1 每個 expert GEMM 讀取 FP4 權重以發出一個 token，因此
-縮小這些重量的 [quantization](../performance/quantization.md) 是
-是什麼讓這一步驟變得經濟實惠。 -**通訊是一流的線路項目。**每層兩個 TP all-reduce
-（約 120 次呼叫）的成本大約與單一最昂貴的 GEMM 一樣多 -
-[collectives](../performance/distributed-training.md) 稅，每層都繳。
+**MoE block 就是 decode 的主體。** routing + 兩個 grouped expert GEMM + shared expert
+合計約佔一步的一半。這是 [memory-bound decode](../foundations/attention-efficiency.md)
+狀態：在 batch 1 時，每個 expert GEMM 為了輸出**一個** token 仍要把整份 FP4 權重讀進
+來。把單一 expert 的權重位元組寫出來（每元素 fp4 = 0.5 byte、hidden $H=7168$、
+intermediate $I=256$、gate+up $=2I$）：
 
-## 第 1 課 — 關鍵路徑是兩條獨立的軌道
+$$ \text{bytes}_{\text{expert}} = \underbrace{2I\,H\cdot 0.5}_{W_{13}=1.84\,\text{MB}}
++ \underbrace{H\,I\cdot 0.5}_{W_{2}=0.92\,\text{MB}} \approx 2.75\ \text{MB}. $$
 
-簡單地理解「階段 X 是步驟的 12%」假設步驟是其步驟的總和。
-kernels。事實並非如此，因為一個好的堆疊**重疊**kernels。輪廓分裂
-decode 掛鐘乾淨俐落：
+stage-1 的 arithmetic intensity 在每個 expert 處理 $m$ 列時是 $I_{\text{AI}} = 4m$
+FLOP/byte（推導見 [kernels](kernels.md)）。decode 平均每 expert 的列數
+$= \dfrac{\text{batch}\times k}{E}$，batch 1 時 $\ll 1$，所以 $I_{\text{AI}}\approx 4$，
+遠低於 ridge point ⇒ 徹底 memory-bound。這就是為什麼用 [quantization](../performance/quantization.md)
+把權重縮小（fp4 對 bf16 是 $1/4$ 位元組 ⇒ 最高 $4\times$ 權重頻寬）是讓這一步划算的關鍵。
 
-$$ \underbrace{\text{wall}}_{\text{latency users feel}} = \underbrace{\text{busy}}_{\text{GPU running ≥1 kernel}} + \underbrace{\text{idle}}_{\text{launch/sync gaps}}, \qquad \underbrace{\text{overlap}}_{\text{time hidden}} = \text{self-time} - \text{busy}. $$
+**Communication 是頭等的 line item。** 每層兩次 TP all-reduce（約 120 次呼叫）的總成本
+大約等於單一最貴的 GEMM——這是每層都要繳的 [collective](../performance/distributed-training.md)
+稅。對 decode 的小訊息（$\approx b\,H\,c$ 位元組）它是 latency-bound，不隨 batch 攤平。
 
-在同一步驟的兩個堆疊上：
+## 第 1 課 — critical path 是兩條獨立的軌道
 
-|                  | 堆疊 A（重疊）        | 堆疊 B（連續） |
-| ---------------- | --------------------- | -------------- |
-| decode 掛鐘      | **1.00×**（基線）     | **1.33×**      |
-| kernel 自拍/壁掛 | 111%（總和超過 100%） | 96%            |
-| 重疊（時間隱藏） | 大                    | 〜0            |
+天真地讀「stage X 佔一步的 12%」，預設了一步等於其 kernel 的時間總和。事實並非如此，
+因為好的堆疊會**重疊**（overlap）kernel。把 decode 的 wall-clock 乾淨地拆開：
 
-堆疊 A 的自時間*超過*其掛鐘 — 它同時運行 kernels
-（例如，第二個串流上始終開啟的共用 expert，而 router 和路由
-experts 在第一個上運行）。堆疊 B 連續運行相同的 kernels。所以
-33% 的間隙分解為**兩個正交的加性軌跡**：
+$$ \underbrace{\text{wall}}_{\text{使用者感受到的 latency}} = \underbrace{\text{busy}}_{\text{GPU 至少跑 1 個 kernel}} + \underbrace{\text{idle}}_{\text{launch/sync 空檔}}, \qquad \underbrace{\text{overlap}}_{\text{被藏起來的時間}} = \text{self-time} - \text{busy}. $$
+
+其中 self-time 是所有 kernel 各自耗時的總和。同一個 step 在兩個堆疊上：
+
+|                       | Stack A（重疊）       | Stack B（循序） |
+| --------------------- | --------------------- | --------------- |
+| decode wall-clock     | **1.00×**（基準）     | **1.33×**       |
+| kernel self-time / wall | 111%（總和超過 100%）| 96%             |
+| overlap（被藏起的時間）| 大                    | ~0              |
+
+Stack A 的 self-time *超過*它的 wall-clock——它同時在跑多個 kernel（例如第二條 stream
+上永遠在線的 shared expert，與第一條 stream 上的 router 及 routed experts 並行）。
+Stack B 則循序跑同一批 kernel。所以這 33% 的差距可分解成**兩條正交、可相加的軌道**：
 
 ```mermaid
 flowchart LR
@@ -113,42 +121,38 @@ flowchart LR
     class TB flagship;
 ```
 
-該身份完全正確：`wall gap = TrackA(net) + TrackB + idle`。的
-實際結果是避免了規劃陷阱－**大約一半的差距不是
-根本就是一個緩慢的 kernel 問題**，這是一個調度問題。優化 kernels
-（軌道 A）和啟用重疊（軌道 B）是*不同的工作*及其節省
-*加*因為它們在構造上是不相交的。只追逐一個就留下另一個
-在桌子上。
+這個恆等式精確成立：$\text{wall gap} = \text{Track A (net)} + \text{Track B} + \text{idle}$。
+實務結論是避開一個規劃陷阱——**差距裡大約一半根本不是「某個 kernel 慢」的問題，而是
+排程（scheduling）問題**。最佳化 kernel（Track A）與啟用重疊（Track B）是*不同的工作*，
+而且它們的節省可以*相加*，因為在結構上互斥。只追其中一條，就把另一條留在桌上。
 
-!!! tip "為什麼阿姆達爾定律使呼叫計數成為正確的鏡頭"
-    階段所佔的掛鐘比重是加速比的**上限**
-    僅優化該階段（Amdahl）。因為每次通話的費用都相似
-    跨階段，*呼叫*最多的階段（每層 MoE 和
-    attention kernels，×60–61）攜帶的總時間最多 - 所以它們在哪裡
-    Track-A 的努力得到了回報，而不是每一次的 decode 序言/尾聲。
+!!! tip "為什麼 Amdahl 定律讓 call count 成為正確的視角"
+    一個 stage 佔的 wall-clock 比例，是「只最佳化該 stage」能得到的加速比**上限**
+    （Amdahl：$S = 1/((1-p) + p/s)$，$p$ 為該 stage 佔比、$s$ 為其加速倍率）。因為各
+    stage 的單次呼叫成本相近，*呼叫次數最多*的 stage（每層的 MoE 與 attention kernel，
+    ×60–61）累積最多總時間——Track A 的力氣花在那裡才有回報，而不是每步只跑一次的
+    decode 序章/尾聲。
 
-## 第 2 課 — 融合決定 kernel 數量
+## 第 2 課 — fusion 決定 kernel 數量
 
-這兩個堆疊計算**相同的數學**，但**將其打包成不同的
-kernels**。每次融合都會刪除 kernel 發射和 HBM 往返
-中級（[operator-fusion](../foundations/flashattention.md) 獲勝，應用
-到 MoE 管道）。痕跡顯示融合是一次*整體*的清洗－每一次
-堆疊融合了不同的東西——但有一種融合占主導地位：
+兩個堆疊算的是**完全相同的數學**，但**打包成不同數量的 kernel**。每一次 fusion 都省掉
+一次 kernel launch 與一趟中間結果的 HBM 來回（[operator fusion](../foundations/flashattention.md)
+的勝利，套用到 MoE pipeline）。trace 顯示 fusion 是一場*整體*的拉鋸——每個堆疊各自融合
+不同的東西——但有一項 fusion 影響最大：
 
-| 運作                                       | 堆疊 A                    | 堆疊 B                      | 誰熔斷                     |
-| ------------------------------------------ | ------------------------- | --------------------------- | -------------------------- | ---- |
-| **routing：頂部-$k$ 選擇 + 規範化 + 排序** | **1 個帶保險絲的 kernel** | **3 kernels**               | **A（最大差距，~3×）**     |
-| q/kv RMSNorm                               | q/kv RMSNorm              | 2 kernels                   | 2 1 融合                   | 乙   |
-| RoPE + KV-快取寫入                         | 2 kernels                 | 2 1 融合                    | 乙                         |
-| 核心 MLA attention                         | 1 融合（attn+reduce）     | 2 kernels（分體 KV + 減少） | 一個                       |
-| 路由 GEMM2 + 聯合收割機                    | 2 kernels                 | 2 1 融合                    | 乙                         |
-| 共享-expert FP4 GEMM                       | in-kernel K-accum         | in-kernel K-accum           | GEMM + 單獨的 split-K 縮減 | 一個 |
+| 運算                                    | Stack A             | Stack B               | 誰融合得多               |
+| --------------------------------------- | ------------------- | --------------------- | ------------------------ |
+| **routing：top-$k$ select + normalize + sort** | **1 個融合 kernel** | **3 個 kernel** | **A（最大差距，約 3×）** |
+| q/kv RMSNorm                            | 2→1 融合            | 2 個 kernel           | A                        |
+| RoPE + KV-cache write                   | 2 個 kernel         | 2→1 融合              | B                        |
+| core MLA attention                      | 1 融合（attn+reduce）| 2 個 kernel（split-KV + reduce）| A          |
+| routed GEMM2 + combine                  | 2 個 kernel         | 2→1 融合              | B                        |
+| shared-expert FP4 GEMM                  | in-kernel K-accum   | GEMM + 獨立 split-K reduce | A                   |
 
-其中最突出的是**routing**。一組執行 sigmoid-bias → top-8 select →
-標準化 → token 在*單一* kernel 中排序；另一個將其分散到三個
-啟動（選擇、排序、定量排序）。那一個階段是最大的一個階段
-kernel - 整個 decode 的效率差距 - 一個直接的、經過衡量的論證
-來自 kernels 頁面的「[fuse the routing](kernels.md)」建議。
+最突出的是 **routing**。一個堆疊在*單一* kernel 內做完 sigmoid-bias → top-8 select →
+normalize → token sort；另一個把它拆成三次 launch（select、sort、quant-for-sort）。那
+一個 stage 是整個 decode 裡單一最大的效率差距——這是 [kernels](kernels.md) 頁「把 routing
+融合起來」建議的一個直接、可量測的論據。
 
 ```mermaid
 flowchart LR
@@ -165,23 +169,20 @@ flowchart LR
     class F1 flagship;
 ```
 
-!!! note "Split-K 在兩個堆疊上都是相同的技巧"
-    追蹤清除了一個微妙的問題：兩個堆疊都使用**split-K GEMM**（分區
-    跨區塊的收縮變暗，然後單獨減少 kernel 求和
-    部分 — 請參閱 [GPU programming](../performance/gpu-programming.md)）。的
-    差別在於*頻率*：一堆拆分 K 僅用於每個 decode LM 頭一次；
-    另一個 split-Ks 共享 expert FP4 GEMM**每一層**，因此其減少
-    kernel 發射 ~60× 而不是一次。相同的功能，截然不同的成本——
-    提醒始終透過呼叫次數來衡量 kernel 的權重。
+!!! note "Split-K 在兩個堆疊上是同一招"
+    trace 釐清了一個微妙處：兩個堆疊都用 **split-K GEMM**（把 contraction 維度切到不同
+    block，再用一個獨立的 reduce kernel 把 partial sum 加總——見 [GPU programming](../performance/gpu-programming.md)）。
+    差別在*頻率*：一個堆疊只在每次 decode 的 LM head 用一次 split-K；另一個對 shared-expert
+    FP4 GEMM **每層**都用，所以它的 reduce kernel 被 launch 約 60× 而不是一次。同樣的功能、
+    截然不同的成本——再次提醒要*以呼叫次數加權*來衡量一個 kernel 的份量。
 
-## 第 3 課 — 共用 experts 融合（受控前/後）
+## 第 3 課 — shared-expert fusion（受控的前/後對照）
 
-資料集中最乾淨的實驗：在一個堆疊上，切換**shared-experts
-融合**開啟和關閉並重新配置。召回 [shared expert](routing-variants.md)
-是每個 token 都經過的始終在線 FFN，*除了*其路由之外
-experts。天真地說，它是每層一個單獨的密集 MLP——它自己的 GEMM、激活、
-定量和殘差相加，全部 ×61。 Fusion 將共用的 expert 的 tokens 折疊到
-**路由分組 GEMM**因此它們與 expert tokens 一起騎行：
+資料集中最乾淨的實驗：在同一個堆疊上把 **shared-experts fusion** 開、關各跑一次並
+重新 profile。回想 [shared expert](routing-variants.md) 是每個 token 都會經過的永遠在線
+FFN，*額外*疊在它的 routed experts 之上。天真做法是每層一個獨立的 dense MLP——自己的
+GEMM、activation、quant 與 residual add，全部 ×61。fusion 把 shared expert 的 token 折進
+**routed grouped GEMM**，讓它們跟 expert token 一起搭便車：
 
 ```mermaid
 flowchart TD
@@ -198,66 +199,57 @@ flowchart TD
     class N1 flagship;
 ```
 
-測量結果是明確的，因為（在此堆疊上）kernels 運行
-串列地，所以掛鐘的變化*完全*是 kernel-自時間變化 -
-沒有重疊混淆：
+量測結果很乾淨，因為（在這個堆疊上）kernel 是循序執行的，所以 wall-clock 的變化*完全*
+等於 kernel self-time 的變化，沒有 overlap 干擾：
 
-| 透過融合移除階段                         | latency 恢復（佔 decode 的百分比） |
-| ---------------------------------------- | ---------------------------------- |
-| 獨立分享-expert / 密集-MLP GEMM          | 〜10.8%                            |
-| 其獨立激活量子 kernels                   | ~4.5%                              |
-| 其殘餘添加                               | 〜2.3%                             |
-| 其 SiLU 啟動                             | 〜2.2%                             |
-| （少量增加的路由成本：更大的排序+ GEMM） | −0.7% 淨值                         |
-| **decode 總加速**                        | **~18%**                           |
+| fusion 移除的 stage                     | latency 回收（佔 decode %） |
+| --------------------------------------- | --------------------------- |
+| 獨立 shared-expert / dense-MLP GEMM     | ~10.8%                      |
+| 其獨立的 activation-quant kernel        | ~4.5%                       |
+| 其 residual add                         | ~2.3%                       |
+| 其 SiLU activation                      | ~2.2%                       |
+| （略增的 routing 成本：更大的 sort + GEMM）| −0.7%（淨）              |
+| **decode 總加速**                       | **~18%**                    |
 
-本課程概括了這個模型：一條始終在線的密集路徑，旁邊是一條
-分組稀疏路徑是融合的邀請。單獨管道的 GEMM，
-一旦共享，活化、定量和殘差都是多餘的啟動
-tokens 只是附加到路由批次。幾乎是 decode latency 的五分之一
-是結構性開銷，不是數學。
+這一課對整個模型一般化：一條永遠在線的 dense 路徑，旁邊接著一條 grouped sparse 路徑，
+就是一張 fusion 的邀請函。獨立 pipeline 的 GEMM、activation、quant 與 residual，一旦
+共享後都成了多餘的 launch——shared token 只是附加到 routed batch 上。decode latency 中
+幾乎五分之一是結構性開銷，而不是數學本身。
 
-## 拿走什麼
+## 重點整理
 
--**decode 步驟主要是其 MoE 區塊**— routing + 兩個分組的 expert GEMM
-
-- 共享的 expert — 每個 token 運行一次
-  [memory-bound](../foundations/attention-efficiency.md) 體制，具有
-  每層 [all-reduce](../performance/distributed-training.md) 稅在頂部。 -**latency 是兩個附加軌道**：kernel 效率（保險絲 + 調諧）和
-  並發（跨流重疊）。他們是脫節的；測量並攻擊它們
-  分開，否則你會錯誤地制定工作預算。 -**Fusion 是 kernel 計數槓桿。**最大的單跨堆疊間隙是
-  _未熔斷的 routing_；最大的單一優化是*shared-experts fusion*
-  （~18%）。兩者都是在[kernels](kernels.md)頁面上進行量化的。 -**始終透過呼叫次數來衡量 kernel 的權重。**每次呼叫成本在於；便宜的
-  發射 60×（split-K 減少、殘餘添加、定量）的 kernel 可以超過
-  昂貴的一次發射。
+- **decode step 主要是它的 MoE block**——routing + 兩個 grouped expert GEMM + shared
+  expert，每 token 跑一次，處於 [memory-bound](../foundations/attention-efficiency.md)
+  狀態，外加每層的 [all-reduce](../performance/distributed-training.md) 稅。
+- **latency 是兩條可相加的軌道**：kernel 效率（fuse + tune）與並發（跨 stream 重疊）。
+  兩者互斥；要分開量測、分開攻擊，否則會把工作預算編錯。
+- **fusion 是 kernel-count 槓桿。** 跨堆疊單一最大差距是*未融合的 routing*；單一最大
+  的最佳化是 *shared-experts fusion*（~18%）。兩者都在 [kernels](kernels.md) 頁量化。
+- **永遠以呼叫次數加權來衡量 kernel。** 重點在單次呼叫成本 × 次數；一個便宜但被 launch
+  60× 的 kernel（split-K reduce、residual add、quant）可能勝過一個昂貴但只跑一次的。
 
 ## 練習
 
-!!! tip "解決方案"
-    參考解答位於 [解答頁](../solutions/moe.md) 上。請先嘗試每個練習，再展開解答。
+!!! tip "解答"
+    參考解答在 [解答頁](../solutions/moe.md)。請先自己試過每題再展開解答。
 
-1. 舞台佔 decode 掛鐘的 12%，但其 kernels 與 kernels 完全重疊
-   另一條溪流。最大端對端加速是多少
-   *無限*快？將你的答案與音軌 A/音軌 B 的分割相關聯。
-2. 路由的 GEMM1 約為步長的 15%，運行 60×； LM 頭約為 1% 並運行
-   一次。你可以將每次通話的費用減半。哪一個獲勝，又會帶來什麼
-   那是說以每次呼叫成本與總成本進行最佳化嗎？
-3. Shared-experts 融合刪除了單獨的 GEMM、活化、定量和殘差
-   增加（每個 ×61）約 18% 的勝利，但代價是稍大的路由排序 +
-   GEMM。寫出不等式（用 kernels 保存的與添加的工作術語），其中
-   這種融合是有利可圖的。
-4. 一堆自拍時間是其掛鐘的 111%；另一個是 96%。解釋一下
-   自拍時間如何超過掛鐘，以及*低於* 100% 的值意味著什麼
-   關於閒置間隙。
-5. Split-K 將一個 GEMM 變成一個計算 kernel + 一個縮減 kernel。鑑於
-   一層上每層 (×60) 減少一次火災，每層 decode 減少一次火災
-   其他，估計調用計數懲罰並爭論是否避免 split-K（通過
-   in-kernel K-accumulation）對於每層 GEMM 來說是值得的。
+1. 某 stage 佔 decode wall-clock 的 12%，但它的 kernel 與另一條 stream 完全重疊。若把它
+   變成*無限*快，端到端最大加速是多少？把你的答案對應到 Track A / Track B 的拆分。
+2. routed GEMM1 約佔一步 15% 且跑 60×；LM head 約 1% 且只跑一次。你能把任一者的單次呼叫
+   成本減半。哪個贏？這對「以單次呼叫成本 vs 總成本來最佳化」說明了什麼？
+3. shared-experts fusion 移除了獨立的 GEMM、activation、quant 與 residual add（各 ×61），
+   換得約 18% 的勝利，代價是略大的 routing sort + GEMM。用「省下的 kernel vs 多做的工作」
+   寫出這個 fusion 有利可圖的不等式。
+4. 一個堆疊的 self-time 是其 wall-clock 的 111%，另一個是 96%。解釋 self-time 為何能超過
+   wall-clock，以及*低於* 100% 的值對 idle 空檔代表什麼。
+5. split-K 把一個 GEMM 變成一個 compute kernel + 一個 reduce kernel。已知一個堆疊每層
+   （×60）做一次 reduce、另一個每次 decode 只做一次，估計呼叫次數的代價，並論證對每層的
+   GEMM 而言，用 in-kernel K-accumulation 避開 split-K 是否值得。
 
 ## 參考文獻
 
-- DeepSeek-AI。 _DeepSeek-V3 技術報告_（MLA、細粒度 + 共享 experts、FP8）。 2024 年。
-- 道等人。 _Flashattention_（操作員融合/IO 感知）。 2022 年。
-- 大風等人。 _MegaBlocks：高效率稀疏 training 與 experts 的混合。 _ 2022 年。
-- 阿姆達爾。 _實現大規模運算能力的單處理器方法的有效性。 _ 1967 年。
-- NVIDIA CUTLASS 和 SGLang serving 框架文件（分組 GEMM、雙流共享 expert 重疊）。 2024–2025。
+- DeepSeek-AI. _DeepSeek-V3 Technical Report_（MLA、fine-grained + shared experts、FP8）. 2024.
+- Dao et al. _FlashAttention_（operator fusion / IO-aware）. 2022.
+- Gale et al. _MegaBlocks: Efficient Sparse Training with Mixture-of-Experts_. 2022.
+- Amdahl. _Validity of the Single Processor Approach to Achieving Large-Scale Computing Capabilities_. 1967.
+- NVIDIA CUTLASS 與 SGLang serving 框架文件（grouped GEMM、dual-stream shared-expert overlap）. 2024–2025.

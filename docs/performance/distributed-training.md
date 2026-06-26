@@ -6,48 +6,88 @@
   <span class="chip"><strong>硬體：</strong> 多 GPU（概念適用於 1 個 GPU）</span>
 </div>
 
-前沿模型不適合單一 GPU－不適合它的參數，也不適合它的最佳化器
-狀態，而不是其啟動。分散式 training 是一組策略
-跨裝置分配工作，每個裝置都以**記憶體**換取**通訊**
-以不同的方式。本頁映射平行度尺寸（DP/TP/PP/SP/EP），
-ZeRO 分片以及下面的集合，並展示了它們如何組成
-訓練真實模型的「N 維並行性」—包括
-[expert parallelism](../moe/systems-ep.md) 是 MoE 的核心。
+前沿模型放不進單一 GPU－無論是它的參數、最佳化器
+狀態，還是它的 activation。分散式 training 是一組策略，
+把工作切分到多個裝置上，每種策略都以不同的方式用**通訊**
+換取**記憶體**。本頁梳理各個並行維度（DP/TP/PP/SP/EP）、
+ZeRO 分片以及底層的 collective，並展示它們如何組成
+訓練真實模型所需的「N 維並行性」—其中包含
+[expert parallelism](../moe/systems-ep.md)，它是 MoE 的核心。
 
-## 你必須知道的集體
+## 你必須知道的 collective
 
-所有並行性都是由少數集體通信原語建構的
+所有並行性都是由少數幾個 collective 通訊原語建構的
 （NVIDIA 上的 NCCL，AMD 上的 RCCL — 相同的 API）：
 
-| 集體                  | 它有什麼作用                             | 使用者            |
+| collective            | 它做什麼                                 | 使用者            |
 | --------------------- | ---------------------------------------- | ----------------- |
-| **all-reduce**        | 對各個等級的張量求和，每個人都會得到結果 | DP 梯度同步       |
-| **全員齊聚**          | 每個等級將所有碎片收集到完整的張量中     | 零，TP            |
-| **減少分散**          | 總和，則每個等級保留一個分片             | 零，TP            |
-| **all-to-all**        | 每個等級向每個其他等級發送一個不同的區塊 | **MoE 調度/合併** |
-| **廣播/P2P 發送接收** | 一對多/點對點                            | PP 階段切換       |
+| **all-reduce**        | 對各個 rank 的張量求和，每個 rank 都拿到結果 | DP 梯度同步       |
+| **all-gather**        | 每個 rank 把所有分片收集成完整的張量     | ZeRO、TP          |
+| **reduce-scatter**    | 先求和，再讓每個 rank 各保留一個分片     | ZeRO、TP          |
+| **all-to-all**        | 每個 rank 向其他每個 rank 各發送一個不同的區塊 | **MoE dispatch/combine** |
+| **broadcast/P2P send-recv** | 一對多／點對點                     | PP 階段切換       |
 
-關鍵標識：**all-reduce = 減少分散 + 全部聚集**。 ZeRO 利用了這一點
-以避免實現完全梯度。成本直覺（環形演算法）：
-$S$ 位元組中的 all-reduce 每個等級移動 $\approx 2S(G{-}1)/G$ 位元組 — 大致
-獨立於 $G$，這就是 DP 在頻寬上具有良好擴展性的原因。
+關鍵恆等式：**all-reduce = reduce-scatter + all-gather**。ZeRO 正是利用這點
+來避免實體化完整梯度。
 
-## 資料並行性 (DP) 和 ZeRO
+### Ring all-reduce 成本模型
 
-**資料並行性**：在每個 GPU 上複製模型，分割*批次*，並且
-all-reduce 漸變，因此每個副本更新相同。簡單且
-通訊輕量級，但每個 GPU 都儲存**完整**模型 + 梯度 +
-優化器狀態——記憶體牆。
+設一條訊息大小為 $M$ 位元組、跨 $N$ 個裝置做 ring all-reduce。ring
+演算法分成 reduce-scatter 與 all-gather 兩個階段，每階段各 $N-1$ 步，
+每步每個裝置送出／收進 $M/N$ 位元組，因此每個裝置總共
+送出／收進 $2\dfrac{N-1}{N}M$ 位元組。其時間約為
 
-**ZeRO**(DeepSpeed) /**FSDP**(PyTorch) 跨 DP 的冗餘狀態進行分片
-分三個階段分組：
+$$
+T_{\text{all-reduce}} \approx 2(N-1)\,\alpha \;+\; 2\,\frac{N-1}{N}\,\frac{M}{\beta},
+$$
 
--**ZeRO-1**：分片優化器狀態（最大的區塊 - Adam 的 fp32 時刻 + 主權重）。 -**ZeRO-2**：也是分片梯度。 -**ZeRO-3 / FSDP**：也是分片參數；每層的權重是
-所有人都及時聚集起來，進行前進/後退，然後釋放。
+其中 $M$ = 訊息位元組數，$N$ = 參與裝置數，$\alpha$ = 每一跳（per-hop）的
+延遲，$\beta$ = 每條鏈路的頻寬（位元組／秒）。延遲項隨 $N$ 線性成長，但
+頻寬項 $2\frac{N-1}{N}\frac{M}{\beta}\to 2\frac{M}{\beta}$ 在 $N$ 變大時趨於與
+$N$ 無關 — 這正是 ring all-reduce（以及建立其上的 DP）能在頻寬上良好擴展的原因。
 
-ZeRO-3 以額外的全聚集/減少分散為代價削減了每 GPU 記憶體 ~$G$×
-流量（與計算重疊）。這是訓練大密集的預設方式
-沒有模型手術的模型。
+## data parallelism (DP) 與 ZeRO
+
+**data parallelism**：在每個 GPU 上複製模型、切分*批次*，並對梯度做
+all-reduce，使每份副本更新到一致的權重。實作簡單、通訊量輕，
+但每個 GPU 都得儲存**完整**的模型 + 梯度 + 最佳化器狀態 — 撞上記憶體牆。
+
+### DP 的每步通訊量
+
+每一步反向傳播後，梯度 all-reduce 在每個裝置上搬移約
+
+$$
+2\,\frac{N-1}{N}\,P\,c \quad\text{位元組／裝置},
+$$
+
+其中 $N$ = DP 裝置數，$P$ = 參數數量，$c$ = 每個參數的位元組數
+（例如 fp16/bf16 時 $c=2$）。這一項與上面 ring all-reduce 的頻寬項
+（取 $M = Pc$）一致。實務上把這個 all-reduce 與反向傳播**重疊**
+（逐層 bucket）即可大致隱藏其成本。
+
+**ZeRO**(DeepSpeed) /**FSDP**(PyTorch) 把 DP 群組內的冗餘狀態分片，
+分為三個階段：
+
+- **ZeRO-1**：分片最佳化器狀態（最大的一塊 — Adam 的 fp32 矩 + master 權重）。
+- **ZeRO-2**：再加上分片梯度。
+- **ZeRO-3 / FSDP**：再加上分片參數；每層權重在 forward/backward 時即時
+  all-gather 起來，用完即釋放。
+
+### ZeRO 記憶體模型
+
+以 Adam 的混合精度訓練為例，每個參數的狀態約需 $16$ 位元組：fp16
+參數 $2$ + fp16 梯度 $2$ + fp32 的 master 權重／一階動量／二階變異數
+$4+4+4 = 12$。未分片時每 GPU 的這部分狀態為 $16P$ 位元組。ZeRO-1/2/3
+分別把最佳化器狀態／+梯度／+參數跨 $N$ 個裝置分片，因此在 stage 3 時
+每 GPU 狀態降為
+
+$$
+\frac{16P}{N} \quad\text{位元組},
+$$
+
+其中 $P$ = 參數數量、$N$ = DP（分片）裝置數。代價是額外的
+all-gather/reduce-scatter 流量（與計算重疊）。這是在不動模型結構
+的前提下，訓練大型 dense 模型的預設做法。
 
 ```mermaid
 flowchart LR
@@ -59,51 +99,77 @@ flowchart LR
     class Z3 flagship;
 ```
 
-每個階段的碎片逐漸增多，以交流換取記憶。
+每往後一個階段就多分片一類狀態，以通訊換取記憶體。
 
-## 張量並行性（TP）
+## tensor parallelism（TP）
 
-跨 GPU (Megatron-LM) 分割各**matmuls**。對於 FFN，將
-按列向上投影並按行向下投影；每個 GPU 計算一個
-切片，一個 all-reduce 組合每層的結果。對於 attention，分片為
-頭。
+跨 GPU 切分每個**matmul**（Megatron-LM）。對 FFN，把上投影按列切、
+下投影按行切；每個 GPU 算一個切片，再用一個 all-reduce 合併每層的結果。
+對 attention，則按 head 切分。
 
-- ✅ 減少每個 GPU 的參數記憶體**和**啟動記憶體；使
-  以一台設備來說層太大。
-- ❌ 大量通訊（all-reduce _每層內部_），因此保留
-  **節點內**透過快速 NVLink/Infinity Fabric。典型 TP 程度 = 每 GPU 數
-  節點（例如 8）。
+### TP 的每層通訊量
 
-## 管道並行性（PP）
+在 Megatron 式 TP 中，每個 transformer 層在 forward pass 需要 2 個
+all-reduce（attention 區塊與 MLP 區塊各一），backward pass 再多 2 個。
+每個 all-reduce 作用在大小約
 
-**按層**將模型拆分為不同 GPU 上的階段；啟動流程
-階段 → 階段（P2P）。天真的版本會閒置大多數 GPU（“泡沫”）；**微-
-批次**(GPipe) 和交錯時間表（1F1B、威震天交錯）收縮
-透過保持多個微批次的飛行來消除氣泡。
+$$
+b \cdot s \cdot H \cdot c \quad\text{位元組}
+$$
 
-- ✅ 低通訊（僅在階段邊界啟動），跨節點擴展。
-- ❌ 管道**泡沫**浪費計算；需要足夠的微批次來攤銷。
-  DeepSeek 的**DualPipe**是一個 PP 時間表，旨在隱藏 MoE all-to-all。
+的 activation 上，其中 $b$ = batch 大小、$s$ = 序列長度、$H$ = hidden 維度、
+$c$ = 每個元素的位元組數。由於每層、每方向都要對整塊 activation 做
+all-reduce，TP 是**頻寬密集**的。
 
-## 序列/上下文並行性（SP）
+- ✅ 同時降低每 GPU 的參數記憶體**與** activation 記憶體；讓單一裝置
+  放不下的層也能放下。
+- ❌ 通訊量大（_每層內部_都要 all-reduce），因此要透過快速的
+  NVLink / Infinity Fabric (xGMI) 把它**限制在節點內**。典型 TP 度數 =
+  每節點的 GPU 數（例如 8）。
 
-將**序列維度**分割到 GPU 上，以便每個 GPU 都包含 tokens 的一部份 —
-對於激活和 attention 計算增長的長上下文至關重要
-與 $N$。變體：Megatron 序列並行性（將 LayerNorm/dropout 分片）
-區域 TP 未命中），環 attention / 上下文並行性（分片 attention 本身，
-繞環傳遞 K/V 塊）。攻擊激活內存和 attention-
-來自 [Part I](../foundations/attention-efficiency.md) 的計算牆。
+## pipeline parallelism（PP）
 
-## expert 平行度 (EP) — MoE 維度
+**按層**把模型拆成放在不同 GPU 上的階段；activation 沿
+階段 → 階段流動（P2P）。天真版本會讓大多數 GPU 閒置（「bubble」）；
+**microbatch**(GPipe) 與交錯排程（1F1B、Megatron interleaved）藉由
+讓多個 microbatch 同時在管線中飛行來縮小 bubble。
 
-[Systems & EP](../moe/systems-ep.md) 中深入介紹：跨分片**experts**
-GPU；透過**all-to-all**將 tokens 路由到 expert 的 GPU。 EP 的獨特運用
-all-to-all（不是 all-reduce），並且它與其他組合。
+### bubble 比例
+
+設管線有 $p$ 個階段、每步餵入 $m$ 個 microbatch。填滿與排空管線分別
+需要 $p-1$ 個 microbatch 的時間，因此閒置時間占比為
+
+$$
+\text{bubble} = \frac{p-1}{m + p - 1},
+$$
+
+其中 $p$ = 管線階段數、$m$ = microbatch 數。提高 $m$ 即可壓低 bubble
+（$m \to \infty$ 時 bubble $\to 0$）。
+
+- ✅ 通訊量低（只在階段邊界傳 activation），可跨節點擴展。
+- ❌ 管線 **bubble** 浪費算力；需要足夠多的 microbatch 來攤銷。
+  DeepSeek 的 **DualPipe** 是一種專為隱藏 MoE all-to-all 而設計的 PP 排程。
+
+## sequence/context parallelism（SP）
+
+把**序列維度**切到多個 GPU 上，使每個 GPU 只持有一部分 tokens —
+對於 activation 與 attention 計算量隨序列長度增長的長上下文至關重要。
+變體：Megatron sequence parallelism（把 TP 未涵蓋區域的 LayerNorm/dropout
+也分片），以及 ring attention / context parallelism（分片 attention 本身，
+沿 ring 傳遞 K/V 區塊）。它攻克的是
+[Part I](../foundations/attention-efficiency.md) 中提到的 activation 記憶體牆與
+attention 計算牆。
+
+## expert parallelism (EP) — MoE 維度
+
+在 [Systems & EP](../moe/systems-ep.md) 中深入介紹：把**experts**分片到
+不同 GPU 上；透過 **all-to-all** 把 tokens 路由到持有對應 expert 的 GPU。
+EP 的獨特之處在於它使用 all-to-all（而非 all-reduce），且能與其他維度組合。
 
 ## 組合它們：N 維並行
 
-真實的 training 堆疊結合了維度，映射到網路拓撲上，以便
-最健談的集體乘坐最快的連結：
+真實的 training 堆疊會結合多個維度，並映射到網路拓撲上，讓
+通訊最頻繁的 collective 走在最快的鏈路上：
 
 ```mermaid
 flowchart TD
@@ -117,18 +183,17 @@ flowchart TD
     class EP flagship;
 ```
 
-從最外層到最內層讀取：DP/ZeRO 包裝所有內容（容忍慢速連結），
-然後跨節點進行 PP，然後將 TP 限制在節點的快速 NVLink，使用 expert
-並行性的核心是 all-to-all。
+由外而內讀：DP/ZeRO 包住一切（可容忍慢速鏈路），
+其次是跨節點的 PP，再把 TP 限制在節點內的快速 NVLink，最內層是
+以 all-to-all 為核心的 expert parallelism。
 
-經驗法則：**TP 節點內**（需要最大頻寬），**跨節點 PP 和 EP
-節點**，**DP/ZeRO 在外部**。為長上下文添加了 SP/CP。 MFU 你
-get 在很大程度上取決於正確的映射和重疊通信
-與計算。
+經驗法則：**TP 留在節點內**（需要最大頻寬），**PP 與 EP 跨節點**，
+**DP/ZeRO 放在最外層**。長上下文再疊加 SP/CP。你最終拿到的 MFU
+很大程度取決於是否做對了映射，以及是否把通訊與計算重疊。
 
 ## 一個最小的 DDP 範例
 
-最簡單的分佈式 training，用於接地：
+最簡單的分散式 training，用來建立直覺：
 
 ```python
 import torch, torch.distributed as dist
@@ -143,36 +208,37 @@ for x, y in sharded_loader:                      # each rank gets a batch slice
     opt.step(); opt.zero_grad()
 ```
 
-對於大型型號，你可以將 `DDP` 替換為**FSDP**(ZeRO-3)，並透過以下方式在 TP/PP/EP 上分層
-威震天-LM / DeepSpeed。
+對大型模型，把 `DDP` 換成 **FSDP**(ZeRO-3)，再透過 Megatron-LM / DeepSpeed
+在其上疊加 TP/PP/EP。
 
 ## 要點
 
-- 所有並行性均由**集體**建構；DP 使用 all-reduce，ZeRO/TP 使用
-  all-gather+reduce-scatter，**MoE 使用 all-to-all**，PP 使用 P2P。 -**ZeRO/FSDP**分片優化器/grad/param 狀態以打破 DP 記憶體牆；
-  **TP**分割 matmuls（節點內，comm-heavy）；**PP**分層（跨節點，
-  氣泡）；**SP/CP**分割長上下文的序列；**EP**拆分 experts。
-- 真實的 training 將這些組合成**N 維並行性**，映射為最健談的
-  集體使用最快的鏈接，通信重疊在計算後面。
+- 所有並行性都由 **collective** 建構：DP 用 all-reduce，ZeRO/TP 用
+  all-gather + reduce-scatter，**MoE 用 all-to-all**，PP 用 P2P。
+- **ZeRO/FSDP** 分片 optimizer/grad/param 狀態以打破 DP 記憶體牆；
+  **TP** 切分 matmul（節點內、通訊密集）；**PP** 按層切分（跨節點、有 bubble）；
+  **SP/CP** 切分長上下文的序列；**EP** 切分 experts。
+- 真實的 training 把這些組合成 **N 維並行性**，做映射讓通訊最頻繁的
+  collective 走最快的鏈路，並把通訊重疊在計算之後。
 
 ## 練習
 
 !!! tip "解決方案"
     參考解答位於 [解答頁](../solutions/performance.md) 上。請先嘗試每個練習，再展開解答。
 
-1. 顯示 all-reduce = reduce-scatter + all-gather 並用它來解釋 ZeRO-2 的
-   通訊量與普通 DDP 的比較。
-2. 對於使用 Adam 的 bf16 中的 70B 模型，在 DDP 與 ZeRO-1/2/3 下計算每個 GPU 內存
-   在 8 個 GPU 上。
-3. 估算 $P$ 級和 $m$ 微批次的管道氣泡分數；
-   多少微批次才能保持在 10% 以下？
-4. 為什麼 TP 可以保留在節點內，而 EP 可以跨節點？與每層通訊相關
-   容量和鏈路頻寬。
+1. 證明 all-reduce = reduce-scatter + all-gather，並用它說明 ZeRO-2 的
+   通訊量與普通 DDP 相比如何。
+2. 對一個用 Adam、以 bf16 訓練的 70B 模型，計算在 8 個 GPU 上 DDP 與
+   ZeRO-1/2/3 各自的每 GPU 記憶體（提示：用 $16P/N$ 的 ZeRO 記憶體模型）。
+3. 用 $\text{bubble} = \frac{p-1}{m+p-1}$ 估算 $p$ 階段、$m$ 個 microbatch 的
+   管線 bubble 比例；要多少個 microbatch 才能把它壓到 10% 以下？
+4. 為什麼 TP 該留在節點內，而 EP 可以跨節點？請用每層通訊量
+   與鏈路頻寬來論證。
 
 ## 參考文獻
 
-- Shoeybi 等人。 _威震天-LM。 _ 2019；納拉亞南等人。 _GPU 叢集上的高效大規模 LM training。 _ 2021。
-- 拉傑班達裡等人*ZeRO。 * 2020；趙等人。 _PyTorch FSDP。 _ 2023。
-- 黃等人*GPipe。 * 2019。
-- 劉等人*戒指 attention。 * 2023；科蒂坎蒂等人。 _序列並行/激活重新計算。 _ 2022。
-- DeepSeek-AI。 _DeepSeek-V3 / DualPipe。 _ 2024 年。
+- Shoeybi 等人。 _Megatron-LM。_ 2019；Narayanan 等人。 _Efficient Large-Scale LM Training on GPU Clusters。_ 2021。
+- Rajbhandari 等人。 _ZeRO。_ 2020；Zhao 等人。 _PyTorch FSDP。_ 2023。
+- Huang 等人。 _GPipe。_ 2019。
+- Liu 等人。 _Ring Attention。_ 2023；Korthikanti 等人。 _Sequence Parallelism / Activation Recomputation。_ 2022。
+- DeepSeek-AI。 _DeepSeek-V3 / DualPipe。_ 2024。

@@ -1,41 +1,42 @@
 ---
 hide:
-  - navigation
   - toc
 ---
 
-<section class="home-hero" markdown>
-<div class="home-hero__copy" markdown>
+<section class="home-hero" markdown="0">
+<div class="home-hero__copy">
 
-<p class="home-kicker">ML 系統效能路線</p>
+<p class="home-kicker">深核手冊 · ML 系統效能路線</p>
 
-# 從模型到 GPU kernel 的完整效能手冊
+<h1 class="home-title">從模型，一路看穿到 <span class="home-title__hl">GPU Kernel</span></h1>
 
-現代機器學習已經是系統工程。理解 Transformer 的數學只是起點；真正
-決定模型能不能被有效部署的，是 FLOPs、記憶體流量、kernel、collective、
-量化格式，以及這些選擇在 GPU 上互相牽制的方式。
+<p class="home-lead">現代機器學習就是系統工程。決定模型能不能被高效部署的，是 FLOPs、記憶體流量、kernel、collective 與量化格式，以及它們在 GPU 上彼此牽制的方式。</p>
 
-這份手冊把每個核心主題拆成**直覺 → 數學 → 參考實作 → 效能化版本**。
-你會看到乾淨的 PyTorch/Triton/CUDA/HIP 版本，也會看到實際 profiling
-如何指出瓶頸，最後如何把瓶頸對應回可修改的原始碼。
+<p class="home-sub">每個核心主題都拆成「直覺 → 數學 → 參考實作 → 效能化版本」，並把 profiling 結果一路對應回可以修改的原始碼。</p>
 
-<div class="home-actions" markdown>
-[開始閱讀路線 :material-arrow-right:](reading-path.md){ .md-button .md-button--primary }
-[查看 AITER 深入解析](aiter/index.md){ .md-button }
+<div class="home-actions">
+<a class="md-button md-button--primary" href="reading-path/">開始閱讀路線&nbsp;→</a>
+<a class="md-button" href="aiter/">AITER 深入解析</a>
 </div>
 
+<ul class="home-points">
+<li><span>📖</span> 從共同語彙到 roofline，先建立分析直覺</li>
+<li><span>🛰️</span> 每個結論都能回到 trace、kernel 與 shape</li>
+<li><span>🧩</span> 從 profiling bucket 直接跳到可 tune 的程式碼</li>
+</ul>
+
 </div>
 
-<div class="home-hero__panel" aria-label="Course scope" markdown="0">
-<div class="home-kicker">核心深挖</div>
-<div class="home-panel-title">Kimi-K2.5 · MoE · AITER</div>
-<div class="home-panel-copy">從 routing、top-k、sort、MXFP4 quant 到 stage-1 / stage-2 MoE GEMM，使用真實 decode trace 串起整條執行路徑。</div>
+<aside class="home-hero__panel" aria-label="核心深挖">
+<div class="home-panel__eyebrow">核心深挖</div>
+<div class="home-panel__title">Kimi-K2.5 · MoE · AITER</div>
+<p class="home-panel__copy">從 routing、top-k、sort、MXFP4 quant 到 stage-1 / stage-2 MoE GEMM，使用真實 decode trace 串起整條執行路徑。</p>
 <div class="home-metrics">
-<div><strong>5</strong><span>主題部件</span></div>
-<div><strong>25</strong><span>decode stages</span></div>
-<div><strong>TP4</strong><span>MI355X 追蹤</span></div>
+<div class="home-metric"><strong>5</strong><span>主題部件</span></div>
+<div class="home-metric"><strong>25</strong><span>decode stages</span></div>
+<div class="home-metric"><strong>TP4</strong><span>MI355X 追蹤</span></div>
 </div>
-</div>
+</aside>
 </section>
 
 ---

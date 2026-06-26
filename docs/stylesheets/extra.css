@@ -1,25 +1,43 @@
-/* ML Perf Handbook - visual system on top of Material defaults. */
+/* ============================================================================
+   深核手冊 — visual system on top of Material for MkDocs.
+   Sections:
+     1. Design tokens (light + slate)
+     2. Diagram tokens (Mermaid / roofline)
+     3. Base layout & typography
+     4. Header, tabs & sidebar navigation
+     5. Cards, buttons, tables, figures
+     6. Homepage (hero, curriculum, stats)
+     7. Mermaid SVG theming  (tuned — kept intact)
+     8. Admonitions, code, roofline, badges, settings  (kept intact)
+     9. Responsive
+   ========================================================================== */
 
+/* ---------- 1. Design tokens --------------------------------------------- */
 :root {
   --md-code-font: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+
   --ml-accent-warm: #f59e0b;
-  --ml-accent-cool: #2563eb;
-  --ml-accent-blue: #4f46e5;
+  --ml-accent-cool: #4f46e5;
+  --ml-accent-blue: #6366f1;
+  --ml-accent-teal: #0d9488;
   --ml-accent-soft: #eef2ff;
-  --ml-surface: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 94%,
-    var(--ml-accent-cool) 6%
-  );
-  --ml-surface-strong: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 88%,
-    var(--ml-accent-blue) 12%
-  );
-  --ml-border: color-mix(in srgb, var(--md-default-fg-color) 15%, transparent);
-  --ml-shadow: 0 0.5rem 1.35rem rgba(15, 23, 42, 0.08);
-  --ml-shadow-strong: 0 0.8rem 2rem rgba(15, 23, 42, 0.13);
-  --ml-radius: 0.45rem;
+
+  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 94%, var(--ml-accent-cool) 6%);
+  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 88%, var(--ml-accent-blue) 12%);
+  --ml-border: color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
+  --ml-border-strong: color-mix(in srgb, var(--md-default-fg-color) 22%, transparent);
+
+  --ml-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --ml-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 18px rgba(15, 23, 42, 0.07);
+  --ml-shadow-strong: 0 2px 6px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.13);
+
+  --ml-radius: 14px;
+  --ml-radius-sm: 9px;
+  --ml-radius-lg: 22px;
+
+  --ml-gradient: linear-gradient(135deg, var(--ml-accent-cool), var(--ml-accent-teal));
+
+  /* Diagram palette (light) */
   --ml-diagram-bg: color-mix(in srgb, var(--md-default-bg-color) 96%, white 4%);
   --ml-diagram-node-bg: #ffffff;
   --ml-diagram-node-muted-bg: #eef2f7;
@@ -28,11 +46,7 @@
   --ml-diagram-edge: #475569;
   --ml-diagram-text: #111827;
   --ml-diagram-muted-text: #475569;
-  --ml-diagram-label-bg: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 92%,
-    white 8%
-  );
+  --ml-diagram-label-bg: color-mix(in srgb, var(--md-default-bg-color) 92%, white 8%);
   --ml-diagram-cluster-bg: rgba(15, 118, 110, 0.08);
   --ml-diagram-cluster-stroke: rgba(15, 118, 110, 0.42);
   --ml-diagram-accent-bg: #ede9fe;
@@ -45,27 +59,22 @@
 
 [data-md-color-scheme="slate"] {
   --ml-accent-warm: #fbbf24;
-  --ml-accent-cool: #60a5fa;
-  --ml-accent-blue: #818cf8;
+  --ml-accent-cool: #818cf8;
+  --ml-accent-blue: #a5b4fc;
+  --ml-accent-teal: #2dd4bf;
   --ml-accent-soft: #1e293b;
-  --ml-surface: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 88%,
-    var(--ml-accent-cool) 12%
-  );
-  --ml-surface-strong: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 80%,
-    var(--ml-accent-blue) 20%
-  );
-  --ml-border: color-mix(in srgb, var(--md-default-fg-color) 22%, transparent);
-  --ml-shadow: 0 0.55rem 1.6rem rgba(0, 0, 0, 0.22);
-  --ml-shadow-strong: 0 1rem 2.4rem rgba(0, 0, 0, 0.28);
-  --ml-diagram-bg: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 88%,
-    #ffffff 12%
-  );
+
+  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 86%, var(--ml-accent-cool) 14%);
+  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 78%, var(--ml-accent-blue) 22%);
+  --ml-border: color-mix(in srgb, var(--md-default-fg-color) 18%, transparent);
+  --ml-border-strong: color-mix(in srgb, var(--md-default-fg-color) 30%, transparent);
+
+  --ml-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --ml-shadow: 0 2px 6px rgba(0, 0, 0, 0.25), 0 10px 28px rgba(0, 0, 0, 0.3);
+  --ml-shadow-strong: 0 4px 10px rgba(0, 0, 0, 0.3), 0 20px 48px rgba(0, 0, 0, 0.4);
+
+  /* Diagram palette (dark) */
+  --ml-diagram-bg: color-mix(in srgb, var(--md-default-bg-color) 88%, #ffffff 12%);
   --ml-diagram-node-bg: #182335;
   --ml-diagram-node-muted-bg: #263244;
   --ml-diagram-node-stroke: #2dd4bf;
@@ -82,6 +91,19 @@
   --ml-roofline-start: #2dd4bf;
   --ml-roofline-mid: #60a5fa;
   --ml-roofline-end: #fbbf24;
+}
+
+/* Brand-tinted primary so the header/links match the new accent. */
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #4f46e5;
+  --md-primary-fg-color--light: #6366f1;
+  --md-primary-fg-color--dark: #4338ca;
+  --md-accent-fg-color: #0d9488;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #4f46e5;
+  --md-accent-fg-color: #2dd4bf;
 }
 
 /* Dark-theme Mermaid colors compatible with a black page background. */
@@ -102,25 +124,27 @@
   --ml-diagram-accent-text: #f8fafc;
 }
 
-/* Slightly wider content column for math + code heavy pages. */
+/* ---------- 3. Base layout & typography ---------------------------------- */
 .md-grid {
-  max-width: 78rem;
+  max-width: 80rem;
 }
 
 .md-main {
-  background: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 95%,
-    var(--ml-accent-soft) 5%
-  );
+  background:
+    radial-gradient(60rem 40rem at 100% -10%, color-mix(in srgb, var(--ml-accent-cool) 7%, transparent), transparent 60%),
+    color-mix(in srgb, var(--md-default-bg-color) 97%, var(--ml-accent-soft) 3%);
 }
 
 .md-main__inner {
-  margin-top: 1.2rem;
+  margin-top: 1.4rem;
 }
 
 .md-content__inner {
-  padding-top: 0.2rem;
+  padding-top: 0.4rem;
+}
+
+.md-content__inner > :first-child {
+  margin-top: 0;
 }
 
 .md-typeset {
@@ -129,23 +153,28 @@
 }
 
 .md-typeset h1 {
-  max-width: 24ch;
-  margin-bottom: 0.4rem;
+  max-width: 26ch;
+  margin-bottom: 0.5rem;
   color: var(--md-default-fg-color);
   font-weight: 800;
-  letter-spacing: 0;
+  letter-spacing: -0.01em;
 }
 
 .md-typeset h2 {
-  margin-top: 2.4em;
-  padding-top: 0.75rem;
+  margin-top: 2.6em;
+  padding-top: 0.8rem;
   border-top: 1px solid var(--ml-border);
-  letter-spacing: 0;
+  font-weight: 750;
+  letter-spacing: -0.005em;
 }
 
 .md-typeset h3 {
-  color: var(--ml-accent-cool);
-  letter-spacing: 0;
+  color: var(--md-default-fg-color);
+  font-weight: 700;
+}
+
+.md-typeset h2 + h3 {
+  margin-top: 1.1em;
 }
 
 .md-typeset p,
@@ -154,13 +183,18 @@
 }
 
 .md-typeset a {
+  color: var(--ml-accent-cool);
   text-underline-offset: 0.18em;
   text-decoration-thickness: 0.06em;
+  transition: color 120ms ease;
+}
+.md-typeset a:hover {
+  color: var(--md-accent-fg-color);
 }
 
 .md-typeset blockquote {
   border-left: 0.18rem solid var(--ml-accent-cool);
-  border-radius: 0 var(--ml-radius) var(--ml-radius) 0;
+  border-radius: 0 var(--ml-radius-sm) var(--ml-radius-sm) 0;
   background: var(--ml-surface);
   padding: 0.6rem 0.9rem;
 }
@@ -181,12 +215,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin: 0.6rem 0 1.2rem 0;
+  margin: 0.6rem 0 1.4rem 0;
   font-size: 0.72rem;
 }
 .page-meta .chip {
-  border-radius: 0.35rem;
-  padding: 0.16rem 0.65rem;
+  border-radius: 999rem;
+  padding: 0.18rem 0.7rem;
   border: 1px solid var(--ml-border);
   background: var(--ml-surface);
   color: var(--md-default-fg-color--light);
@@ -197,65 +231,140 @@
   font-weight: 600;
 }
 
-/* Cards, tables, figures, and diagrams. */
-.md-typeset .grid.cards > :is(ul, ol) > li,
-.md-typeset .md-button,
-.md-typeset .admonition,
-.md-typeset details {
-  border-radius: var(--ml-radius);
+/* ---------- 4. Header, tabs & sidebar navigation ------------------------- */
+.md-header {
+  border-bottom: 1px solid var(--ml-border);
+  background-color: color-mix(in srgb, var(--md-default-bg-color) 80%, transparent);
+  color: var(--md-default-fg-color);
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  box-shadow: none;
 }
 
+[data-md-color-scheme] .md-header,
+[data-md-color-scheme] .md-tabs {
+  color: var(--md-default-fg-color);
+}
+
+.md-header__title {
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.md-header__topic .md-ellipsis {
+  font-size: 0.92rem;
+}
+
+/* Sidebar: roomier, rounded active pills, clearer hierarchy. */
+.md-nav {
+  font-size: 0.72rem;
+}
+
+.md-nav__title {
+  color: var(--md-default-fg-color--light);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.md-nav__item .md-nav__link {
+  border-radius: 0.5rem;
+  padding: 0.32rem 0.6rem;
+  margin: 0.06rem 0;
+  transition: background-color 130ms ease, color 130ms ease;
+}
+
+.md-nav__link:hover {
+  background: var(--ml-surface);
+  color: var(--md-default-fg-color);
+}
+
+.md-nav__link--active,
+.md-nav__link[aria-current="page"] {
+  background: color-mix(in srgb, var(--ml-accent-cool) 14%, transparent);
+  color: var(--ml-accent-cool) !important;
+  font-weight: 700;
+}
+
+/* Top-level section labels in the sidebar read as quiet group headers. */
+.md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link {
+  font-weight: 700;
+  color: var(--md-default-fg-color);
+}
+
+.md-sidebar__scrollwrap::-webkit-scrollbar {
+  width: 0.3rem;
+}
+.md-sidebar__scrollwrap::-webkit-scrollbar-thumb {
+  background: var(--ml-border-strong);
+  border-radius: 999rem;
+}
+
+/* TOC active marker */
+.md-nav--secondary .md-nav__link--active {
+  background: transparent;
+  color: var(--ml-accent-cool) !important;
+}
+
+/* ---------- 5. Cards, buttons, tables, figures --------------------------- */
 .md-typeset .grid.cards > :is(ul, ol) > li {
-  border-color: var(--ml-border);
-  background: linear-gradient(
-    180deg,
-    color-mix(
-      in srgb,
-      var(--md-default-bg-color) 96%,
-      var(--ml-accent-cool) 4%
-    ),
-    var(--md-default-bg-color)
-  );
-  box-shadow: var(--ml-shadow);
-  transition: transform 160ms ease, box-shadow 160ms ease,
-    border-color 160ms ease;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius);
+  padding: 1rem 1.1rem;
+  background: var(--md-default-bg-color);
+  box-shadow: var(--ml-shadow-sm);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
 .md-typeset .grid.cards > :is(ul, ol) > li:hover {
   border-color: color-mix(in srgb, var(--ml-accent-cool) 45%, var(--ml-border));
-  box-shadow: var(--ml-shadow-strong);
-  transform: translateY(-2px);
+  box-shadow: var(--ml-shadow);
+  transform: translateY(-3px);
+}
+
+.md-typeset .grid.cards > :is(ul, ol) > li > :first-child {
+  color: var(--ml-accent-cool);
 }
 
 .md-typeset .md-button {
-  border-radius: 0.4rem;
+  border-radius: 999rem;
+  padding: 0.42rem 1.1rem;
+  font-weight: 650;
   box-shadow: none;
+  border-width: 1px;
   transition: background-color 140ms ease, border-color 140ms ease,
-    color 140ms ease, transform 140ms ease;
+    color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
 }
 
 .md-typeset .md-button:hover {
   transform: translateY(-1px);
+  box-shadow: var(--ml-shadow-sm);
 }
 
 .md-typeset .md-button--primary {
-  background-color: var(--ml-accent-cool);
-  border-color: var(--ml-accent-cool);
+  background: var(--ml-gradient);
+  border-color: transparent;
   color: #fff;
+}
+.md-typeset .md-button--primary:hover {
+  color: #fff;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--ml-accent-cool) 40%, transparent);
 }
 
 .md-typeset__table {
   display: block;
-  margin: 1.1rem 0;
+  margin: 1.2rem 0;
   overflow-x: auto;
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-radius);
-  box-shadow: var(--ml-shadow);
+  box-shadow: var(--ml-shadow-sm);
 }
 
 .md-typeset table:not([class]) {
   display: table;
   margin: 0;
+  border: 0;
 }
 
 .md-typeset table:not([class]) th {
@@ -269,8 +378,12 @@
   border-color: var(--ml-border);
 }
 
+.md-typeset table:not([class]) tr:hover td {
+  background: color-mix(in srgb, var(--ml-accent-cool) 5%, transparent);
+}
+
 figure {
-  margin: 1.5rem auto;
+  margin: 1.6rem auto;
 }
 
 .md-typeset figure:not(.roofline-figure) > :is(img, svg) {
@@ -278,20 +391,312 @@ figure {
   max-width: 100%;
   height: auto;
   margin: 0 auto;
-  padding: 0.6rem;
+  padding: 0.7rem;
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-radius);
   background: var(--ml-diagram-bg);
-  box-shadow: var(--ml-shadow);
+  box-shadow: var(--ml-shadow-sm);
 }
 
 figure > figcaption {
   font-size: 0.78rem;
   color: var(--md-default-fg-color--light);
   text-align: center;
-  margin-top: 0.45rem;
+  margin-top: 0.5rem;
 }
 
+/* ---------- 6. Homepage -------------------------------------------------- */
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(17rem, 0.85fr);
+  gap: clamp(1.2rem, 3vw, 2.2rem);
+  align-items: center;
+  margin: 0.2rem 0 2.4rem;
+  padding: clamp(1.6rem, 4vw, 2.8rem);
+  overflow: hidden;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius-lg);
+  box-shadow: var(--ml-shadow);
+  background:
+    radial-gradient(38rem 26rem at -5% -20%, color-mix(in srgb, var(--ml-accent-cool) 22%, transparent), transparent 55%),
+    radial-gradient(34rem 24rem at 110% 120%, color-mix(in srgb, var(--ml-accent-teal) 18%, transparent), transparent 55%),
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--ml-accent-cool) 7%, var(--md-default-bg-color)),
+      color-mix(in srgb, var(--ml-accent-warm) 6%, var(--md-default-bg-color)));
+}
+
+.home-hero__copy {
+  min-width: 0;
+}
+
+.home-kicker {
+  margin: 0 0 0.7rem;
+  color: var(--ml-accent-cool);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-title {
+  max-width: 18ch;
+  margin: 0 0 0.9rem;
+  font-size: clamp(1.85rem, 1rem + 2.6vw, 3rem);
+  font-weight: 850;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  color: var(--md-default-fg-color);
+}
+
+.home-title__hl {
+  background: var(--ml-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  white-space: nowrap;
+}
+
+.home-lead {
+  max-width: 56ch;
+  margin: 0 0 0.7rem;
+  color: var(--md-default-fg-color);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.home-sub {
+  max-width: 56ch;
+  margin: 0;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 1.3rem 0 0;
+}
+
+.home-actions .md-button {
+  margin: 0;
+}
+
+.home-points {
+  list-style: none;
+  margin: 1.4rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.home-points li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: none;
+  font-size: 0.8rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.home-points li span {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 0.55rem;
+  background: var(--ml-surface);
+  border: 1px solid var(--ml-border);
+  font-size: 0.85rem;
+}
+
+/* Hero side panel — a "spec sheet" card. */
+.home-hero__panel {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.3rem;
+  border: 1px solid var(--ml-border-strong);
+  border-radius: var(--ml-radius);
+  color: #f8fafc;
+  overflow: hidden;
+  background:
+    linear-gradient(155deg, #1e1b4b, #0f172a 60%, #042f2e);
+  box-shadow: var(--ml-shadow-strong);
+}
+
+.home-hero__panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in srgb, #fff 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, #fff 8%, transparent) 1px, transparent 1px);
+  background-size: 1.4rem 1.4rem;
+  mask-image: radial-gradient(120% 80% at 80% 0%, #000, transparent 75%);
+  -webkit-mask-image: radial-gradient(120% 80% at 80% 0%, #000, transparent 75%);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.home-hero__panel > * {
+  position: relative;
+}
+
+.home-panel__eyebrow {
+  color: #a5b4fc;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.home-panel__title {
+  margin: 0.35rem 0 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #fff;
+}
+
+.home-panel__copy {
+  margin: 0.6rem 0 1.1rem;
+  max-width: none;
+  color: #cbd5e1;
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.home-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.home-metric {
+  min-width: 0;
+  padding: 0.6rem 0.5rem;
+  border: 1px solid color-mix(in srgb, #fff 14%, transparent);
+  border-radius: var(--ml-radius-sm);
+  background: color-mix(in srgb, #fff 6%, transparent);
+  text-align: center;
+}
+
+.home-metric strong {
+  display: block;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #fff;
+}
+
+.home-metric span {
+  display: block;
+  margin-top: 0.3rem;
+  color: #94a3b8;
+  font-size: 0.58rem;
+  line-height: 1.25;
+}
+
+/* Curriculum map cards. */
+.curriculum-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin: 1.2rem 0 1.4rem;
+}
+
+.curriculum-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 13rem;
+  padding: 1.15rem;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius);
+  background: var(--md-default-bg-color);
+  box-shadow: var(--ml-shadow-sm);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.curriculum-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--ml-accent-cool) 40%, var(--ml-border));
+  box-shadow: var(--ml-shadow);
+}
+
+.curriculum-card--feature {
+  border-color: color-mix(in srgb, var(--ml-accent-cool) 40%, var(--ml-border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--ml-accent-cool) 9%, var(--md-default-bg-color)), var(--md-default-bg-color));
+}
+
+.curriculum-card__eyebrow {
+  color: var(--ml-accent-cool);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.curriculum-card h3 {
+  margin: 0.4rem 0 0.4rem;
+  color: var(--md-default-fg-color);
+}
+
+.curriculum-card > p {
+  margin: 0;
+  max-width: none;
+}
+
+.curriculum-card h3 + p {
+  flex: 1;
+  margin: 0 0 0.95rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.curriculum-card .md-button {
+  align-self: flex-start;
+  margin: 0;
+}
+
+/* "Recent highlights" stat strip. */
+.ml-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 1rem 0;
+}
+
+.ml-stat {
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius);
+  background: var(--ml-surface);
+  box-shadow: var(--ml-shadow-sm);
+}
+
+.ml-stat strong {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ml-accent-cool);
+}
+
+.ml-stat span {
+  display: block;
+  margin-top: 0.4rem;
+  max-width: none;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+/* ---------- 7. Mermaid SVG theming (kept intact) ------------------------- */
 .md-typeset .mermaid {
   /* Material renders Mermaid SVGs in a shadow root; these variables are what
      its injected Mermaid themeCSS can inherit from the host element. */
@@ -327,194 +732,8 @@ figure > figcaption {
   border-radius: var(--ml-radius);
   background: var(--ml-diagram-bg);
   color: var(--ml-diagram-text);
-  box-shadow: var(--ml-shadow);
+  box-shadow: var(--ml-shadow-sm);
   overflow-x: auto;
-}
-
-/* Homepage. */
-.home-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(16rem, 0.85fr);
-  gap: clamp(1rem, 4vw, 2.4rem);
-  align-items: stretch;
-  margin: 0.4rem 0 2.2rem;
-  padding: clamp(1rem, 3vw, 1.6rem) 0 0.6rem;
-}
-
-.home-hero__copy {
-  min-width: 0;
-}
-
-.home-hero .md-typeset h1,
-.home-hero h1 {
-  max-width: 13ch;
-  margin: 0 0 0.75rem;
-  font-size: clamp(2.15rem, 5.6vw, 4.1rem);
-  line-height: 0.98;
-}
-
-.home-hero p {
-  max-width: 62ch;
-  margin-bottom: 0.85rem;
-  color: var(--md-default-fg-color--light);
-  font-size: 0.9rem;
-}
-
-.home-actions {
-  margin-top: 1.15rem;
-}
-
-.home-actions p {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  margin: 0;
-}
-
-.home-hero__panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 17rem;
-  padding: 1rem;
-  border: 1px solid var(--ml-border);
-  border-radius: var(--ml-radius);
-  background: linear-gradient(
-      135deg,
-      color-mix(
-        in srgb,
-        var(--md-default-bg-color) 72%,
-        var(--ml-accent-cool) 28%
-      ),
-      color-mix(
-        in srgb,
-        var(--md-default-bg-color) 86%,
-        var(--ml-accent-blue) 14%
-      )
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0,
-      transparent 1.4rem,
-      color-mix(in srgb, var(--md-default-fg-color) 7%, transparent) 1.4rem,
-      color-mix(in srgb, var(--md-default-fg-color) 7%, transparent) 1.45rem
-    );
-  background-blend-mode: normal;
-  box-shadow: var(--ml-shadow);
-}
-
-.home-kicker,
-.curriculum-card__eyebrow {
-  color: var(--ml-accent-cool);
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.home-panel-title {
-  max-width: 12ch;
-  margin-top: 0.35rem;
-  color: var(--md-default-fg-color);
-  font-size: 1.45rem;
-  font-weight: 800;
-  line-height: 1.05;
-}
-
-.home-panel-copy {
-  max-width: 28ch;
-  margin: 0.75rem 0 1.1rem;
-  color: var(--md-default-fg-color--light);
-  font-size: 0.78rem;
-  line-height: 1.55;
-}
-
-.home-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-
-.home-metrics div {
-  min-width: 0;
-  padding: 0.55rem;
-  border: 1px solid var(--ml-border);
-  border-radius: 0.35rem;
-  background: color-mix(in srgb, var(--md-default-bg-color) 82%, transparent);
-}
-
-.home-metrics strong {
-  display: block;
-  color: var(--md-default-fg-color);
-  font-size: 1.15rem;
-  line-height: 1;
-}
-
-.home-metrics span {
-  display: block;
-  margin-top: 0.2rem;
-  color: var(--md-default-fg-color--light);
-  font-size: 0.58rem;
-  line-height: 1.2;
-}
-
-.curriculum-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin: 1rem 0 1.2rem;
-}
-
-.curriculum-card {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 13rem;
-  padding: 0.9rem;
-  border: 1px solid var(--ml-border);
-  border-radius: var(--ml-radius);
-  background: var(--md-default-bg-color);
-  box-shadow: var(--ml-shadow);
-}
-
-.curriculum-card--feature {
-  border-color: color-mix(in srgb, var(--ml-accent-cool) 48%, var(--ml-border));
-  background: linear-gradient(
-    180deg,
-    color-mix(
-      in srgb,
-      var(--md-default-bg-color) 90%,
-      var(--ml-accent-cool) 10%
-    ),
-    var(--md-default-bg-color)
-  );
-}
-
-.curriculum-card h3 {
-  margin: 0.35rem 0 0.35rem;
-  color: var(--md-default-fg-color);
-}
-
-.curriculum-card > p {
-  margin: 0;
-}
-
-.curriculum-card > p:first-child {
-  margin-bottom: 0.35rem;
-}
-
-.curriculum-card h3 + p {
-  flex: 1;
-  margin: 0 0 0.85rem;
-  color: var(--md-default-fg-color--light);
-}
-
-.curriculum-card > p:last-child {
-  margin-top: auto;
-}
-
-.curriculum-card .md-button {
-  align-self: flex-start;
 }
 
 .md-typeset .mermaid svg {
@@ -827,15 +1046,13 @@ figure > figcaption {
   --ml-acc-text: #f8fafc;
 }
 
-/* Tighten admonition / details spacing and align body text with the title.
-   Material indents the title past its icon (~2.5rem) but leaves body content at
-   the container padding, so the body juts left of the title and the title→body
-   gap is loose. These rules hug the content and line the body up under the
-   title text, uniformly across every callout type and collapsible. */
+/* ---------- 8. Admonitions, code, roofline, badges, settings ------------- */
+/* Tighten admonition / details spacing and align body text with the title. */
 .md-typeset .admonition,
 .md-typeset details {
   border-width: 0;
-  box-shadow: var(--ml-shadow);
+  border-radius: var(--ml-radius);
+  box-shadow: var(--ml-shadow-sm);
   border-left: 0.18rem solid
     color-mix(in srgb, var(--md-accent-fg-color) 58%, var(--ml-accent-warm));
   padding: 0 0.75rem 0.6rem;
@@ -850,15 +1067,11 @@ figure > figcaption {
   line-height: 1.5;
 }
 
-/* The global `p { max-width: 72ch }` cap also hits the title bar (a <p>) and
-   body paragraphs, so the colored title stops short and leaves empty space on
-   the right of wide boxes. Let callout content span the full box width. */
 .md-typeset .admonition :is(p, li),
 .md-typeset details :is(p, li) {
   max-width: none;
 }
 
-/* Body content: align under the title text and drop the doubled edge gaps. */
 .md-typeset .admonition > :not(.admonition-title):not(style),
 .md-typeset details > :not(summary):not(style) {
   margin-left: 1rem;
@@ -877,15 +1090,14 @@ figure > figcaption {
 
 .md-typeset .highlight {
   border-radius: var(--ml-radius);
-  box-shadow: var(--ml-shadow);
+  box-shadow: var(--ml-shadow-sm);
 }
 
 .md-typeset pre > code {
   border-radius: var(--ml-radius);
 }
 
-/* Keep wide content (code, tables, math, diagrams) inside the viewport:
-   scroll horizontally within the block instead of widening the page. */
+/* Keep wide content (code, tables, math, diagrams) inside the viewport. */
 .md-typeset pre,
 .md-typeset .highlighttable,
 .md-typeset .highlight pre {
@@ -896,6 +1108,7 @@ figure > figcaption {
 .md-typeset :not(pre) > code {
   overflow-wrap: anywhere;
   word-break: break-word;
+  border-radius: 0.3rem;
 }
 
 .md-typeset .md-typeset__scrollwrap,
@@ -1011,8 +1224,8 @@ figure > figcaption {
   display: inline-block;
   font-size: 0.7rem;
   font-weight: 700;
-  border-radius: 4px;
-  padding: 0.05rem 0.45rem;
+  border-radius: 999rem;
+  padding: 0.05rem 0.55rem;
   vertical-align: middle;
 }
 .status-badge.wip {
@@ -1024,257 +1237,18 @@ figure > figcaption {
   color: #fff;
 }
 
-@media screen and (max-width: 44.984rem) {
-  .md-main__inner {
-    margin-top: 0.4rem;
-  }
-
-  .md-typeset h1 {
-    max-width: none;
-    font-size: 1.9rem;
-  }
-
-  .home-hero {
-    grid-template-columns: 1fr;
-    margin-top: 0;
-  }
-
-  .home-hero .md-typeset h1,
-  .home-hero h1 {
-    max-width: 12ch;
-    font-size: 2.45rem;
-  }
-
-  .home-hero__panel {
-    min-height: 14rem;
-  }
-
-  .home-actions p,
-  .home-actions .md-button {
-    width: 100%;
-  }
-
-  .home-actions .md-button {
-    text-align: center;
-  }
-
-  .curriculum-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .md-typeset p,
-  .md-typeset li {
-    max-width: none;
-  }
-
-  /* Let the prereq chips wrap and their links break instead of overflowing. */
-  .page-meta .chip {
-    white-space: normal;
-  }
-  .page-meta .chip,
-  .page-meta .chip a {
-    overflow-wrap: anywhere;
-  }
-
-  .roofline-label {
-    font-size: 20px;
-  }
-}
-
-/* Reference-site-inspired chrome: translucent header, softer cards, local settings. */
-.md-header {
-  border-bottom: 1px solid var(--ml-border);
-  background-color: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 82%,
-    transparent
-  );
-  color: var(--md-default-fg-color);
-  backdrop-filter: blur(18px);
-  box-shadow: none;
-}
-
-.md-tabs {
-  border-bottom: 1px solid var(--ml-border);
-  background-color: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 86%,
-    transparent
-  );
-  backdrop-filter: blur(18px);
-}
-
-.md-tabs__link,
-.md-nav__link {
-  border-radius: 0.55rem;
-  transition: background-color 140ms ease, color 140ms ease;
-}
-
-.md-tabs__link:is(:hover, .md-tabs__link--active),
-.md-nav__link:is(:hover, .md-nav__link--active) {
-  background: var(--ml-surface);
-}
-
-.md-typeset .admonition,
-.md-typeset details,
-.md-typeset .grid.cards > :is(ul, ol) > li,
-.curriculum-card,
-.home-hero,
-.home-hero__panel,
-.ml-stat,
-.ml-settings-panel {
-  border-radius: 0.8rem;
-  border-color: var(--ml-border);
-  box-shadow: 0 0.35rem 1.1rem rgba(15, 23, 42, 0.06);
-}
-
-.home-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(17rem, 0.8fr);
-  gap: 1.2rem;
-  margin: 0 0 1.6rem;
-  padding: clamp(1.2rem, 4vw, 2.2rem);
-  overflow: hidden;
-  border: 1px solid var(--ml-border);
-  background: radial-gradient(
-      circle at 15% 0%,
-      color-mix(in srgb, var(--ml-accent-cool) 20%, transparent),
-      transparent 36%
-    ),
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--ml-accent-cool) 12%, var(--md-default-bg-color)),
-      color-mix(in srgb, var(--ml-accent-warm) 10%, var(--md-default-bg-color))
-    );
-}
-
-.home-hero__copy {
-  min-width: 0;
-}
-
-.home-kicker,
-.section-kicker {
-  margin: 0 0 0.55rem;
-  color: var(--ml-accent-cool);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.home-hero .md-typeset h1,
-.md-typeset .home-hero h1 {
-  max-width: 16ch;
-  margin-top: 0;
-  font-size: clamp(1.8rem, 4vw, 3rem);
-  line-height: 1.08;
-}
-
-.home-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  margin-top: 1.1rem;
-}
-
-.home-hero__panel {
-  align-self: stretch;
-  padding: 1.1rem;
-  border: 1px solid var(--ml-border);
-  background: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 82%,
-    var(--ml-accent-soft) 18%
-  );
-  backdrop-filter: blur(18px);
-}
-
-.home-panel-title {
-  margin-top: 0.35rem;
-  font-size: 1.2rem;
-  font-weight: 800;
-}
-
-.home-panel-copy {
-  margin-top: 0.55rem;
-  color: var(--md-default-fg-color--light);
-  font-size: 0.78rem;
-}
-
-.home-metrics,
-.ml-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.55rem;
-  margin-top: 1rem;
-}
-
-.home-metrics > div,
-.ml-stat {
-  padding: 0.75rem;
-  border: 1px solid var(--ml-border);
-  background: color-mix(in srgb, var(--md-default-bg-color) 88%, transparent);
-}
-
-.home-metrics strong,
-.ml-stat strong {
-  display: block;
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
-.home-metrics span,
-.ml-stat span {
-  display: block;
-  margin-top: 0.25rem;
-  color: var(--md-default-fg-color--light);
-  font-size: 0.68rem;
-}
-
-.curriculum-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85rem;
-}
-
-.curriculum-card {
-  padding: 1rem;
-  border: 1px solid var(--ml-border);
-  background: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 91%,
-    var(--ml-accent-soft) 9%
-  );
-}
-
-.curriculum-card--feature {
-  border-color: color-mix(in srgb, var(--ml-accent-cool) 42%, var(--ml-border));
-  background: color-mix(
-    in srgb,
-    var(--md-default-bg-color) 82%,
-    var(--ml-accent-soft) 18%
-  );
-}
-
-.curriculum-card__eyebrow {
-  color: var(--ml-accent-cool);
-  font-size: 0.68rem;
-  font-weight: 700;
-}
-
-.aiter-stage-table table code {
-  white-space: nowrap;
-}
-
+/* Floating local-settings launcher + panel (driven by site-settings.js). */
 .ml-settings-launcher {
   position: fixed;
   right: 1rem;
   bottom: 1rem;
   z-index: 5;
-  min-width: 3.5rem;
-  min-height: 3.5rem;
+  min-width: 3.2rem;
+  min-height: 3.2rem;
   border: 1px solid var(--ml-border);
   border-radius: 999rem;
   background: var(--md-primary-fg-color);
-  color: var(--md-primary-bg-color);
+  color: #fff;
   font: 700 0.72rem/1 var(--md-text-font-family);
   box-shadow: var(--ml-shadow-strong);
   cursor: pointer;
@@ -1288,8 +1262,10 @@ figure > figcaption {
   width: min(19rem, calc(100vw - 2rem));
   padding: 1rem;
   border: 1px solid var(--ml-border);
+  border-radius: var(--ml-radius);
   background: color-mix(in srgb, var(--md-default-bg-color) 94%, transparent);
   backdrop-filter: blur(18px);
+  box-shadow: var(--ml-shadow-strong);
 }
 
 .ml-settings-panel__head {
@@ -1371,21 +1347,78 @@ figure > figcaption {
 }
 
 [data-reading-width="wide"] .md-grid {
-  max-width: 88rem;
+  max-width: 90rem;
 }
 
 [data-code-wrap="true"] .md-typeset pre > code {
   white-space: pre-wrap;
 }
 
+/* ---------- 9. Responsive ------------------------------------------------ */
+@media screen and (max-width: 76.1875em) {
+  /* Drawer nav on tablet/mobile. */
+  .md-nav--primary .md-nav__title {
+    background: var(--md-primary-fg-color);
+  }
+}
+
 @media screen and (max-width: 60rem) {
-  .home-hero,
+  .home-hero {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+
+  .ml-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media screen and (max-width: 44.984rem) {
+  .md-main__inner {
+    margin-top: 0.6rem;
+  }
+
+  .md-typeset h1 {
+    max-width: none;
+    font-size: 1.9rem;
+  }
+
+  .home-hero {
+    padding: 1.3rem;
+  }
+
+  .home-title {
+    max-width: none;
+  }
+
+  .home-title__hl {
+    white-space: normal;
+  }
+
+  .home-actions .md-button {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+
   .curriculum-grid {
     grid-template-columns: 1fr;
   }
 
-  .home-metrics,
-  .ml-stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .md-typeset p,
+  .md-typeset li {
+    max-width: none;
+  }
+
+  /* Let the prereq chips wrap and their links break instead of overflowing. */
+  .page-meta .chip {
+    white-space: normal;
+  }
+  .page-meta .chip,
+  .page-meta .chip a {
+    overflow-wrap: anywhere;
+  }
+
+  .roofline-label {
+    font-size: 20px;
   }
 }

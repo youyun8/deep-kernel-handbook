@@ -6,68 +6,131 @@
   <span class="chip"><strong>硬體：</strong>理論無； GPU對標</span>
 </div>
 
-壓縮使模型的儲存成本更低、運行速度更快——尤其是在
-[memory-bound decode](../foundations/attention-efficiency.md)，其中減半
-重量位元組大約減半 latency。本頁涵蓋**量化**（大
-槓桿：PTQ vs QAT，以及 GPTQ/AWQ 系列），然後**修剪**和
-**蒸餾**。 [MoE serving page](../moe/inference-serving.md) 適用於所有
-這個具體到 experts。
+壓縮讓模型的儲存成本更低、運行速度更快——尤其是在
+[memory-bound decode](../foundations/attention-efficiency.md) 階段，將權重
+位元組減半大約能把 latency 減半。本頁涵蓋**量化**（最大的
+槓桿：PTQ vs QAT，以及 GPTQ/AWQ 系列），接著是**剪枝（pruning）**和
+**蒸餾（distillation）**。[MoE serving page](../moe/inference-serving.md)
+把這些觀念具體套用到 experts 上。
 
 ## 量化基礎知識
 
-量化將高精度值映射為小整數（或低位浮點數）
-網格。張量 $x$ 的標準仿射方案：
+量化把高精度值映射到一個小的整數（或低位元浮點數）
+網格上。對張量 $x$ 而言，標準的**仿射（affine，非對稱）**方案把
+$x$ 量化為 $b$ 位元：
 
-$$ q = \text{round}\!\left(\frac{x}{s}\right) + z, \qquad \hat{x} = s\,(q - z), $$
+$$ q = \mathrm{round}\!\left(\frac{x}{s}\right) + z, \qquad \hat{x} = s\,(q - z), $$
 
-其中選擇 $s$（刻度）和 $z$（零點），以便整數網格覆蓋
-張量的範圍。**粒度**非常重要：
+其中 $x$ 為原始的全精度值、$q$ 為量化後的整數碼、$\hat{x}$ 為
+反量化（dequantize）後的近似值、$s$ 為 scale（步長）、$z$ 為 zero-point
+（把實數 $0$ 對應到的整數碼）。選擇 $s$ 與 $z$ 使整數網格剛好覆蓋
+張量的數值範圍。
 
--**每個張量**：整個張量使用一個 $(s,z)$ — 最便宜，最不準確。 -**每通道/每行**：每個輸出通道一個秤 — 重量標準。 -**每組**（例如 128 個元素）：每個小塊一個尺度 — 最佳點
-對於 4 位元權重；與 [microscaling/MX formats](../foundations/numerics-precision.md) 配對。
+當數值分佈關於 $0$ 對稱時，可採用**對稱（symmetric）量化**：令
+zero-point $z = 0$，並取
 
-你量化的「內容」的兩個軸：
+$$ s = \frac{\max|x|}{2^{\,b-1}-1}, $$
 
--**僅重量**（W8/W4，激活保持在 bf16）：非常適合**decode**，它
-受權重頻寬限制－你可以減少每個 token 讀取的位元組數。計算用途
-反量化值，因此它不會大大加快計算密集型 prefill 的速度。 -**權重+啟動**（W8A8 / fp8）：也加速**matmul**（整數/fp8）
-張量核），幫助計算密集型 prefill/training — 但啟動是
-更難量化（異常值）。
+其中 $\max|x|$ 為張量中絕對值最大者，$2^{\,b-1}-1$ 為有號 $b$ 位元整數
+的正側最大碼（例如 int8 時為 $127$）。此時 $q = \mathrm{round}(x/s)$、
+$\hat{x} = s\,q$，省去存放 $z$ 的成本。
+
+**粒度（granularity）**決定一個 scale 涵蓋多少元素，是準確度與成本的取捨：
+
+- **per-tensor**：整個張量共用一個 $s$（與 $z$）——最便宜，最不準確。
+- **per-channel / per-token**：每個輸出 channel（矩陣的列）或每個 token
+  （矩陣的行）一個 $s$——權重量化的標準做法。
+- **per-block / group**：每 $g$ 個元素一組、各自一個 $s$（例如 $g=128$）——
+  4 位元權重的甜蜜點；與 [microscaling / MX formats](../foundations/numerics-precision.md) 搭配。
+
+形式上，令 $\mathcal{B}$ 為某個元素所屬的分組（per-tensor 時 $\mathcal{B}$ 為
+整個張量、per-channel 時為一列、per-block 時為 $g$ 個元素），則該組共用
+$s_{\mathcal{B}} = \dfrac{\max_{i\in\mathcal{B}}|x_i|}{2^{\,b-1}-1}$。
+
+**MXFP4** 即是 per-block 的一個具體實例：取 $g = 32$，每個 block 共用一個
+**E8M0**（以 `uint8` 表示、即 8 位元純指數）的 power-of-two scale，而每個元素
+本身以 fp4（$b = 4$）儲存。其**有效位元數（effective bits）**為每元素位元數
+加上攤提到每元素的 scale 成本：
+
+$$ b_{\text{eff}} = b + \frac{\text{scale bits}}{g} = 4 + \frac{8}{32} = 4.25 \ \text{bits/element}. $$
+
+「量化什麼」有兩個正交的軸：
+
+- **weight-only**（W8/W4，activation 維持 bf16）：非常適合**decode**，因為
+  decode 受權重頻寬限制——你能減少每個 token 需讀取的位元組數。計算時使用
+  反量化後的值，所以它**不會**明顯加速 compute-bound 的 prefill。
+- **weight + activation**（W8A8 / fp8）：同時也加速 **matmul**（在整數 / fp8
+  的 Tensor Core / Matrix Core 上），有助於 compute-bound 的 prefill / training
+  ——但 activation 較難量化（異常值問題，見下）。
+
+### 量化誤差與 SQNR
+
+把 $x$ 量化再反量化會引入捨入誤差 $e = \hat{x} - x$。在步長
+$\Delta = s$ 遠小於訊號變化的常見假設下，$e$ 近似為**均勻分佈**於
+$[-\Delta/2,\ \Delta/2]$，其平均為 $0$、變異數為
+
+$$ \mathrm{Var}(e) = \frac{\Delta^2}{12}, $$
+
+其中 $\Delta = s$ 為量化步長。將訊號功率與此噪聲功率相比，得到
+**訊號量化噪聲比（SQNR, signal-to-quantization-noise ratio）**。對滿量程
+（full-scale）訊號，標準結果為
+
+$$ \mathrm{SQNR} \approx 6.02\,b + 1.76 \ \text{dB}, $$
+
+其中 $b$ 為位元數。重點是：**每多 1 個位元約增加 6 dB**（精度約增 4 倍），
+這也是 int8 → int4 會明顯掉精度的根本原因。
+
+### 記憶體與頻寬的收益
+
+權重所佔位元組數正比於位元寬度。因此 fp4 相對於 bf16 只佔
+
+$$ \frac{4\ \text{bits}}{16\ \text{bits}} = \frac14 $$
+
+的位元組數，對於 **memory-bound decode**（GEMM 在串流讀取權重、而非
+compute-bound）最多可帶來 $4\times$ 的**權重頻寬**。這正是為什麼
+低位元權重對 **decode** 的幫助遠大於對 **prefill** 的幫助：decode
+受權重讀取頻寬限制，prefill 受算力限制。
+
+### 異常值（outliers）
+
+由於量化範圍由 $\max|x|$ 決定（對稱量化中 $s = \max|x| / (2^{\,b-1}-1)$），
+**單一異常值**就會撐大 $s$，使得整個分組的步長 $\Delta = s$ 變大，把解析度
+浪費在那一個大值上，而其餘所有「正常」值都只落在少數幾個碼上、損失精度。
+這正是 **per-channel / per-group scaling**、**clipping（截斷）**、以及
+outlier-aware（如 SmoothQuant、AWQ）方案存在的動機。
 
 ## PTQ 與 QAT
 
--**training 後量化 (PTQ)**：使用小型量化訓練模型
-**校準**設定為拾取刻度（對於 GPTQ/AWQ，可修正錯誤）。便宜，
-快速，無需 retraining — LLM inference 的預設設定。 -**量化感知 training (QAT)**：在 training 期間模擬量化
-（本輪的直通估計器）因此模型學會了魯棒性。
-在非常低的位上恢復更高的精度，但需要 training 運作。
+- **訓練後量化（PTQ, post-training quantization）**：用一個小的
+  **校準（calibration）**集來挑選 scale（對 GPTQ/AWQ 還會做誤差修正）。
+  便宜、快速、不需要 retraining——是 LLM inference 的預設做法。
+- **量化感知訓練（QAT, quantization-aware training）**：在 training 期間
+  模擬量化（捨入處用 straight-through estimator 反傳梯度），使模型學會對
+  量化的魯棒性。能在很低的位元數下恢復較高精度，但需要一次 training 流程。
 
-LLM PTQ 的困難是**啟動異常值**：有些管道有
-巨大的量級，如果天真地量化，就會擴大規模並壓碎
-其他一切。 GPTQ/AWQ 系列就是用來處理這個問題的。
+LLM PTQ 的難點是 **activation 異常值**：某些 channel 的量級極大，若天真地
+量化就會撐大 scale、壓垮其餘所有值（見上方〈異常值〉）。GPTQ/AWQ 系列
+正是為了處理這個問題而生。
 
 ### GPTQ — 糾錯權重量化
 
-GPTQ 一次量化一列的權重，並在每一列捨入後，**更新
-剩餘的未量化權重用於補償**引入的誤差（a
-使用校準活化的二階/基於 Hessian 的校正）。的
-結果：精確的 3-4 位元*僅權重*量化，精度損失很小。
-僅重量 → decode 的理想選擇。
+GPTQ 一次量化權重的一個 column，並在每個 column 捨入後**更新尚未量化的
+剩餘權重以補償**所引入的誤差（一種使用校準 activation 的二階 /
+Hessian-based 修正）。結果是精度損失很小的 3–4 位元 *weight-only* 量化，
+屬於 weight-only → decode 的理想選擇。
 
 ### AWQ — 激活感知權重量化
 
-AWQ 觀察到並非所有權重都同等重要：權重相乘
-高強度（顯著）活化通道是最重要的。它**可擴展
-在量化**（和補償）之前將那些顯著的通道提升，保護它們
-來自舍入誤差－不需要反向傳播。通常在 4 位上匹配或擊敗 GPTQ
-並且簡單/快速。
+AWQ 觀察到並非所有權重同等重要：與高量級（顯著）activation channel 相乘的
+權重最重要。它在量化前**放大（scale up）**那些顯著的 channel（再對應地補償），
+保護它們不受捨入誤差影響——而且不需要反向傳播。在 4 位元上通常可匹敵或勝過
+GPTQ，且簡單、快速。
 
 ### SmoothQuant — 使激活可量化
 
-對於 W8A8，SmoothQuant**將啟動離群值遷移**到
-透過數學上等效的重新縮放來調整權重（每個通道），因此兩者
-激活和權重變得很容易量化為 int8 — 實現快速 int8
-prefill/serving 的 matmuls。
+對於 W8A8，SmoothQuant 透過一個數學上等價的 per-channel 重新縮放，把
+**activation 的異常值「搬移」到權重上**，使 activation 與權重都變得容易
+量化為 int8——從而實現 prefill / serving 用的快速 int8 matmul。
 
 ```python
 # The shared idea: choose per-channel scales so the *product* is unchanged
@@ -75,68 +138,71 @@ prefill/serving 的 matmuls。
 # y = (x / s) @ (s * W)   # s absorbs outliers from x into W or vice-versa
 ```
 
-!!! tip "使用哪一個"
-    受記憶體限制**decode**，想要簡單+準確 →**AWQ 或 GPTQ**（W4，
-    僅重量）。也想要更快的**prefill/serving 計算**→**SmoothQuant**
-    或**fp8**(W8A8)。準確度低於 4 位元 → 考慮**QAT**。
+!!! tip "該用哪一個"
+    memory-bound 的 **decode**、想要簡單 + 準確 → **AWQ 或 GPTQ**
+    （W4，weight-only）。也想要更快的 **prefill / serving 計算** →
+    **SmoothQuant** 或 **fp8**（W8A8）。要在 4 位元以下仍維持準確度 →
+    考慮 **QAT**。
 
 ## fp8 作為量化
 
-fp8 (E4M3/E5M2) 是具有浮動網格的量化－更適合寬螢幕
-啟動的動態範圍高於 int8，並且在 H100/MI300 上原生加速。
-對於每張量/每塊尺度，它可用於 inference（W8A8 樣式）和，
-越來越多地，**training**(DeepSeek-V3)。參見
-格式為 [numerics & precision](../foundations/numerics-precision.md)
-細節和縮放規則。
+fp8（E4M3 / E5M2）是一種帶有浮點網格的量化——它的動態範圍比 int8 更寬，
+更適合 activation，且在 H100 / MI300 上有原生硬體加速。搭配 per-tensor /
+per-block scale，它可用於 inference（W8A8 風格），並且越來越常用於
+**training**（DeepSeek-V3）。格式細節與縮放規則見
+[numerics & precision](../foundations/numerics-precision.md)。
 
-## 修剪
+## 剪枝（Pruning）
 
-刪除權重/結構而不是降低其精確度：
+剪枝是直接移除權重 / 結構，而非降低其精度：
 
--**非結構化**（將各小重量歸零）：高壓縮
-理論上，但不規則稀疏性很難在 GPU 上加速。 -**結構化**（刪除整個頭/通道/層）：壓縮較少，但是
-產生一個更小的“密集”模型，可以在庫存 kernels 上快速運行。 -**2:4 半結構化**（每 4 個中的 2 個權重為零）：硬體支持
-中間立場 — NVIDIA 稀疏張量核心在這些方面提供了約 2 倍的效能。一個實用的
-支援時的最佳位置。
+- **非結構化（unstructured）**（把個別小權重歸零）：理論上壓縮率高，
+  但不規則的稀疏性很難在 GPU 上加速。
+- **結構化（structured）**（移除整個 head / channel / layer）：壓縮較少，
+  但產生一個更小的「dense」模型，能在現成 kernels 上快速運行。
+- **2:4 半結構化（semi-structured）**（每 4 個權重中有 2 個為零）：有硬體
+  支援的折衷方案——NVIDIA 的 sparse Tensor Core 對此提供約 $2\times$ 的效能。
+  在有支援時是實務上的甜蜜點。
 
-修剪通常需要微調以恢復品質；當它最有吸引力的時候
-你可以利用硬體稀疏性或想要更小的密集模型。
+剪枝通常需要 fine-tuning 才能恢復品質；當你能利用硬體稀疏性、或想要更小的
+dense 模型時，它最有吸引力。
 
 ## 蒸餾
 
-訓練一個小**學生**來模仿一個大**老師**（匹配輸出
-分佈/軟邏輯，有時還有中間特徵）。不像
-量化/修剪，它產生了一個真正更小的架構，並且可以
-傳輸功能，以 training 運作和存取教師為代價。
-通常與上述結合（蒸餾，然後量化學生）。
+訓練一個小的 **student** 去模仿一個大的 **teacher**（匹配輸出分佈 /
+soft logits，有時還包含中間層特徵）。不同於量化 / 剪枝，它產生的是一個
+真正更小的架構，並能轉移能力，代價是需要一次 training 流程與存取 teacher。
+常與上述方法結合（先蒸餾、再量化 student）。
 
 ## 要點
 
-- 量化透過比例/零點映射到低位網格；**粒度**
-  （每個張量 → 每組）以準確度換取成本。 -**僅重量（GPTQ/AWQ、W4）**加速記憶體限制**decode**；
-  **權重+啟動（SmoothQuant/fp8、W8A8）**還可以加快計算速度
-  **prefill/training**，但必須馴服**啟動異常值**。 -**PTQ**（僅校準）是 LLM 預設值；**QAT**以非常低的價格購買準確性
-  training 價格位。 -**修剪**（特別是 2:4 結構）和**蒸餾**是互補的
-  壓縮工具；將它們結合起來。
+- 量化透過 scale / zero-point 把值映射到低位元網格；**粒度**
+  （per-tensor → per-group）以準確度換取成本。每多 1 位元約 +6 dB SQNR。
+- **weight-only（GPTQ/AWQ、W4）**加速 memory-bound 的 **decode**；
+  **weight + activation（SmoothQuant/fp8、W8A8）**還能加速 compute-bound 的
+  **prefill / training**，但必須馴服 **activation 異常值**。
+- **PTQ**（僅校準）是 LLM 的預設；**QAT** 以一次 training 流程的代價換取
+  在極低位元下的準確度。
+- **剪枝**（尤其是 2:4 結構化）與**蒸餾**是互補的壓縮工具；可彼此結合。
 
 ## 練習
 
 !!! tip "解決方案"
     參考解答位於 [解答頁](../solutions/performance.md) 上。請先嘗試每個練習，再展開解答。
 
-1. 推導 int8 仿射量化/反量化與最大量化誤差
-   每個張量與每個通道在具有一個離群通道的張量上進行縮放。
-2. 在單一線性層上實現 AWQ 的顯著通道縮放並測量
-   困惑與樸素的每聲道 int4。
-3. 估計 13B 型號上 decode-latency 相對於僅 W4 重量的改進（使用
-   [memory-bound](../foundations/attention-efficiency.md) 參數）。
-4. 對於 MoE，爭論為什麼路由 experts 能夠容忍激進的 (int4) 量化
-   比 router 或 attention 更好。 （連接到[MoE serving](../moe/inference-serving.md)。）
+1. 對一個含有單一異常 channel 的張量，推導 int8 仿射量化 / 反量化，並比較
+   per-tensor 與 per-channel scaling 下的最大量化誤差。
+2. 在單一線性層上實作 AWQ 的顯著 channel 縮放，並與樸素的 per-channel int4
+   比較 perplexity。
+3. 用 [memory-bound](../foundations/attention-efficiency.md) 參數，估計在
+   13B 模型上採用 W4 weight-only 對 decode-latency 的改善。
+4. 對 MoE，論證為什麼被路由的 experts 比 router 或 attention 更能容忍激進的
+   （int4）量化。（連接到 [MoE serving](../moe/inference-serving.md)。）
 
 ## 參考文獻
 
-- 弗蘭塔等人。 _GPTQ。 _ 2022 年。
-- 林等人。 _AWQ。 _ 2023 年。
-- 蕭等人*SmoothQuant。 * 2022 年。
-- 德特默斯等人。 _LLM.int8() / GPTQ 時代異常值分析。 _ 2022 年。
-- 米甚拉等。 _2:4 結構化稀疏性。 _ 2021 年；辛頓等人。 _提煉神經網路中的知識。 _ 2015。
+- Frantar 等人。 _GPTQ。_ 2022。
+- Lin 等人。 _AWQ。_ 2023。
+- Xiao 等人。 _SmoothQuant。_ 2022。
+- Dettmers 等人。 _LLM.int8() / 異常值分析。_ 2022。
+- Mishra 等人。 _2:4 結構化稀疏性。_ 2021；Hinton 等人。 _Distilling the Knowledge in a Neural Network。_ 2015。

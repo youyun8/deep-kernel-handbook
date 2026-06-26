@@ -1,368 +1,482 @@
 # AITER decode 深入解析：Kimi-K2.5 MXFP4 的 MoE 執行路徑
 
 <div class="page-meta" markdown>
-<span class="chip"><strong>Trace:</strong> `/dockerx/sglang-gpu-perf/prof_sweep/*/traces`</span>
+<span class="chip"><strong>Trace:</strong> `prof_sweep/*/…/traces`（torch profiler / CUDA graph）</span>
 <span class="chip"><strong>Model:</strong> Kimi-K2.5-MXFP4</span>
 <span class="chip"><strong>Backend:</strong> SGLang + AITER MoE</span>
-<span class="chip"><strong>Target:</strong> gfx950 / MI355X / TP4</span>
+<span class="chip"><strong>Target:</strong> gfx950 / MI355X ×4 / TP4</span>
 </div>
 
-本章把 `/dockerx/sglang-gpu-perf/` 裡的 profiling traces 對回 Kimi-K2.5
-decode 架構與 AITER 原始碼。核心目標不是背 kernel 名稱，而是建立一條可操作的
-對照鏈：
+本章把 profiling traces 對回 Kimi-K2.5 的 decode 架構與 AITER 原始碼。所有比例、
+µs 數字與 kernel 名稱都來自實際採到的 trace（見「資料來源」），不是估計值。核心
+目標不是背 kernel 名稱，而是建立一條可操作的對照鏈：
 
 ```text
 Chrome/Kineto trace bucket
-  -> Kimi-K2.5 decode stage
-  -> SGLang 呼叫的 AITER operator
-  -> AITER Python dispatcher
-  -> HIP / CK / FlyDSL / HSACO kernel
-  -> 可 tune 的 config 或實作檔案
+  → Kimi-K2.5 decode stage（25-stage taxonomy）
+  → SGLang 呼叫的 AITER operator
+  → AITER Python dispatcher
+  → HIP / CK / FlyDSL / HSACO kernel
+  → 可 tune 的 config 或實作檔案
 ```
 
-本章使用的 profiling 摘要來自
-`/dockerx/sglang-gpu-perf/docs/kimi_k25_decode_profile_breakdown.md`，trace
-分類規則來自
-`/dockerx/sglang-gpu-perf/scripts/profiling/analyze_decode_trace.py`。
+!!! note "資料來源（皆為 repo 相對路徑）"
+    - 量測組態與端到端數據：`docs/kimi_k25_decode_profile_breakdown.md`
+    - 25-stage 分類規則：`scripts/profiling/analyze_decode_trace.py`
+    - 每 stage 的 µs / 次數：`prof_sweep/ana/<sweep>/semantic_decode.json`
+    - SGLang→AITER 呼叫路徑（runtime log）：`docs/kimi_k25_rocm_path.md`
 
-## 1. Kimi-K2.5 decode 的一層在做什麼
+    量測平台：Kimi-K2.5-MXFP4、gfx950（MI355X）×4、TP4、SGLang + AITER MoE、
+    bf16 tuned GEMM、`--enable-aiter-allreduce-fusion`、shared-expert fusion 開啟、
+    KV cache fp8_e4m3。Sweep：ISL ∈ {1024, 8192}、OSL 1024、concurrency ∈ {4,8,16,32,64}。
 
-在 decode 階段，每一步只有新 token 進入，但每一層仍然要走完整的 attention、
-MoE 與 tensor-parallel communication。Kimi-K2.5 的 profiling taxonomy 把一層
-拆成 25 個 stage，其中 stage 16 保留未使用，因此 trace 中會看到 `15 -> 17`。
+---
 
-```mermaid
-flowchart LR
-  X[hidden states<br/>M x hidden] --> N1[1. Input RMSNorm + quant]
-  N1 --> QA[2. QKV-A downproj]
-  QA --> QB[3. Q_b upproj]
-  QB --> KA[4. K-absorb bmm]
-  QB --> R[5. RoPE + 6. KV write]
-  R --> MLA[7. MLA core attention<br/>+ 8. split-KV reduce]
-  MLA --> VA[9. V-absorb bmm]
-  VA --> OP[10. o_proj]
-  OP --> AR1[11. TP all-reduce]
-  AR1 --> G[12. Router gate GEMM]
-  G --> TK[13. grouped top-k + MoE sort]
-  TK --> Q1[14. routed input MXFP4 quant]
-  Q1 --> M1[15. MoE GEMM 1<br/>gate/up + fused SwiGLU]
-  M1 --> M2[17. MoE GEMM 2<br/>down projection + combine]
-  TK --> SQ[19-22. shared expert path]
-  M2 --> AR2[TP / residual path]
-  SQ --> AR2
-  AR2 --> OUT[23-25. residual / copy / metadata]
-```
+## 1. Kimi-K2.5 的模型組態（trace 實測）
 
-在 Kimi-K2.5 MXFP4 + TP4 的設定下，MoE 是 decode 的主要負載。8k context 的
-stage-separated trace 顯示，concurrency 32/64 時 routed expert GEMM 約占
-decode GPU-busy time 的**52%**，attention 約**14.5-16.9%**，TP all-reduce
-約**11%**。這表示吞吐型 serving 的第一優先不是 Python scheduling，而是 AITER
-MoE GEMM 與 communication kernel 本身。
+Kimi-K2.5 走 DeepSeek-V3 語言模型實作（runtime log：
+`architectures=['DeepseekV3ForCausalLM'], model_type=kimi_k2`）。decode 相關的
+關鍵維度，全部取自 AITER dispatch metadata 與 `create_weights` log：
 
-## 2. Trace 中的主要 bucket
+| 參數                | 值                          | 來源 / 備註                                          |
+| ------------------- | --------------------------- | ---------------------------------------------------- |
+| Transformer 層數    | 61（layer 0 dense + 1–60 MoE） | trace kernel 次數反推（見 §3）                       |
+| hidden size $H$     | 7168                        | `hidden_size=7168`                                   |
+| MoE intermediate    | 每 partition $I=256$        | `intermediate_size_per_partition=256`，`moe_tp_size=8` |
+| routed experts      | 384                         | `num_experts=385` − 1 fused shared                   |
+| fused shared expert | 1                           | `num_fused_shared_experts=1`（折進 routed path）     |
+| top-k               | 9（8 routed + 1 shared）    | `num_routed_topk=8, top_k=9`                         |
+| 權重格式            | MXFP4（`per_1x32` block scale） | `w13/w2 = float4_e2m1fn_x2`，scale `uint8`           |
+| 每專家 W13（gate+up）| `[512, 7168]` fp4           | `w13_up_dim=512`（= 2×256）                          |
+| 每專家 W2（down）   | `[7168, 256]` fp4           | `w2_down_dim=128`（fp4x2 packed）                    |
+| Attention           | MLA + 吸收式 bmm            | `mla_a8w8` core、fp8 KV cache                        |
+| Router              | grouped top-k + correction bias | `biased_grouped_topk`，`num_expert_group=1`         |
 
-<div class="aiter-stage-table" markdown>
+這些維度後面所有 FLOPs / bytes 估算都會用到。注意 **gate+up = 512 = 2×256**，
+所以 stage-1 的輸出維度天生是 stage-2 輸入維度的 2 倍——這正是後面量到「stage-1 ≈
+2× stage-2」的結構原因（§9）。
 
-| Bucket                | 8k c4 | 8k c8 | 8k c16 | 8k c32 | 8k c64 | 主要 kernel 名稱                                      |
-| --------------------- | ----: | ----: | -----: | -----: | -----: | ----------------------------------------------------- |
-| MoE expert GEMM       | 26.3% | 32.9% |  42.6% |  52.6% |  52.0% | `mfma_moe1`, `mfma_moe2`                              |
-| Attention             | 18.3% | 18.2% |  15.8% |  14.5% |  16.9% | `mla_a8w8`, `mla_reduce`, RoPE/KV                     |
-| Dense projection GEMM | 18.6% | 16.5% |  13.3% |  10.3% |   9.7% | `hgemm_bf16_*`, `Cijk_*`                              |
-| MoE route/sort/quant  | 14.5% | 13.1% |  11.5% |   7.1% |   5.6% | `grouped_topk`, `moe_sorting`, `mxfp4_quant_moe_sort` |
-| TP communication      | 14.8% | 12.7% |  11.5% |  11.1% |  11.5% | `allreduce_fusion`, `cross_device_reduce`             |
-| Shared expert GEMM    |  6.8% |  5.9% |   4.6% |   4.0% |   4.0% | `_gemm_afp4wfp4*`, shared MLP GEMM                    |
+---
 
-</div>
+## 2. decode 一層在做什麼
 
-解讀重點：
-
--**MoE expert GEMM 隨 batch 上升後成為主瓶頸。**這不是因為每個 token 變慢，
-而是 route 到 top-k experts 後，routed GEMM 的總工作量支配整個 decode step。 -**stage-1 約為 stage-2 的 2 倍。**stage-1 同時計算 gate/up projection，還要做
-fused activation/multiply；stage-2 是 down projection，把 intermediate state
-回到 hidden size 並依 routing weight 合併。 -**route/sort/quant 在低 concurrency 更重要。**小 batch 時 GEMM 沒有完全攤平
-kernel launch 與排序成本，因此 `grouped_topk`、`moe_sorting`、MX scale shuffle
-會變成 latency-sensitive path 的目標。 -**TP all-reduce 不會像 GEMM 一樣被 batch 攤平。**trace 裡 `allreduce_fusion`
-與 `cross_device_reduce` 仍占 11-18%，所以它是 MoE GEMM 之後的固定成本。
-
-## 3. AITER MoE 的總入口
-
-SGLang 端把 MoE runner backend 設成 AITER 後，真正進入 AITER 的主入口是：
-
-```text
-/dockerx/sglang-gpu-perf/patch/aiter-shared-expert-topk/aiter/aiter/fused_moe.py
-```
-
-關鍵函式：
-
-- `fused_moe(...)`：使用者 API，接收 `hidden_states`、`w1`、`w2`、
-  `topk_weight`、`topk_ids`、scale 與 quant metadata。
-- `fused_moe_(...)`：真正的 dispatcher。它決定 activation dtype、weight dtype、
-  `q_dtype_a`、是否走 gfx1250 grouped path、是否走 1-stage 或 2-stage。
-- `get_2stage_cfgs(...)`：讀取 `AITER_CONFIG_FMOE_FILE`，用模型 shape 與 dtype
-  查 tuned config，決定 `kernelName1`、`kernelName2`、`block_m`、`ksplit`、
-  `run_1stage` 與 `flat`。
-- `fused_moe_2stages(...)`：呼叫 stage-1 GEMM、必要的 activation/quant，再呼叫
-  stage-2 GEMM。
+在 decode 階段，每一步每個 sequence 只進一個新 token，但每一層仍要走完整的
+attention、MoE 與 tensor-parallel communication。`analyze_decode_trace.py` 把一層
+拆成 **25 個 canonical stage**，其中 **stage 16 保留未使用**，因此 trace 中會看到
+`15 → 17`。下面用縱向流程圖呈現一條 decode 的執行路徑（每個節點標出對應的實際
+kernel 名稱）：
 
 ```mermaid
 flowchart TB
-  API[fused_moe API] --> DISP[fused_moe_ dispatcher]
-  DISP --> DTYPE[決定 q_dtype_a / q_dtype_w<br/>bf16, fp8, fp4x2, int4]
-  DTYPE --> CFG[get_2stage_cfgs<br/>查 tuned_fmoe.csv]
-  CFG --> SORT[moe_sorting<br/>Opus 或 CK sort]
-  SORT --> ONE{run_1stage?}
-  ONE -- yes --> S1ONLY[fused_moe_1stage<br/>ASM / fp8 blockscale path]
-  ONE -- no --> S2PATH[fused_moe_2stages]
-  S2PATH --> GEMM1[stage1 wrapper<br/>CK / CKTile / FlyDSL]
-  GEMM1 --> Q2[intermediate quant / scale shuffle]
-  Q2 --> GEMM2[stage2 wrapper<br/>atomic 或 reduce mode]
+  X["hidden state h<br/>M × 7168 · bf16"] --> S1["1 · Input RMSNorm + quant<br/>fused_qk_rmsnorm"]
+  S1 --> S2["2 · QKV-A downproj<br/>hgemm_bf16_32x64x128"]
+  S2 --> S3["3 · Q_b upproj"]
+  S3 --> S4["4 · K-absorb bmm<br/>_batched_gemm_a16wfp4 (m4)"]
+  S4 --> S56["5 · RoPE + 6 · KV-cache write<br/>fused_qk_rope_cat_and_cache"]
+  S56 --> S7["7 · MLA core attention<br/>mla_a8w8 · fp8 KV"]
+  S7 --> S8["8 · split-KV reduce<br/>mla_reduce"]
+  S8 --> S9["9 · V-absorb bmm<br/>_batched_gemm_a16wfp4 (m8)"]
+  S9 --> S10["10 · o_proj<br/>Cijk_* (Tensile)"]
+  S10 --> S11a["11 · TP all-reduce ①<br/>allreduce_fusion"]
+  S11a --> S12["12 · Router gate GEMM<br/>hgemm_bf16_16x64x256"]
+  S12 --> S13["13 · grouped top-k + MoE sort<br/>grouped_topk · opus_moe_sorting"]
+  S13 --> S14["14 · routed input MXFP4 quant<br/>mxfp4_quant_moe_sort"]
+  S14 --> S15["15 · routed GEMM1 gate/up + SwiGLU<br/>mfma_moe1 / flydsl_moe1"]
+  S15 --> S17["17 · routed GEMM2 down + combine<br/>mfma_moe2 / flydsl_moe2 (atomic)"]
+  S17 --> S18["18 · combine / finalize<br/>weighted by top-k"]
+  S18 --> S11b["11 · TP all-reduce ②<br/>allreduce_fusion"]
+  S11b --> S23["23 · residual add + norm<br/>add_rmsnorm_quant"]
+  S23 --> OUT["下一層 / next layer"]
+  class X,OUT accBlue;
+  class S7,S8 accTeal;
+  class S11a,S11b accAmber;
+  class S15,S17 flagship;
 ```
+
+!!! info "兩個容易誤會的點"
+    - **stage 16 不存在**：它在 taxonomy 中刻意保留空號，所以 trace 是 `15 → 17`。
+    - **stage 19–22（獨立 shared expert）在本組態下幾乎消失**：因為
+      `num_fused_shared_experts=1`，shared expert 被折成「第 385 個專家 / top-k 第 9 名」，
+      跟著 routed experts 一起在 stage 15/17 算完，不再有獨立的 shared GEMM/SiLU kernel。
+
+---
+
+## 3. trace 怎麼確認層數與步數
+
+semantic 分類後的 kernel **次數**可以反推結構，這也是「比例不是猜的」的佐證。以
+8k / concurrency 32 的 decode 視窗為例（`semantic_decode.json`）：
+
+| group                          | 次數 cnt | 推論                              |
+| ------------------------------ | -------: | --------------------------------- |
+| MoE stage1 GEMM                |      120 | 60 MoE 層 × 2 decode step         |
+| MoE stage2 GEMM                |      120 | 同上，stage1:stage2 = 1:1（每層各一次）|
+| Dense proj GEMM（q/kv/o）      |      488 | 4 GEMM × 61 層 × 2 step           |
+| Attention MLA core             |      244 | 2 × 61 × 2                        |
+| Communication（allreduce）     |      248 | ≈ 2/層（每層兩次 all-reduce）     |
+
+$488 / (4 \times 61) = 2$、$120 / 60 = 2$ 完全一致，因此這個視窗剛好抓到 **2 個
+decode step、61 層（1 dense + 60 MoE）**。後面所有百分比都是在這種「乾淨 decode 視窗」
+下算出來的。
+
+---
+
+## 4. 時間都花在哪：8k 權威 breakdown
+
+8k 全 sweep 是用 `--profile-by-stage` 分開抓 prefill / decode，保證每個 concurrency
+都有乾淨的 decode trace，是本章最權威的 decode 組成（佔 decode GPU-busy time 的 %）：
+
+<div class="aiter-stage-table" markdown>
+
+| Bucket                              |    c4 |    c8 |   c16 |   c32 |   c64 | 主要 kernel                                           |
+| ----------------------------------- | ----: | ----: | ----: | ----: | ----: | ----------------------------------------------------- |
+| MoE expert GEMM（fp4 stage1+stage2）| 26.3% | 32.9% | 42.6% | 52.6% | 52.0% | `mfma_moe1`, `mfma_moe2`, `flydsl_moe1/2`            |
+| Attention（MLA + RoPE/KV + QK-norm）| 18.3% | 18.2% | 15.8% | 14.5% | 16.9% | `mla_a8w8`, `mla_reduce`, `fused_qk_*`                |
+| Dense proj GEMM（bf16: q/kv/o）     | 18.6% | 16.5% | 13.3% | 10.3% |  9.7% | `hgemm_bf16_32x64x128`, `Cijk_*`                      |
+| MoE route + sort + quant            | 14.5% | 13.1% | 11.5% |  7.1% |  5.6% | `grouped_topk`, `opus_moe_sorting`, `mxfp4_quant_moe_sort` |
+| Communication（allreduce）          | 14.8% | 12.7% | 11.5% | 11.1% | 11.5% | `allreduce_fusion`, `cross_device_reduce`            |
+| MoE/shared-expert fp4 GEMM（a16wfp4）|  6.8% |  5.9% |  4.6% |  4.0% |  4.0% | `_batched_gemm_a16wfp4`, shared MLP                   |
+| Norm / quant / misc                 |  0.8% |  0.7% |  0.6% |  0.5% |  0.4% | `add_rmsnorm_quant` 等                                |
+
+</div>
+
+把 conc32 的絕對 µs 攤開（`semantic_decode.json`，視窗總計 38,135 µs / 2 step）更直觀：
+
+| group                       |       µs |    pct | 次數 |
+| --------------------------- | -------: | -----: | ---: |
+| MoE stage1 GEMM（gate/up+SwiGLU）| 13,467.8 | 35.3% |  120 |
+| MoE stage2 GEMM（down）     |  6,580.1 | 17.3% |  120 |
+| Attention MLA core          |  4,492.1 | 11.8% |  244 |
+| Communication               |  4,226.8 | 11.1% |  248 |
+| Dense proj GEMM             |  3,939.9 | 10.3% |  488 |
+| MoE/shared fp4 GEMM         |  1,519.1 |  4.0% |  248 |
+| MoE sort + fused quant-sort |  1,857.6 |  4.9% |  364 |
+| MoE routing（grouped_topk） |    842.7 |  2.2% |  120 |
+| RoPE + KV cache             |    519.2 |  1.4% |  122 |
+| QK RMSNorm                  |    518.2 |  1.4% |  122 |
+
+**解讀重點：**
+
+- **MoE expert GEMM 隨 batch 變主瓶頸，conc32 後在 ~52% 飽和。** 不是每個 token 變慢，
+  而是 routed GEMM 的「每層讀完整專家權重」這件固定成本支配整步（§9 會用 roofline 解釋）。
+- **stage-1 實測 13,467.8 / 6,580.1 = 2.05× stage-2**，跟 §1 的結構推論（512 vs 256）一致。
+- **Attention 在 8k 比 1k 重很多。** conc4 比較乾淨的兩組顯示 MLA core 從 1k 的 6.8% 漲到
+  8k 的 12.0%（≈1.8×），因為 MLA 要讀長 KV cache，而且**不隨 batch 攤平**（conc64 還回升到 16.9%）。
+- **route/sort/quant 在低 concurrency 更重要**（c4 14.5% → c64 5.6%）：小 batch 時 GEMM
+  沒攤平 kernel launch 與排序成本。
+- **TP all-reduce 不被 batch 攤平**（穩在 ~11–15%）：它是 latency-bound 的固定尾巴，conc64
+  時還會從 1-stage 切到 2-stage reduce-scatter 路徑。
+
+1k sweep 的趨勢相同、只是更早觸頂：MoE expert GEMM 16.9%（c4）→ 42.2%（c16）→ 53.5%（c32）；
+per-call overhead（route/sort/quant、dense GEMM、attention）則從 ~20% 一路攤平到個位數。
+
+---
+
+## 5. SGLang → AITER 的呼叫路徑（runtime log 實證）
+
+下面的鏈每一步都有 runtime log 對應（`docs/kimi_k25_rocm_path.md`），不是推測：
+
+```text
+DeepseekV2MoE.forward                      branch=forward_normal（非 mega/A2A/dual-stream）
+  └─ TopK.forward_cuda                      use_grouped_topk=True, correction_bias=True
+       └─ select_experts                    branch=grouped_topk, num_routed_topk=8, top_k=9
+  └─ FusedMoE.forward_impl → run_moe_core   dispatcher=StandardDispatcher（moe_ep_size=1）
+       └─ QuarkW4A4MXFp4MoE.apply_weights   w13=(385,512,3584ᵇ), w2=(385,7168,128ᵇ) fp4
+            └─ AiterRunnerCore.run          → AITER fused_moe(...)
+                 └─ fused_moe_              dispatcher：決定 dtype / 1-stage vs 2-stage
+                      └─ get_2stage_cfgs    查 tuned_fmoe.csv → kernelName1/2, block_m, ksplit
+                      └─ moe_sorting        sorted_ids / expert_ids / num_valid / weights
+                      └─ fused_moe_2stages
+                           ├─ stage1 wrapper  flydsl_moe1_…_t64x128x256_w4_fp4
+                           └─ stage2 wrapper  flydsl_moe2_…_atomic（大 M）或 ck_moe_stage2（M=1）
+```
+
+幾個關鍵分支（皆由 log 確認）：
+
+- **走 `forward_normal`**：`should_use_mega_moe` 否、`_enable_a2a_moe=False`、dual-stream
+  guard 要求 `num_fused_shared_experts==0` 但此處為 1，所以不走雙流。
+- **shared expert 被 fuse**：`num_fused_shared_experts=1`，`_forward_shared_experts` 回傳
+  `None`，shared expert 變成 routed path 的第 9 名。
+- **走 AITER MXFP4**：`moe_runner_backend=auto` 被 Quark scheme 解析成 AITER；不是 CUDA、
+  FlashInfer TRT-LLM 或 Triton MoE。
 
 ### config lookup 怎麼決定 kernel
 
-`get_2stage_cfgs(...)` 的 lookup key 包含：
+`get_2stage_cfgs(...)` 的 lookup key（決定 `kernelName1/2`、`block_m`、`ksplit`、
+`run_1stage`、`flat`）包含：
 
 ```text
 gfx, cu_num, token, model_dim, inter_dim, expert, topk,
 act_type, dtype, q_dtype_a, q_dtype_w, q_type, use_g1u1, doweight_stage1
 ```
 
-這裡的 `token` 不是原始 batch，而是 `get_padded_M(M)` 後的 tier；decode 的小 M
-會被補到 power-of-two，超大 M 則落到固定 tier。若 `AITER_ONLINE_TUNE=1` 且找不到
-config，AITER 會呼叫
-`csrc/ck_gemm_moe_2stages_codegen/gemm_moe_tune.py` 產生新的 tuned rows。
+其中 `token` 不是原始 batch，而是 `get_padded_M(M)` 後的 tier（decode 的小 M 會補到
+power-of-two）。實測 decode 在 `M=1` 時走 `flydsl_moe1_…_t32x128x256_w3_kb14` + **CK**
+stage2；`M=8` 時走 `flydsl_moe1_…_t64x128x256_w4` + **FlyDSL atomic** stage2。tuning
+要檢查 `aiter/configs/tuned_fmoe.csv`、`untuned_fmoe.csv` 與 `AITER_CONFIG_FMOE`。
 
-實務上，Kimi-K2.5 decode tuning 主要要檢查：
+---
 
-- `aiter/configs/tuned_fmoe.csv`
-- `aiter/configs/untuned_fmoe.csv`
-- `aiter/configs/model_configs/*tuned_fmoe*.csv`
-- 環境變數 `AITER_CONFIG_FMOE`
+## 6. Attention：MLA 區塊（stage 1–10）
 
-## 4. Router、top-k 與 MoE sort
+MLA（Multi-head Latent Attention）把 KV 壓到低秩 latent，再用「吸收式」bmm 展開，
+decode 時只需讀壓縮後的 KV cache。trace 對應：
 
-decode 進入 MoE 後，第一件事是從 router logits 選出每個 token 的 top-k experts，
-再把 token 依 expert 分桶，讓後續 grouped GEMM 可以按 expert 連續讀取。
+| stage | 意義                | kernel                              |
+| ----: | ------------------- | ----------------------------------- |
+|     1 | input / QK RMSNorm + quant | `fused_qk_rmsnorm`           |
+|   2/3 | QKV-A downproj、Q_b upproj  | `hgemm_bf16_32x64x128`       |
+|     4 | K-absorb bmm        | `_batched_gemm_a16wfp4 …m_4`        |
+|   5/6 | RoPE + KV-cache write | `fused_qk_rope_cat_and_cache`     |
+|     7 | MLA core attention  | `mla_a8w8`（a8w8 → fp8 KV）         |
+|     8 | split-KV reduce     | `mla_reduce`                        |
+|     9 | V-absorb bmm        | `_batched_gemm_a16wfp4 …m_8`        |
+|    10 | o_proj              | `Cijk_*`（Tensile GEMM）            |
+
+decode 時 attention 的主要成本是 **MLA core 讀 KV cache 的頻寬**，而不是 FLOPs：每步只有
+一個新 query，但要對整段 KV 做 attention。所以它**隨 context length 變重、卻不隨 batch
+攤平**——8k 時 MLA core 升到 ~12%（conc4）甚至 ~17%（conc64），是長 context decode 的
+穩定第二大成本。要 tune 的方向是 `aiter/mla.py` / `csrc/cpp_itfs/mla/*` 的 MLA kernel 與
+fp8 KV/attention 路徑（`kimi-k25-fp8-attn-proj` 實驗）。
+
+---
+
+## 7. Router、top-k 與 MoE sort（stage 12–13）
+
+進 MoE 後第一步是從 router logits 選每個 token 的 top-k experts，再把 token 依 expert
+分桶，讓後續 grouped GEMM 能按 expert 連續讀取。
 
 ```mermaid
-flowchart LR
-  H[hidden states] --> RG[router gate GEMM]
-  RG --> TOPK[grouped_topk<br/>topk_ids/topk_weights]
-  TOPK --> SORT[moe_sorting_opus_fwd<br/>按 expert 排 token]
-  SORT --> SID[sorted_ids]
-  SORT --> SEID[sorted_expert_ids]
-  SORT --> NVID[num_valid_ids]
-  SORT --> W[sorted_weights]
-  SID --> GEMM[MoE GEMM kernels]
+flowchart TB
+  H["hidden state"] --> RG["router gate GEMM<br/>hgemm_bf16_16x64x256"]
+  RG --> TOPK["biased grouped top-k<br/>grouped_topk → topk_ids / topk_weights"]
+  TOPK --> SORT["MoE sort<br/>opus_moe_sorting"]
+  SORT --> SID["sorted_ids（含 padding）"]
+  SORT --> SEID["sorted_expert_ids（每 block 的 expert）"]
+  SORT --> NVID["num_valid_ids（跳過 padding）"]
+  SORT --> W["sorted_weights（routed weight）"]
+  SID --> GEMM["MoE GEMM kernels"]
   SEID --> GEMM
   NVID --> GEMM
   W --> GEMM
+  class GEMM flagship;
 ```
 
-要看原始碼：
+| 部件                 | 入口                                       | 低層實作                                                       |
+| -------------------- | ------------------------------------------ | -------------------------------------------------------------- |
+| grouped top-k        | `aiter/ops/topk.py`、`aiter/ops/moe_op.py` | `csrc/include/moe_op.h`、`csrc/pybind/moe_topk_pybind.cu`      |
+| Opus MoE sort        | `aiter/ops/moe_sorting_opus.py`            | `csrc/include/moe_sorting_opus.h`                              |
+| CK MoE sort fallback | `aiter/fused_moe.py::_moe_sorting_impl`    | `csrc/py_itfs_ck/moe_sorting_kernels.cu`                       |
+| shared expert append | `fused_append_shared_experts` bucket       | `aiter-shared-expert-topk` patch（見 §11）                     |
 
-| 部件                 | 入口                                       | 低層實作                                                                    |
-| -------------------- | ------------------------------------------ | --------------------------------------------------------------------------- |
-| grouped top-k        | `aiter/ops/topk.py`、`aiter/ops/moe_op.py` | `csrc/include/moe_op.h`、`csrc/pybind/moe_topk_pybind.cu`                   |
-| Opus MoE sort        | `aiter/ops/moe_sorting_opus.py`            | `csrc/include/moe_sorting_opus.h`、`csrc/pybind/moe_sorting_opus_pybind.cu` |
-| CK MoE sort fallback | `aiter/fused_moe.py::_moe_sorting_impl`    | `csrc/py_itfs_ck/moe_sorting_kernels.cu`                                    |
-| shared expert append | `fused_append_shared_experts` trace bucket | patch: `patch/aiter-shared-expert-topk/aiter-shared-expert-topk.patch`      |
+`grouped_topk` 在 conc32 約 2.2%、sort + fused quant-sort 約 4.9%；低 concurrency 時這群
+是 latency-sensitive path 的主要目標。
 
-`moe_sorting(...)` 會輸出五個主要 tensor：
+---
 
-- `sorted_ids`：排序後的 token id，含 padding。
-- `sorted_weights`：對應 routed weight。
-- `sorted_expert_ids`：每個 block 對應的 expert id。
-- `num_valid_ids`：有效 token 數，讓 kernel 跳過 padding。
-- `moe_buf`：stage-2 的 accumulate buffer，通常是 `[M, model_dim]`。
+## 8. Routed input MXFP4 quant（stage 14）
 
-若 tuned config 標記 `flat=1`，AITER 會走 `_moe_prepare_unsorted_input(...)`，
-讓 FLAT kernel 在 kernel 內處理 routing；這是 gfx950-only 的特殊 path。
+MXFP4 routed GEMM 不直接吃 bf16 activation：stage-1 前要把 activation quantize 成
+MXFP4（`per_1x32` block scale，每 32 個元素共享一個 `uint8` scale），並把 scale 排成
+GEMM kernel 期望的 tile layout。邏輯集中在 `aiter/ops/quant.py::fused_dynamic_mx_quant_moe_sort`，
+有兩條 path：
 
-## 5. Routed input quant：MXFP4 scale 怎麼被排到 GEMM layout
+| path           | 何時用            | 做什麼                                                       | 代價                                   |
+| -------------- | ----------------- | ------------------------------------------------------------ | -------------------------------------- |
+| fused HIP path | 小 M / 非預設 group | 一個 kernel 完成 quant + sort + scale swizzle                | 少一次 launch，但同 token 可能被 top-k 重複 quant |
+| split path     | 較大 M            | `per_1x32_mx_quant_hip` 先逐 token quant，再 `mxfp4_moe_sort_hip` 排 scale | 每個 row 只讀一次，較適合大 batch    |
 
-Kimi-K2.5 MXFP4 的 routed expert GEMM 不直接吃 bf16 activation。stage-1 前要把
-activation quantize 成 MXFP4 / MXFP8 類型，並把 scale 排成 GEMM kernel 期望的
-tile layout。這個邏輯集中在：
+cutoff 判斷式（`quant.py`）：
+
+$$
+M \le \frac{8 \times 256}{\text{topk}} \;\;(\text{stage-1}), \qquad
+M \le \frac{8 \times 1024}{\text{topk}} \times \text{eff\_topk} \;\;(\text{stage-2})
+$$
+
+這也是為什麼「把 quant fuse 到 GEMM critical path」不一定變快：低 M 省 launch，大 M 反而
+可能因重複讀 row 而退化。實測上 quantize-on-load 在 decode **退化 +16% TPOT**，所以 decode
+預設關閉、改用 `decode-sort-consolidated` 與 `aiter-shared-expert-topk` 來省 standalone
+sort/quant kernel。
+
+---
+
+## 9. MoE GEMM 1 / 2 的數學：為什麼是 decode 的主瓶頸
+
+這是本章最關鍵的量化分析。每層 routed MoE 的兩個 GEMM（per token-expert row）：
+
+$$
+\text{stage-1:}\quad \mathbf{a}[1,7168] \times W_{13}[7168,512] \to [1,512],
+\quad \text{FLOPs} = 2\cdot 7168 \cdot 512 = 7.34\,\text{MFLOP}
+$$
+$$
+\text{stage-2:}\quad \mathbf{x}[1,256] \times W_{2}[256,7168] \to [1,7168],
+\quad \text{FLOPs} = 2\cdot 256 \cdot 7168 = 3.67\,\text{MFLOP}
+$$
+
+比值恰好 $7.34 / 3.67 = 2.0$——這就是 trace 量到 stage-1 ≈ 2.05× stage-2 的根本原因
+（gate+up 的輸出維度是 down 輸入維度的兩倍）。
+
+**關鍵：decode 時 MoE GEMM 是 weight-bandwidth-bound，不是 compute-bound。** 每個專家
+的 fp4 權重（0.5 byte/元素）要讀進來才能算：
+
+$$
+W_{13}: 512 \times 7168 \times 0.5 = 1.84\,\text{MB}, \quad
+W_{2}: 7168 \times 256 \times 0.5 = 0.92\,\text{MB}
+$$
+
+每個專家 2.75 MB，384 個 routed experts 全打到的話，**一層要讀約 1.06 GB 權重**。而
+decode 每步分到每個專家的 token 數極少：
+
+$$
+\text{平均 rows/expert} = \frac{\text{conc}\times\text{topk}}{384}
+= \begin{cases} 0.08 & (\text{conc4}) \\ 0.67 & (\text{conc32}) \\ 1.33 & (\text{conc64}) \end{cases}
+$$
+
+把 stage-1 的 arithmetic intensity 寫出來（權重每層只讀一次，$m$ = 該專家處理的 row 數）：
+
+$$
+\text{AI}_{\text{stage-1}} = \frac{2\cdot 7168 \cdot 512 \cdot m}{512 \cdot 7168 \cdot 0.5}
+= 4m \;\;\text{FLOP/byte}
+$$
+
+也就是 $m=1$ 時只有 **4 FLOP/byte**，$m=8$ 也才 32。MI355X 的 fp4 算力 / HBM 頻寬 ridge
+point 高達數千 FLOP/byte，所以 decode 的 MoE GEMM 落在 roofline 的**記憶體頻寬斜坡**上，
+離 compute roof 很遠。這解釋了所有觀察：
+
+- **為什麼 MoE GEMM 支配 decode**：你為了 ~1 個 token 付出整個專家權重的讀取成本。
+- **為什麼 batch 有幫助但會飽和**：$m$ 變大→AI 變大→每 byte 攤更多 FLOP，但在 $m$ 還很小時
+  仍是頻寬主導，所以 conc32 後曲線就壓平在 ~52%。
+- **P0 tuning 先攻 stage-1**：它是最大的 kernel family，10% 的 stage-1 改善 ≈ conc32 下
+  ~4–5% 端到端 TPOT。
+
+### stage-1 / stage-2 在 AITER 哪裡實作
+
+| 層級              | 檔案 / 函式                                                  | 角色                                  |
+| ----------------- | ----------------------------------------------------------- | ------------------------------------- |
+| stage-1 dispatcher | `aiter/fused_moe.py::_flydsl_stage1_wrapper`               | 解析 `kernelName1` → FlyDSL 參數      |
+| stage-1（CK 路）  | `aiter/fused_moe.py::ck_moe_stage1` / `cktile_moe_stage1`   | 非 FlyDSL path                        |
+| stage-2 dispatcher | `aiter/fused_moe.py::_flydsl_stage2_wrapper`               | 傳入 atomic/reduce、scale、topk meta  |
+| kernel registry    | `aiter/ops/flydsl/moe_kernels.py`                          | 產生 `flydsl_moe1/2_*` 名稱與 tile    |
+| FlyDSL kernel      | `aiter/ops/flydsl/kernels/moe_gemm_2stage.py`              | 2-stage MoE GEMM 主實作               |
+| CK low-level       | `csrc/py_itfs_ck/moe_ck_2stages_kernel.cu`                | CK stage-1/2 launch glue              |
+| ASM / HSACO        | `csrc/py_itfs_cu/asm_moe_2stage.cu`、`hsa/gfx950/fmoe_2stages/*` | prebuilt assembly kernel        |
+
+**stage-2 的 combine：** down projection 後要把 top-k 個專家輸出依 `topk_weight` 合回
+原 token。實測大 M 走 **atomic mode**（`flydsl_moe2_…_atomic`，直接 atomic accumulate 到
+`[M, 7168]`）；`M=1` 走 **CK stage2**（`moe_ck2stages_gemm2_…`）。tuning stage-2 要同時看
+GEMM tile 與 combine 方式（小 M atomic 固定成本可接受，大 M / EP 可考慮 reduce mode）。
+
+stage-1 的 P0 tuning checklist：`kernelName1` 是否命中 tuned config；`tile_m/tile_n/tile_k`
+是否覆蓋 decode M range（$M=\text{conc}\times\text{topk}$ 展開後約 32–512）；`q_dtype_a`
+是 `fp4x2`；`gate_mode`（實測 `separated`）；以及 `ksplit`、`b_nt`、`xcd_swizzle`。
+
+---
+
+## 10. TP communication（stage 11）
+
+每層有 **2 次 all-reduce**（attention o_proj 後、MoE down + combine 後）。decode 的 hidden
+state 訊息很小：
+
+$$
+\text{每次 all-reduce} = \text{bs} \times 7168 \times 2\,\text{byte}
+= \begin{cases} 448\,\text{KB} & (\text{conc32}) \\ 896\,\text{KB} & (\text{conc64}) \end{cases}
+$$
+
+訊息小 → latency-bound → **不隨 batch 攤平**，所以穩在 ~11–15%，是 MoE GEMM 之後的固定
+尾巴。實測 conc64 時 fused all-reduce 會從 1-stage（`allreduce_fusion_1stage`）切到
+**2-stage reduce-scatter + load-rmsnorm**（`cross_device_reduce` / `reduce_scatter_*`）。
+tuning 方向（`kimi-k25-fused-ar-rms-stage-tuning`）：驗證小訊息選 1-stage、確認 1↔2 stage
+crossover 與 AR+RMSNorm 融合最佳；原始碼在 `aiter/ops/custom_all_reduce.py`、
+`aiter/dist/communication_op.py`。
+
+---
+
+## 11. Shared expert：fusion 後在 trace 裡怎麼看
+
+本組態 shared-expert fusion 開啟，所以 shared expert 不再是獨立 kernel，而是 routed path
+的第 9 名（`top_k=9 = 8 + 1`）。若關閉 fusion，taxonomy 會出現獨立的 stage 19–22：
+
+| stage | 名稱                      | kernel                          |
+| ----: | ------------------------- | ------------------------------- |
+|    19 | Shared expert-input quant | `dynamic_mxfp4_quant`           |
+|    20 | Shared MLP GEMMs          | `_gemm_afp4wfp4` / `hgemm_bf16_16x64x256` |
+|    21 | Shared split-K reduce     | `_gemm_afp4wfp4_reduce`         |
+|    22 | Shared SiLU               | `act_and_mul`                   |
+
+`aiter-shared-expert-topk` patch 的重點就是把 shared expert append 併進 routing/sort，
+減少獨立 sort/append kernel 的 overhead（低 M 時 standalone launch 佔比更高）。可追：
 
 ```text
-aiter/ops/quant.py::fused_dynamic_mx_quant_moe_sort
+patch/aiter-shared-expert-topk/aiter-shared-expert-topk.patch
+patch/aiter-shared-expert-topk/aiter/op_tests/test_biased_grouped_topk_shared_append.py
+patch/aiter-shared-expert-topk/aiter/aiter/fused_moe_dp_shared_expert.py
 ```
 
-它有兩條 path：
+trace 上 `a16wfp4` 這群（含吸收 bmm 與 shared MLP）在 8k decode 約 4–7%。
 
-| path           | 何時使用                  | 做什麼                                                                              | 優點 / 代價                                              |
-| -------------- | ------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| fused HIP path | 小 M，或非預設 group size | `fused_dynamic_mx_quant_moe_sort_hip` 一個 kernel 完成 quant + sort + scale swizzle | 少一次 launch，但同一 token 可能因 top-k 被重複 quantize |
-| split path     | 較大 M                    | `per_1x32_mx_quant_hip` 先逐 token quant，再用 `mxfp4_moe_sort_hip` 排 scale        | 每個 input row 只讀一次，較適合大 batch                  |
+---
 
-判斷式在 `quant.py` 中明確寫成：
+## 12. 從 trace 回到原始碼的查表
 
-```text
-stage-1 cutoff: M <= 8 * 256 / topk
-stage-2 cutoff: M <= 8 * 1024 / topk * eff_topk
-```
+| trace pattern                                 | stage | 意義                            | 優先看的檔案                                                        |
+| --------------------------------------------- | ----: | ------------------------------- | ------------------------------------------------------------------- |
+| `fused_qk_rmsnorm`                            |     1 | input / QK RMSNorm + quant      | `aiter/ops/fused_qk_norm_rope_cache_quant.py`、`aiter/ops/rmsnorm.py` |
+| `hgemm_bf16_32x64x128`                        |   2/3 | QKV-A / Q_b projection          | `aiter/tuned_gemm.py`、`aiter/ops/gemm_op_a16w16.py`                 |
+| `_batched_gemm_a16wfp4_…m_4` / `…m_8`         |   4/9 | K-absorb / V-absorb bmm         | `aiter/ops/batched_gemm_op_bf16.py`、`aiter/ops/gemm_op_a4w4.py`     |
+| `fused_qk_rope_cat_and_cache`                 |   5/6 | RoPE + KV cache write           | `aiter/ops/rope.py`、`aiter/ops/cache.py`                           |
+| `mla_a8w8`                                    |     7 | MLA core attention              | `aiter/mla.py`、`aiter/aot/asm_mla_decode_fwd.py`、`csrc/cpp_itfs/mla/*` |
+| `mla_reduce`                                  |     8 | split-KV reduce                 | `aiter/ops/attention.py`                                            |
+| `Cijk_*`                                      |    10 | o_proj（Tensile）               | `aiter/tuned_gemm.py`                                               |
+| `allreduce_fusion`, `cross_device_reduce`     |    11 | TP all-reduce fusion            | `aiter/ops/custom_all_reduce.py`、`aiter/dist/communication_op.py`   |
+| `hgemm_bf16_16x64x256`                        |    12 | router gate GEMM                | `aiter/tuned_gemm.py`                                               |
+| `grouped_topk`, `opus_moe_sorting`            |    13 | top-k 選擇 + token 排序         | `aiter/ops/topk.py`、`aiter/ops/moe_sorting_opus.py`                 |
+| `mxfp4_quant_moe_sort`                        |    14 | routed input quant + scale sort | `aiter/ops/quant.py`                                               |
+| `mfma_moe1` / `flydsl_moe1`                   |    15 | MoE GEMM 1 gate/up + SwiGLU     | `aiter/fused_moe.py`、`aiter/ops/flydsl/kernels/moe_gemm_2stage.py`  |
+| `mfma_moe2` / `flydsl_moe2`                   |    17 | MoE GEMM 2 down + combine       | `aiter/fused_moe.py`、`aiter/ops/flydsl/kernels/moe_gemm_2stage.py`  |
+| `add_rmsnorm_quant`                           |    23 | residual add + norm + quant     | `aiter/ops/rmsnorm.py`                                              |
 
-這也是為什麼「把 quant fuse 到 GEMM critical path」不一定總是變快：低 M 可以省
-launch，大 M 則可能因重複讀 row 或增加 MFMA 前置工作而退化。
+---
 
-## 6. MoE GEMM 1：gate/up + fused SwiGLU
+## 13. 實作與 tuning 檢查清單（依槓桿排序）
 
-trace 中的**moe gemm 1**通常對應 `mfma_moe1`，在 stage taxonomy 裡是
-stage 15：`Routed GEMM1 (gate+up)`。它做的是每個 routed token 對應 expert 的
-第一個 MLP projection：
+1. **先確認 trace 是 decode window。** 長 ISL + 高 concurrency 時預設 profile 視窗會被
+   chunked prefill 填滿；8k sweep 要用 `--profile-by-stage` 的 decode trace。
+2. **P0：MoE fp4 expert GEMM（最大槓桿）。** 占 40–54%+ 且隨 batch 上升。先 tune **stage-1**
+   （gate/up，~2× stage-2），針對 decode 的 $(E,N,K)$ 與 $M=$ conc×topk 範圍持久化
+   tuned_fmoe，比照 bf16 GEMM asset 的 `AITER_CONFIG_FMOE` 接線。
+3. **P0：TP communication。** ~11–18% 且不攤平。tune 1-stage / 2-stage all-reduce crossover
+   與 fused AR+RMSNorm；驗證小訊息選 1-stage、all-reduce 數為 2/層。
+4. **P1：dense bf16 projection GEMM。** 10–14%，確認 bf16 tuned asset 覆蓋 q_a/q_b/kv_a/
+   kv_b/o_proj 的 decode shape；可評估 `kimi-k25-fp8-attn-proj`。
+5. **P1：低 concurrency 的 route/sort/quant。** decode 保持 quantize-on-load **關閉**
+   （實測 +16% TPOT），改走 `decode-sort-consolidated` 與 `aiter-shared-expert-topk`。
+6. **P2：長 context attention。** 8k 下 MLA ~17% 且隨 KV 長度上升，考慮 fp8 KV/attention。
+7. **不建議 decode dual-stream overlap：** decode ~100% GPU-busy、幾乎沒有 idle，compute/comm
+   重疊沒什麼可回收，把力氣放在 kernel 效率（P0）。
 
-```text
-hidden_states[M, hidden]
-  -> W1[expert, 2 * inter_dim, hidden]
-  -> gate[M*topk, inter_dim] and up[M*topk, inter_dim]
-  -> activation(gate) * up
-```
+---
 
-Kimi-K2.5 的 `w1` 註解在 AITER API 裡是
-`[expert, inter_dim*2, dim]`，因此 `isG1U1=True` 代表 gate/up 合併在同一組
-weight 裡。stage-1 的結果通常是 intermediate state，shape 約為
-`[M * topk, inter_dim]`，或依 kernel mode 直接按 sorted expert layout 存放。
-
-### stage-1 在 AITER 哪裡實作
-
-| 層級               | 檔案 / 函式                                                          | 角色                                              |
-| ------------------ | -------------------------------------------------------------------- | ------------------------------------------------- |
-| Python dispatcher  | `aiter/fused_moe.py::_flydsl_stage1_wrapper`                         | 解析 tuned `kernelName1`，轉成 FlyDSL kernel 參數 |
-| Python dispatcher  | `aiter/fused_moe.py::ck_moe_stage1` / `cktile_moe_stage1`            | 非 FlyDSL path 的 CK / CKTile stage-1             |
-| kernel registry    | `aiter/ops/flydsl/moe_kernels.py::get_flydsl_stage1_kernels`         | 產生 `flydsl_moe1_*` kernel 名稱與 tile 參數      |
-| FlyDSL kernel      | `aiter/ops/flydsl/kernels/moe_gemm_2stage.py`                        | 2-stage MoE GEMM 主 kernel 實作                   |
-| mixed dtype kernel | `aiter/ops/flydsl/kernels/mixed_moe_gemm_2stage.py`                  | mixed fp4/fp8/bf16 變體                           |
-| CK low-level       | `csrc/py_itfs_ck/moe_ck_2stages_kernel.cu`                           | CK stage-1/2 launch glue                          |
-| ASM / HSACO        | `csrc/py_itfs_cu/asm_moe_2stage.cu`、`hsa/gfx950/fmoe_2stages/*.csv` | prebuilt assembly kernels 與 manifest             |
-
-### 為什麼 gemm 1 通常比較貴
-
-stage-1 的輸出維度是 `2 * inter_dim` 的 gate/up，再做 activation/multiply。即使
-實作上融合了 SwiGLU，工作量仍比 stage-2 高，trace 也量到 stage-1 約為 stage-2
-的 1.9-2.05 倍。對 Kimi-K2.5 decode，若要做第一個 P0 tuning，通常先看 stage-1：
-
-- `kernelName1` 是否命中 tuned config。
-- `tile_m/tile_n/tile_k` 是否覆蓋 decode M range。
-- `q_dtype_a` 是 `bf16`、`fp8` 還是 `fp4x2`。
-- `gate_mode` 是 `separated`、`interleave` 還是 `mock_gate_only`。
-- 是否使用 `ksplit`、`k_wave`、`waves_per_eu`、`b_nt`、`xcd_swizzle`。
-
-## 7. MoE GEMM 2：down projection + combine
-
-trace 中的**moe gemm 2**對應 `mfma_moe2`，在 stage taxonomy 裡是 stage 17：
-`Routed GEMM2 (down)`。它把 stage-1 的 intermediate state 投影回 hidden size：
-
-```text
-intermediate[M * topk, inter_dim]
-  -> W2[expert, hidden, inter_dim]
-  -> output contribution[M * topk, hidden]
-  -> weighted combine / atomic accumulate -> moe_buf[M, hidden]
-```
-
-stage-2 的重點不是只做 GEMM，還要把 top-k experts 的輸出依 `topk_weight` 合回原本
-token。AITER 依 config 可能選：
-
--**atomic mode**：stage-2 直接 atomic accumulate 到 `[M, model_dim]`。 -**reduce mode**：stage-2 先輸出較規整的 intermediate，再由 reduce path 合併。 -**persistent / async-copy variant**：例如 `flydsl_moe2_*_persist_async_w4_cumul3`。
-
-### stage-2 在 AITER 哪裡實作
-
-| 層級                 | 檔案 / 函式                                                             | 角色                                                      |
-| -------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------- |
-| Python dispatcher    | `aiter/fused_moe.py::_flydsl_stage2_wrapper`                            | 解析 `kernelName2`，傳入 mode、scale、bias、topk metadata |
-| kernel registry      | `aiter/ops/flydsl/moe_kernels.py::get_flydsl_stage2_kernels`            | 產生 atomic/reduce/persist 變體                           |
-| production variant   | `aiter/ops/flydsl/moe_kernels.py::_register_production_variants_stage2` | 加入手調變體，例如 persist + async copy                   |
-| FlyDSL kernel        | `aiter/ops/flydsl/kernels/moe_gemm_2stage.py`                           | stage-2 GEMM 與 accumulation                              |
-| gather/reduce helper | `aiter/ops/flydsl/kernels/moe_gather_reduce.py`                         | reduce mode 的 gather/reduce 支援                         |
-| CK low-level         | `csrc/py_itfs_ck/moe_ck_2stages_kernel.cu`                              | CK launch glue                                            |
-
-stage-2 tuning 要同時看 GEMM tile 與 combine 方式。對小 M，atomic 的固定成本可能
-可接受；對較大 M 或 EP 模式，reduce mode 可能更容易控制寫回衝突。
-
-## 8. Shared expert 在 trace 裡怎麼看
-
-Kimi-K2.5 的 MoE stack 可能同時有 routed experts 與 shared experts。trace taxonomy
-把 shared path 拆成：
-
-| stage | 名稱                      | 常見 kernel                                |
-| ----: | ------------------------- | ------------------------------------------ |
-|    19 | Shared expert-input quant | `dynamic_mxfp4_quant`                      |
-|    20 | Shared MLP GEMMs          | `hgemm_bf16_16x64x256` 或 shared GEMM path |
-|    21 | Shared split-K reduce     | `_gemm_afp4wfp4_reduce`                    |
-|    22 | Shared SiLU               | `act_and_mul`, `activation`                |
-
-本 repo 的 AITER patch 有一個重點是 `aiter-shared-expert-topk`：把 shared expert
-append 併入 routing/sort 流程，目標是減少獨立 sort/append kernel 的 overhead。
-你可以從這些地方追：
-
-```text
-/dockerx/sglang-gpu-perf/patch/aiter-shared-expert-topk/aiter-shared-expert-topk.patch
-/dockerx/sglang-gpu-perf/patch/aiter-shared-expert-topk/aiter/op_tests/test_biased_grouped_topk_shared_append.py
-/dockerx/sglang-gpu-perf/patch/aiter-shared-expert-topk/aiter/aiter/fused_moe_dp_shared_expert.py
-```
-
-profiling 上，shared expert GEMM 在 8k decode 大約 4-7%。它不是最大項，但在低延遲
-場景仍值得合併 route/sort overhead，因為低 M 時 standalone kernel launch 比例更高。
-
-## 9. 從 trace 回到原始碼的查表
-
-| trace pattern                                 | stage | 意義                            | 優先看的檔案                                                                                   |
-| --------------------------------------------- | ----: | ------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `fused_qk_rmsnorm`                            |     1 | input / QK RMSNorm + quant      | `aiter/ops/fused_qk_norm_rope_cache_quant.py`、`aiter/ops/rmsnorm.py`                          |
-| `hgemm_bf16_32x64x128`                        |   2/3 | QKV-A / Q_b projection          | `aiter/tuned_gemm.py`、`aiter/ops/gemm_op_a16w16.py`、`aiter/ops/opus/*`                       |
-| `_batched_gemm_a16wfp4_kernel_block_size_m_4` |     4 | K-absorb bmm                    | `aiter/ops/batched_gemm_op_bf16.py`、`aiter/ops/gemm_op_a4w4.py`                               |
-| `fused_qk_rope_cat_and_cache`                 |   5/6 | RoPE + KV cache write           | `aiter/ops/rope.py`、`aiter/ops/cache.py`                                                      |
-| `mla_a8w8`                                    |     7 | MLA core attention              | `aiter/mla.py`、`aiter/aot/asm_mla_decode_fwd.py`、`csrc/cpp_itfs/mla/*`                       |
-| `mla_reduce`                                  |     8 | split-KV reduce                 | `aiter/ops/attention.py`、`csrc/pybind/mla_reduce_pybind.cu`                                   |
-| `grouped_topk`                                |    13 | router top-k                    | `aiter/ops/topk.py`、`csrc/include/moe_op.h`                                                   |
-| `moe_sorting`, `opus_moe_sorting`             |    13 | token 按 expert 排序            | `aiter/ops/moe_sorting_opus.py`、`csrc/include/moe_sorting_opus.h`                             |
-| `mxfp4_quant_moe_sort`                        |    14 | routed input quant + scale sort | `aiter/ops/quant.py`                                                                           |
-| `mfma_moe1`                                   |    15 | MoE GEMM 1 gate/up + activation | `aiter/fused_moe.py`、`aiter/ops/flydsl/kernels/moe_gemm_2stage.py`                            |
-| `mfma_moe2`                                   |    17 | MoE GEMM 2 down + combine       | `aiter/fused_moe.py`、`aiter/ops/flydsl/kernels/moe_gemm_2stage.py`                            |
-| `allreduce_fusion`, `cross_device_reduce`     |    11 | TP all-reduce fusion            | `aiter/ops/custom_all_reduce.py`、`aiter/dist/communication_op.py`、`aiter/ops/triton/comms/*` |
-
-## 10. 實作與 tuning 檢查清單
-
-1. **先確認 trace 是 decode window。**長 ISL + 高 concurrency 時，預設 profile
-   window 可能被 chunked prefill 填滿；8k sweep 要優先使用 `--profile-by-stage`
-   的 `*-DECODE.trace.json.gz`。
-2. **用 stage taxonomy 分 bucket。**`analyze_decode_trace.py` 以 kernel name 對應
-   25-stage taxonomy；CUDA graph replay 裡 parent correlation 不一定可靠。
-3. **先看 `mfma_moe1` / `mfma_moe2`。**若 MoE expert GEMM 超過 40%，先確認
-   `tuned_fmoe.csv` 是否命中 decode M range。
-4. **檢查 `kernelName1` / `kernelName2`。**AITER log 會印出使用 1-stage 或
-   2-stage、default 或 tuned config，以及對應 lookup key。
-5. **低 concurrency 看 route/sort/quant。**若 `grouped_topk`、`moe_sorting`、
-   `mxfp4_quant_moe_sort` 占比偏高，優先看 shared expert append、Opus sort 與
-   fused/split quant cutoff。
-6. **TP all-reduce 單獨量。**若 `allreduce_fusion_1stage` 與 2-stage
-   `cross_device_reduce` 交界不合理，要 tune fused AR + RMSNorm crossover。
-
-## 11. 重現分析
+## 14. 重現分析
 
 ```bash
-# 1k / 8k full sweep
+# 1k / 8k full sweep（concurrency 4..64）
 ./run_profile_suite.sh --platform amd --moe-runner-backend aiter \
   --isl 1024 --osl 1024 --log-root "$PWD/prof_sweep/isl1k"
-
 ./run_profile_suite.sh --platform amd --moe-runner-backend aiter \
   --isl 8192 --osl 1024 --log-root "$PWD/prof_sweep/isl8k"
 
-# stage-separated profile for long context decode
+# stage-separated profile（長 context 的乾淨 decode trace）
 ./run_profile_suite.sh --platform amd --moe-runner-backend aiter \
   --isl 8192 --osl 1024 --profile-by-stage \
   --log-root "$PWD/prof_sweep/isl8k_bystage"
 
-# 分析 trace，建議先看 rank 0
+# 分析 trace（先看 rank 0）
 python3 scripts/profiling/analyze_profile_trace.py <view_dir> --ranks 0 \
   --out-dir <view_dir>/analysis
-
 python3 scripts/profiling/analyze_decode_trace.py \
   -d <decode_trace_dir> -o decode_breakdown.xlsx
 ```
 
 !!! note "本章的判讀邊界"
-    這裡的比例是 Kimi-K2.5-MXFP4、gfx950、TP4、SGLang + AITER MoE、
-    KV cache fp8_e4m3 與特定 concurrency sweep 下的結果。架構結論可遷移，但
-    具體比例會隨模型 hidden/intermediate size、top-k、context length、batch、
-    TP/EP 切法與 tuned config 而變。
+    這裡的比例是 Kimi-K2.5-MXFP4、gfx950、TP4、SGLang + AITER MoE、KV cache fp8_e4m3
+    與特定 concurrency sweep 下的結果。架構結論可遷移，但具體比例會隨模型 hidden /
+    intermediate size、top-k、context length、batch、TP/EP 切法與 tuned config 而變。

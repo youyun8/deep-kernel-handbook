@@ -1,7 +1,7 @@
-site_name: ML 效能手冊
+site_name: 深核手冊
 site_description: >-
-  從數學、乾淨參考實作到效能工程化的多 GPU 版本，系統化學習現代
-  ML 系統。核心深度路線：Mixture-of-Experts (MoE) 與 AITER。
+  深核手冊：從模型數學、乾淨參考實作到多 GPU 效能工程，系統化看穿現代
+  ML 系統如何在 GPU kernel 上跑得快。核心深度路線：Mixture-of-Experts (MoE) 與 AITER。
 site_author: ml-perf-handbook contributors
 site_url: https://youyun8.github.io/ml-perf-handbook/
 
@@ -20,11 +20,10 @@ theme:
     - navigation.instant
     - navigation.instant.progress
     - navigation.tracking
-    - navigation.tabs
-    - navigation.sections
     - navigation.top
     - navigation.indexes
     - navigation.footer
+    - navigation.prune
     - toc.follow
     - search.suggest
     - search.highlight
@@ -60,6 +59,7 @@ theme:
     text: Inter
     code: JetBrains Mono
   icon:
+    logo: material/chip
     repo: fontawesome/brands/github
     edit: material/pencil
     view: material/eye
