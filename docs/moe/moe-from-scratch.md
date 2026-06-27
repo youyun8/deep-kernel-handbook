@@ -6,7 +6,7 @@
   <span class="chip"><strong>程式碼：</strong> <code>code/moe/</code>（CPU、已測試）</span>
 </div>
 
-現在我們用 PyTorch 把一個完整的 MoE 層做出來 —— expert、router/gate、top-$k$ 選擇與加權合併。 先寫一個最乾淨、保證正確的版本，再重構成 [系統章節](systems-ep.md)與 [kernels](kernels.md) 要 優化的那種 dispatch 形式。這裡的所有程式碼都在 CPU 上可跑，並由 [`code/moe/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code/moe) 的測試把關。
+現在我們用 PyTorch 把一個完整的 MoE 層做出來 —— Expert、router/gate、top-$k$ 選擇與加權合併。 先寫一個最乾淨、保證正確的版本，再重構成 [系統章節](systems-ep.md)與 [kernels](kernels.md) 要 優化的那種 dispatch 形式。這裡的所有程式碼都在 CPU 上可跑，並由 [`code/moe/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code/moe) 的測試把關。
 
 ## MoE 層的剖析
 
@@ -19,25 +19,25 @@ MoE FFN 把單一前饋 block 換成：
 
 對一個 token 表示 $h\in\mathbb{R}^d$、gate 權重 $g_e$：
 
-$$ y = \sum\_{e \in \text{TopK}(h)} g_e \cdot \text{expert}\_e(h), \qquad g = \text{normalize}\big(\text{score}(W_r h)\big). $$
+$$ y = \sum_{e \in \text{TopK}(h)} g_e \cdot \text{expert}_e(h), \qquad g = \text{normalize}\big(\text{score}(W_r h)\big). $$
 
 ## 閘控：softmax 與 sigmoid
 
-gate 的計分函數，比它表面上看起來更關鍵。
+Gate 的計分函數，比它表面上看起來更關鍵。
 
 **Softmax gating**（GShard、Switch、Mixtral）：對全部 $E$ 個 logit 做 softmax，取 top-$k$， 再把這 $k$ 個重新歸一化成總和為 1。
 
-$$ p = \text{softmax}(W*r h), \quad g_e = \frac{p_e}{\sum*{j\in\text{TopK}} p_j}\ \text{for } e\in\text{TopK}. $$
+$$ p = \text{softmax}(W_r h), \quad g_e = \frac{p_e}{\sum_{j\in\text{TopK}} p_j}\ \text{for } e\in\text{TopK}. $$
 
 權重彼此*競爭*：expert 共用一份固定預算，抬高一個就會壓低其他。乾淨，但這把各 expert 的 gate 綁在一起（也是 [訓練穩定性](training-stability.md)裡不穩定的來源之一）。
 
 **Sigmoid gating**（DeepSeek-V3 與一些較新模型）：用 sigmoid *獨立*為每個 expert 計分，取 top-$k$，再把選中的歸一化。
 
-$$ s*e = \sigma(W_r h), \quad g_e = \frac{s_e}{\sum*{j\in\text{TopK}} s_j}. $$
+$$ s_e = \sigma(W_r h), \quad g_e = \frac{s_e}{\sum_{j\in\text{TopK}} s_j}. $$
 
 獨立計分把各 expert 解耦（沒有固定預算的零和競爭），這跟**細粒度 expert**與 **aux-loss-free** 的平衡偏差天生契合（見 [負載平衡](load-balancing.md)） —— 偏差可以直接加到 $s_e$ 上，而不會扭曲 softmax 的歸一化。現代大型 MoE 越來越愛用 sigmoid gating，正是這個原因。
 
-!!! note "top-k *之後*再歸一化"
+!!! Note "top-k *之後*再歸一化"
     兩種變體都會把**選中的** $k$ 個 gate 重新歸一化成總和為 1，這樣層的輸出尺度就不取決於 哪些／多少個 expert 被啟用。要不要重新歸一化是一個真實的設計選擇：Switch（$k=1$）略過它， 大多數 $k\ge2$ 的模型則會做。
 
 ## 參考實作#1：可讀循環
@@ -120,7 +120,7 @@ def moe_dispatch(x, topi, topv, experts, n_experts):
 
 `argsort`／`bincount`／`index_add_` 這三件套，在 GPU 上對應的就是融合的 **permute** kernel； 而每個 expert 的連續區塊則餵進單一的 **grouped GEMM** 呼叫。我們已經把「參差不齊的遮罩迴圈」 變成了「排序 + 密集區塊」。
 
-!!! tip "兩種實作經測試一致"
+!!! Tip "兩種實作經測試一致"
     [`code/moe/test_moe.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/moe/test_moe.py) 斷言 `MoELayerNaive` 與 dispatch 形式在隨機輸入、兩種 gate、數種 $k$ 下產生相同輸出 （`torch.allclose`），並且單一 expert 在 $E{=}1$ 時退化成普通 FFN。執行 `pytest code/moe`。
 
 ## 將其放入 Transformer 塊中
@@ -151,7 +151,7 @@ class MoEBlock(nn.Module):
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/moe.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 在 `MoELayerNaive` 裡實作 sigmoid gating，並用測試驗證。
@@ -161,8 +161,12 @@ class MoEBlock(nn.Module):
 
 ## 參考文獻
 
-- Shazeer et al. _Sparsely-Gated Mixture-of-Experts._ 2017。
-- Fedus, Zoph, Shazeer. _Switch Transformer._ 2021。
-- Jiang et al. _Mixtral of Experts._ 2024。
-- DeepSeek-AI. _DeepSeekMoE_ 與 _DeepSeek-V3._ 2024。
-- Gale et al. _MegaBlocks: Efficient Sparse Training with Mixture-of-Experts._ 2022。
+[1] N. Shazeer *et al.*, "Outrageously large neural networks: The sparsely-gated mixture-of-experts layer," in *Proc. ICLR*, 2017.
+
+[2] W. Fedus, B. Zoph, and N. Shazeer, "Switch Transformers: Scaling to trillion parameter models with simple and efficient sparsity," *J. Mach. Learn. Res.*, vol. 23, no. 120, pp. 1-39, 2022.
+
+[3] A. Q. Jiang *et al.*, "Mixtral of experts," *arXiv:2401.04088*, 2024.
+
+[4] D. Dai *et al.*, "DeepSeekMoE: Towards ultimate expert specialization in mixture-of-experts language models," *arXiv:2401.06066*, 2024.
+
+[5] T. Gale, D. Narayanan, C. Young, and M. Zaharia, "MegaBlocks: Efficient sparse training with mixture-of-experts," *arXiv:2211.15841*, 2022.

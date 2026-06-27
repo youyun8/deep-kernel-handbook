@@ -8,7 +8,7 @@
 
 本手冊其餘部分談的是怎麼讓 Transformer **跑得快**。這一頁先確保你清楚知道 Transformer **到底是什麼** —— 一次加一個機制，每步配一張圖。讀完之後，你能從原始文字一路追到下一個 token 預測，叫得出每個權重矩陣的名字，並理解為什麼大家都在優化 attention。不需要任何 Transformer 先備知識；只要你會把兩個矩陣相乘，就跟得上。
 
-!!! tip "怎麼讀這一頁"
+!!! Tip "怎麼讀這一頁"
     每一節只往這張流動的畫面上**加一個**機制。先看圖，再看式子，最後讀「它為什麼長這樣」的 註解。**形狀（維度）和數學一樣重要** —— 後面幾頁數 FLOPs 和 bytes，數的就是這些形狀。
 
 ## 工作：預測下一個 token
@@ -39,7 +39,7 @@ flowchart TB
 
 一段 $N$ 個 token 的序列就變成矩陣 $X \in \mathbb{R}^{N \times d}$ —— 每個 token 一列。**這個 $[N, d]$ 矩陣就是流經整個網路的東西**：每一層讀進一個 $[N,d]$，再寫出一個形狀完全相同的 $[N,d]$。
 
-!!! note "位置資訊必須另外加進去"
+!!! Note "位置資訊必須另外加進去"
     不管「cat」出現在句子哪裡，它的嵌入都一樣，但詞序是有意義的（「貓坐」≠「坐貓」）。所以 模型要額外注入**位置資訊** —— 傳統做法是在 $X$ 上加位置嵌入，現代模型則多半用**旋轉位置 嵌入（RoPE）**，在 attention 內部施加。無論哪種，目的都是告訴網路每個 token 在*哪裡*， 而不只是它*是什麼*。
 
 ## 步驟 2 — 核心思想：把 attention 看成軟性查表
@@ -72,7 +72,7 @@ flowchart TD
 
 寫成整個序列一次到位的形式（也就是你到處會看到的那個式子）：
 
-$$ \text{Attn}(Q,K,V) = \underbrace{\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d*h}}\right)}*{\text{attention weights } A\ [N\times N]} V. $$
+$$ \text{Attn}(Q,K,V) = \underbrace{\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d_h}}\right)}_{\text{attention weights } A\ [N\times N]} V. $$
 
 兩個 matmul 中間夾一個 softmax。我們把這兩段拆開來看。
 
@@ -109,7 +109,7 @@ flowchart TB
 
 ## 步驟 3 — 多頭 attention
 
-attention 的一個「頭（head）」學一種關係。真正的 Transformer 會**並行**跑很多個頭，每個頭有 自己的小 $W_Q, W_K, W_V$（$h$ 個頭時維度 $d_h = d / h$），再把各頭輸出接起來、乘上輸出投影 $W_O$。一個頭可能在追語法、另一個在追指代、再一個在追局部位置 —— 模型因此同時擁有多條關係 「通道」。
+Attention 的一個「頭（head）」學一種關係。真正的 Transformer 會**並行**跑很多個頭，每個頭有 自己的小 $W_Q, W_K, W_V$（$h$ 個頭時維度 $d_h = d / h$），再把各頭輸出接起來、乘上輸出投影 $W_O$。一個頭可能在追語法、另一個在追指代、再一個在追局部位置 —— 模型因此同時擁有多條關係 「通道」。
 
 ```mermaid
 flowchart TD
@@ -123,14 +123,14 @@ flowchart TD
     class C accIndigo;
 ```
 
-!!! note "頭，就是 MQA / GQA / MLA 動手腳的地方"
+!!! Note "頭，就是 MQA / GQA / MLA 動手腳的地方"
     每個頭通常各自保留自己的 key 與 value，所以 KV cache 會隨頭數成長。整個 attention 變體 家族 —— [MQA、GQA、MLA](attention-efficiency.md) —— 做的事就是**跨頭共享或壓縮 key/value**， 把快取縮小。下一頁會正式介紹它們；現在只要知道這個槓桿就在這裡。
 
 ## 步驟 4 — 前饋網路 (FFN)
 
-attention 負責在 token 之間**混合**資訊。Transformer block 的另一半則用一個小型的兩層 MLP **獨立**處理每個 token —— 這裡放著模型大部分的參數（與原始 FLOP）。它先把寬度放大約 4 倍， 施加一個非線性，再投影回來：
+Attention 負責在 token 之間**混合**資訊。Transformer block 的另一半則用一個小型的兩層 MLP **獨立**處理每個 token —— 這裡放著模型大部分的參數（與原始 FLOP）。它先把寬度放大約 4 倍， 施加一個非線性，再投影回來：
 
-$$ \text{FFN}(x) = W*{\text{down}}\,\sigma(W*{\text{up}}\,x), \qquad W*{\text{up}}\in\mathbb{R}^{d*{ff}\times d},\; d\_{ff}\approx 4d. $$
+$$ \text{FFN}(x) = W_{\text{down}}\,\sigma(W_{\text{up}}\,x), \qquad W_{\text{up}}\in\mathbb{R}^{d_{ff}\times d},\; d_{ff}\approx 4d. $$
 
 ```mermaid
 flowchart TB
@@ -140,7 +140,7 @@ flowchart TB
     class A accGreen;
 ```
 
-!!! tip "這正是 MoE 要稀疏化的對象"
+!!! Tip "這正是 MoE 要稀疏化的對象"
     FFN 是每個 token 上最貴的零件。一個 [Mixture-of-Experts](../moe/index.md) 層把這個單一 FFN 換成*許多個* FFN（「experts」），並把每個 token 只路由到其中幾個 —— 藉此把總參數量和每個 token 的計算量解耦。MoE 篇講的一切，都是這個方塊的變形。
 
 ## 步驟 5 — 組裝 Transformer 塊
@@ -222,7 +222,7 @@ flowchart TD
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/foundations.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 追蹤形狀：從 token id $[N]$ 開始，列出張量在這些步驟後的形狀 —— 嵌入後、$QK^\top$ 後、 softmax 後、$\times V$ 後、乘 $W_O$ 後、LM head 後。其中哪一個對 $N$ 是二次的？
@@ -233,8 +233,12 @@ flowchart TD
 
 ## 參考文獻
 
-- Vaswani et al. _Attention Is All You Need._ 2017（原始 Transformer）。
-- Phuong & Hutter. _Formal Algorithms for Transformers._ 2022（精確的偽代碼）。
-- Elhage et al. _A Mathematical Framework for Transformer Circuits._ 2021（把 attention 視為資訊搬移）。
-- Su et al. _RoFormer: Rotary Position Embedding._ 2021。
-- Zhang & Sennrich. _Root Mean Square Layer Normalization (RMSNorm)._ 2019。
+[1] A. Vaswani *et al.*, "Attention is all you need," in *Proc. NeurIPS*, 2017.
+
+[2] M. Phuong and M. Hutter, "Formal algorithms for transformers," *arXiv:2207.09238*, 2022.
+
+[3] N. Elhage *et al.*, "A mathematical framework for transformer circuits," Transformer Circuits Thread, 2021.
+
+[4] J. Su *et al.*, "RoFormer: Enhanced transformer with rotary position embedding," *arXiv:2104.09864*, 2021.
+
+[5] B. Zhang and R. Sennrich, "Root mean square layer normalization," in *Proc. NeurIPS*, 2019.

@@ -6,7 +6,7 @@
   <span class="chip"><strong>硬體：</strong> GPU</span>
 </div>
 
-inference 是一個 throughput 與 latency 的最佳化問題，其根基是 [memory wall](../foundations/attention-efficiency.md)：decode 受頻寬限制， 因此整個賽局就是攤銷權重讀取並避免浪費工作。本頁 涵蓋 **Continuous Batching**、**speculative decoding**、**KV cache 管理**， 以及 serving 系統如何將它們串接起來。MoE 專屬的 serving 已在 [MoE inference & serving](../moe/inference-serving.md) 討論。
+Inference 是一個 throughput 與 latency 的最佳化問題，其根基是 [memory wall](../foundations/attention-efficiency.md)：decode 受頻寬限制， 因此整個賽局就是攤銷權重讀取並避免浪費工作。本頁 涵蓋 **continuous batching**、**speculative decoding**、**KV cache 管理**， 以及 serving 系統如何將它們串接起來。MoE 專屬的 serving 已在 [MoE inference & serving](../moe/inference-serving.md) 討論。
 
 ## 再談兩個階段
 
@@ -25,11 +25,15 @@ $$
 
 其中因子 $2$ 對應 K 與 V 兩份；$L$ 為層數；$H_{kv}$ 為 KV head 數 （GQA/MQA 下小於 query head 數）；$d_h$ 為每個 head 的維度；$s$ 為序列 長度；$c$ 為每個元素的位元組數（FP16 為 $2$、FP8 為 $1$）。此式對每個 序列、每個 token 線性成長，是 serving 的動態記憶體瓶頸來源。
 
-paged attention 與 KV 量化都直接作用於此式：FP8 KV 把 $c$ 減半。 MLA（multi-head latent attention）則改為每個 token 只儲存單一個低秩 latent，而非完整的 $H_{kv}$ 份 K/V，因而把上式縮小一個很大的因子。
+Paged attention 與 KV 量化都直接作用於此式：FP8 KV 把 $c$ 減半。 MLA（multi-head latent attention）則改為每個 token 只儲存單一個低秩 latent，而非完整的 $H_{kv}$ 份 K/V，因而把上式縮小一個很大的因子。
 
-## Continuous Batching
+!!! Example "數值例子：一個 8k context 的 KV cache"
+    若 $L=32$、$H_{kv}=8$、$d_h=128$、$s=8192$、FP16/BF16 $c=2$，單一序列的 KV cache 為
+    $2\cdot32\cdot8\cdot128\cdot8192\cdot2\approx2.15$ GB。若同時服務 32 條這樣的序列，就要約 **69 GB** HBM。把 KV 改成 FP8 可降到約 34 GB；把 $H_{kv}$ 再縮小或用 MLA，才會真正改變可承載的並發上限。
 
-靜態批次（等待、湊滿一批、跑到全部完成）會浪費 GPU：較短的 序列提早完成，其時槽閒置直到最長的序列結束，而新到的 請求必須等下一批。**Continuous Batching（in-flight batching）**改以 **迭代（token）等級**排程：
+## Continuous batching
+
+靜態批次（等待、湊滿一批、跑到全部完成）會浪費 GPU：較短的 序列提早完成，其時槽閒置直到最長的序列結束，而新到的 請求必須等下一批。**continuous batching（in-flight batching）**改以 **迭代（token）等級**排程：
 
 - 每個 decode 步驟之後，完成的序列離開，等待中的請求即刻加入。
 - GPU 維持滿載；在相同的 latency 預算下，throughput 比靜態批次提升 2–20 倍。
@@ -59,17 +63,20 @@ $$
 
 這正是 decode throughput 會隨 batch 增加而提升的原因 — 直到 $I$ 超過 ridge point、轉為 compute-bound 為止。
 
+!!! Example "數值例子：batch 如何拉高 decode 強度"
+    BF16 weight-only decode 時 $c=2$，所以 batch $b=1$ 的 $I\approx1$ FLOP/byte；batch $b=64$ 時 $I\approx64$。若硬體 ridge point 約 250 FLOP/byte，batch 64 仍偏 memory-bound，但已比 batch 1 好很多。W4 權重的 $c=0.5$，同樣 batch 64 時 $I\approx256$，已接近 ridge；這說明量化與 continuous batching 是互相放大的。
+
 每個 token 的 decode 時間下界（由權重串流主宰）為
 
 $$
-t_{\text{step}} \gtrsim \frac{P\,c}{\beta},
+T_{\text{step}} \gtrsim \frac{P\,c}{\beta},
 $$
 
 其中 $\beta$ 為 HBM 頻寬（bytes/s）。這就是 decode 的頻寬牆：在轉為 compute-bound 之前，單步時間無法低於此值。
 
 ### Throughput 與 latency
 
-在 Continuous Batching 下，throughput 為
+在 continuous batching 下，throughput 為
 
 $$
 \text{throughput} = \frac{b}{t_{\text{step}}},
@@ -78,14 +85,17 @@ $$
 其中 $b$ 為同時在飛行中的 token（請求）數，$t_{\text{step}}$ 為單一 decode 步驟的時間。增大 $b$ 會提高 throughput，但也會推高每個請求的 latency （TPOT）。Little's law 將兩者綁定：
 
 $$
-b = \text{throughput} \times \text{latency}.
+B = \text{throughput} \times \text{latency}.
 $$
 
 因此 serving 的調參本質是在固定的 latency SLO 下，盡量把 $b$ 推大。
 
+!!! Example "數值例子：Little's law 設定並發"
+    如果你的服務目標是 800 tokens/s，且平均 TPOT latency 預算是 80 ms，穩態 in-flight token 數約為 $800\cdot0.08=64$。這意味著 scheduler 至少要維持約 64 條 decode 序列同時在飛，否則 throughput 目標與 latency SLO 不可能同時成立。
+
 ## Speculative decoding
 
-decode 受記憶體限制，因此 GPU 在等待記憶體時有閒置的計算能力。 speculative decoding 花費這份計算，在每次昂貴的驗證步驟中一次 產生多個 tokens：
+Decode 受記憶體限制，因此 GPU 在等待記憶體時有閒置的計算能力。 Speculative decoding 花費這份計算，在每次昂貴的驗證步驟中一次 產生多個 tokens：
 
 1. 一個便宜的 **draft**（一個小模型、模型自身的早期層，或 [n-gram/Medusa/EAGLE heads](#)）提出 $k$ 個候選 tokens。
 2. 大的 **target** 模型在**單一次** forward pass 中平行驗證全部 $k$ 個候選 （成本與一個 decode 步驟相當，因為它本來就是 memory-bound）。
@@ -102,19 +112,23 @@ $$
 $$
 \text{speedup} \approx \frac{1}{c_{\text{ratio}}}\cdot\frac{1 - \alpha^{\,k+1}}{1 - \alpha},
 \qquad
-c_{\text{ratio}} = \frac{t_{\text{draft}} + t_{\text{verify}}}{t_{\text{decode}}}.
+C_{\text{ratio}} = \frac{t_{\text{draft}} + t_{\text{verify}}}{t_{\text{decode}}}.
 $$
 
 若 draft 夠好，每次 target forward pass 可近乎免費換得 2–3× tokens， 因為驗證本來就受記憶體限制。self-speculation（Medusa/EAGLE） 免去執行獨立的 draft 模型。DeepSeek-V3 的 [Multi-token Prediction](../moe/case-studies.md) 頭可充當起草者。
 
-!!! note "為什麼是無損的"
+!!! Example "數值例子：speculation 的期望收益"
+    若 draft 長度 $k=4$、接受率 $\alpha=0.7$，每次 target verify 期望產生
+    $(1-0.7^5)/(1-0.7)\approx2.77$ 個 token。若 draft+verify 的成本是普通 decode 的 $1.2\times$，淨加速約 $2.77/1.2\approx2.3\times$。若接受率降到 0.4，同樣計算只剩約 $1.65/1.2\approx1.4\times$，所以 draft 品質非常關鍵。
+
+!!! Note "為什麼是無損的"
     接受/拒絕步驟的建構，使得被接受 tokens 的分佈 *完全*等同於直接從 target 模型取樣。speculation 改變的是 _計算的時程_，而非輸出分佈。
 
 ## KV cache 管理
 
 KV cache 是 serving 的動態記憶體消耗者（參見 [attention efficiency](../foundations/attention-efficiency.md)，並回顧上方 $\text{bytes} = 2\,L\,H_{kv}\,d_h\,s\,c$）。可用的槓桿：
 
-- **paged attention**：以區塊為單位配置 → 無碎片，支援共享 （prefix caching、平行取樣）。它是 Continuous Batching 的基底。
+- **paged attention**：以區塊為單位配置 → 無碎片，支援共享 （prefix caching、平行取樣）。它是 continuous batching 的基底。
 - **prefix/prompt caching**：對共享系統 prompt 的請求重複使用其 KV （copy-on-write 區塊）— 對具有固定前導的聊天場景效益巨大。
 - **架構收縮**：GQA/MQA/MLA 從源頭（降低 $H_{kv}$ 或改存 latent）縮小 cache。
 - **KV 量化**：以 int8/FP8 儲存 K/V（降低 $c$）以容納更多序列； 在長上下文中要留意品質。
@@ -145,24 +159,35 @@ flowchart TD
 
 ## 要點
 
-- decode **受記憶體限制**；serving 的核心是攤銷權重讀取而非 浪費工作（$I \approx 2b/c$，下界 $t_{\text{step}} \gtrsim P c/\beta$）。
-- **Continuous Batching**（paged KV cache 上的迭代級調度）是 throughput 最大的勝利。
+- Decode **受記憶體限制**；serving 的核心是攤銷權重讀取而非 浪費工作（$I \approx 2b/c$，下界 $t_{\text{step}} \gtrsim P c/\beta$）。
+- **continuous batching**（paged KV cache 上的迭代級調度）是 throughput 最大的勝利。
 - **speculative decoding** 以備用計算換取更少的 target forward pass， 且**無損** — 正因 decode 受記憶體限制才有效。
 - **KV cache 管理**（paging、prefix caching、量化、架構 收縮）控制動態記憶體上限；**融合、graphs、量化與 prefill/decode 分解**讓堆疊更完整。
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/performance.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 將 speculative decoding 的期望加速推導為 draft 接受率 $\alpha$ 與提案長度 $k$ 的函數。
-2. 估計 Continuous Batching 相對於靜態批次的 throughput 增益，工作負載 的序列長度在 $[64, 1024]$ 間均勻分佈。
+2. 估計 continuous batching 相對於靜態批次的 throughput 增益，工作負載 的序列長度在 $[64, 1024]$ 間均勻分佈。
 3. 以 prefix caching，計算 100 個共享同一個 2k-token 系統 prompt 的 請求所節省的 KV 記憶體（用 $\text{bytes} = 2\,L\,H_{kv}\,d_h\,s\,c$）。
-4. prefill/decode 分解何時有益、何時有害？請就池之間的 KV cache 傳輸成本論證。
+4. Prefill/decode 分解何時有益、何時有害？請就池之間的 KV cache 傳輸成本論證。
 
 ## 參考文獻
 
-- Yu et al. _Orca: Continuous batching._ 2022；Kwon et al. _vLLM / PagedAttention._ 2023.
-- Leviathan et al. & Chen et al. _Speculative decoding._ 2023.
-- Cai et al. _Medusa._ 2024；Li et al. _EAGLE._ 2024.
-- Zhong et al. _Distributed/disaggregated serving._ 2024；Patel et al. _Splitwise._ 2024.
+[1] G.-I. Yu *et al.*, "Orca: A distributed serving system for transformer-based generative models," in *Proc. OSDI*, 2022.
+
+[2] W. Kwon *et al.*, "Efficient memory management for large language model serving with PagedAttention," in *Proc. SOSP*, 2023.
+
+[3] Y. Leviathan, M. Kalman, and Y. Matias, "Fast inference from transformers via speculative decoding," in *Proc. ICML*, 2023.
+
+[4] C. Chen *et al.*, "Accelerating large language model decoding with speculative sampling," *arXiv:2302.01318*, 2023.
+
+[5] T. Cai *et al.*, "Medusa: Simple LLM inference acceleration framework with multiple decoding heads," in *Proc. ICML*, 2024.
+
+[6] Y. Li *et al.*, "EAGLE: Speculative sampling requires rethinking feature uncertainty," in *Proc. ICML*, 2024.
+
+[7] Y. Zhong *et al.*, "DistServe: Disaggregating prefill and decoding for goodput-optimized large language model serving," in *Proc. OSDI*, 2024.
+
+[8] P. Patel *et al.*, "Splitwise: Efficient generative LLM inference using phase splitting," in *Proc. ISCA*, 2024.

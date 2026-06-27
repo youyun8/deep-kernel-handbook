@@ -38,9 +38,9 @@ record_function("Decode") window
 | 每專家 W13（gate+up）            | `[512, 7168]` FP4               | `w13_up_dim=512`（= 2×256）                         |
 | 每專家 W2（down）                | `[7168, 256]` FP4               | `w2_down_dim=128`（fp4x2 packed）                   |
 
-!!! note "`moe_tp_size=8`"
+!!! Note "`moe_tp_size=8`"
 
-    1. **runtime log 直接印出 `moe_tp_size=8`**： `FusedMoE.__init__: ... num_experts=385, num_fused_shared_experts=1, moe_ep_size=1, moe_tp_size=8`
+    1. **runtime log 直接印出 `moe_tp_size=8`**： `FusedMoE.__init__: ... Num_experts=385, num_fused_shared_experts=1, moe_ep_size=1, moe_tp_size=8`
     2. **與 server_args 一致**：profiling 用 `--tensor-parallel-size 4`，server_args 為 `tp_size=4, moe_ep_size=1, moe_dp_size=1` （`shared_expert_fusion_on/.../server.log` 第 8 行）。
     3. **與 SGLang 推導式一致**： `moe_tp_size = tp_size // moe_ep_size // moe_dp_size` （`/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py:1118`）。
 
@@ -57,5 +57,5 @@ record_function("Decode") window
 1. [Decode 算子數學對照](decode-math.md) —— 把整個 decode step 的數學路徑（attention + MoE）逐一對齊。
 2. [Shared-expert fusion 開 / 關](fusion.md) —— 怎麼從 trace 框出一層，以及 fusion 開啟 / 關閉兩組 kernel 順序對照。
 3. [MoE GEMM 與吸收式 BMM](moe-gemm.md) —— 為什麼 stage-1 ≈ 2× stage-2、吸收式 BMM，以及 tuned_fmoe.csv 的完整 kernel 名稱。
-4. [TP 通訊、查表與重現](comms-repro.md) —— all-reduce 成本、trace pattern 回原始碼的查表，以及如何重現這兩組 trace。
+4. [TP 通訊、查表與重現](comms-repro.md) —— All-reduce 成本、trace pattern 回原始碼的查表，以及如何重現這兩組 trace。
 5. [AITER 原始碼解析](source-breakdown.md) —— AITER repo 架構、tuning 機制與「要改 MoE 該動哪裡」。

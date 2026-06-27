@@ -8,7 +8,7 @@
 
 Triton 讓你用 Python 寫 GPU kernel，編譯成接近峰值的機器碼，同時替你處理那些痛苦的細節 （coalescing、SMEM 分段、向量化、大部分排程）。你以 **tile（張量塊）** 的角度思考，而不是 單個 thread。本路線從最簡單的 kernel 一路堆到融合 softmax 與 matmul，再指向手冊其他地方的 attention / MoE kernel。
 
-!!! info "為什麼先學 Triton"
+!!! Info "為什麼先學 Triton"
     對大多數 kernel，Triton 能以一小部分的工作量達到手調 CUDA 80–95% 的效能，而且*同一份原始碼 也能在 AMD 上跑*（Triton 有 ROCm 後端，對映到 wavefront-64 與 MFMA）。只有當你需要 Triton 沒暴露出來的控制權時，才往下掉到 [CUDA/HIP](cuda-hip-track.md)。
 
 ## Triton 心智模型
@@ -114,7 +114,7 @@ def matmul_kernel(a_ptr, b_ptr, c_ptr, M, N, K,
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/performance.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 跑向量加法與 softmax kernel；對照 PyTorch 驗證，並與原生操作比 benchmark。
@@ -124,6 +124,10 @@ def matmul_kernel(a_ptr, b_ptr, c_ptr, M, N, K,
 
 ## 參考文獻
 
-- Tillet, Kung, Cox. _Triton._ 2019；以及 Triton 官方教學。
-- Dao et al. _FlashAttention_（本頁的 kernel 就是為它鋪路）。2022。
-- AMD ROCm Triton 後端文件。
+[1] P. Tillet, H. T. Kung, and D. Cox, "Triton: An intermediate language and compiler for tiled neural network computations," in *Proc. MAPL*, 2019.
+
+[2] Triton Project, "Triton documentation and tutorials," Documentation, 2024.
+
+[3] T. Dao, D. Y. Fu, S. Ermon, A. Rudra, and C. Re, "FlashAttention: Fast and memory-efficient exact attention with IO-awareness," in *Proc. NeurIPS*, 2022.
+
+[4] AMD, "ROCm Triton backend," Documentation, 2024.

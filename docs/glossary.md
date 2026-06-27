@@ -46,9 +46,9 @@
 
 **PagedAttention** ：以區塊為單位配置 KV cache（如虛擬記憶體分頁），消除碎片並支援共享。
 
-## Mixture-of-Experts
+## MoE (Mixture of Experts)
 
-**MoE（Mixture-of-Experts）** ：含許多 expert FFN 與一個 router 的層，每個 token 只啟動其中幾個，把總參數和每 token FLOP 解耦。 見[MoE 篇](moe/index.md)。
+**MoE (Mixture of Experts)** ：含許多 expert FFN 與一個 router 的層，每個 token 只啟動其中幾個，把總參數和每 token FLOP 解耦。 見[MoE 篇](moe/index.md)。
 
 **expert** ：MoE 層裡並列的其中一個 FFN（通常是 SwiGLU）。
 
@@ -121,5 +121,5 @@
 
 互連（用於 [分散式訓練](performance/distributed-training.md)）：節點內 **NVLink** ~0.9 TB/s/GPU （NVLink 4）或 MI300 上的 **Infinity Fabric**；跨節點 **InfiniBand/RoCE** ~25–50 GB/s/GPU；主機 **PCIe Gen5** ~64 GB/s。從 HBM → NVLink → IB → PCIe 每一級掉 1–2 個數量級 —— 這正是為什麼要把並行 小心對映，好讓最多話的 collective 走最快的連結。
 
-!!! note "怎麼用這些數字"
+!!! Note "怎麼用這些數字"
     數字會隨 SKU、時脈與稀疏性宣稱而變（廠商常引用 2× 結構稀疏 —— 對密集要減半）。你的估計裡該 穩健的是**機制**與**數量級**，而不是第三位有效數字。

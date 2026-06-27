@@ -32,6 +32,10 @@ $$
 
 其中 $M$ = 訊息位元組數，$N$ = 參與裝置數，$\alpha$ = 每一跳（per-hop）的 延遲，$\beta$ = 每條鏈路的頻寬（位元組／秒）。延遲項隨 $N$ 線性成長，但 頻寬項 $2\frac{N-1}{N}\frac{M}{\beta}\to 2\frac{M}{\beta}$ 在 $N$ 變大時趨於與 $N$ 無關 — 這正是 ring all-reduce（以及建立其上的 DP）能在頻寬上良好擴展的原因。
 
+!!! Example "數值例子：8 卡 all-reduce 的資料量"
+    若梯度 bucket 大小 $M=1$ GB、$N=8$，每張 GPU 在 ring all-reduce 中搬移約
+    $2\cdot(7/8)\cdot1=1.75$ GB。若鏈路有效頻寬 $200$ GB/s，頻寬時間約 $1.75/200=8.75$ ms，再加上 $14\alpha$ 的延遲項。這說明大 bucket 主要看頻寬，小 bucket 則容易被延遲與 launch overhead 主導。
+
 ## Data parallelism (DP) 與 ZeRO
 
 **data parallelism**：在每個 GPU 上複製模型、切分*批次*，並對梯度做 all-reduce，使每份副本更新到一致的權重。實作簡單、通訊量輕， 但每個 GPU 都得儲存**完整**的模型 + 梯度 + 最佳化器狀態 — 撞上記憶體牆。
@@ -62,6 +66,9 @@ $$
 
 其中 $P$ = 參數數量、$N$ = DP（分片）裝置數。代價是額外的 all-gather/reduce-scatter 流量（與計算重疊）。這是在不動模型結構 的前提下，訓練大型 dense 模型的預設做法。
 
+!!! Example "數值例子：70B 模型的 ZeRO 記憶體"
+    70B 參數用 Adam mixed precision 時，未分片狀態約 $16P=16\cdot70$B bytes $\approx1.12$ TB/GPU，單卡不可能。若 $N=8$ 做 ZeRO-3/FSDP，狀態降到 $1.12/8\approx140$ GB/GPU；若還有 activation、workspace 與 fragmentation，仍需要 activation checkpointing、TP/PP 或更多 GPU。這就是為什麼 ZeRO 解的是「狀態冗餘」，不是所有記憶體問題。
+
 ```mermaid
 flowchart TB
     O[optimizer state<br/>FP32 moments + master] --> Z1[ZeRO-1<br/>shard optimizer]
@@ -83,7 +90,7 @@ flowchart TB
 在 Megatron 式 TP 中，每個 transformer 層在 forward pass 需要 2 個 all-reduce（attention 區塊與 MLP 區塊各一），backward pass 再多 2 個。 每個 all-reduce 作用在大小約
 
 $$
-b \cdot s \cdot H \cdot c \quad\text{位元組}
+B \cdot s \cdot H \cdot c \quad\text{位元組}
 $$
 
 的 activation 上，其中 $b$ = batch 大小、$s$ = 序列長度、$H$ = hidden 維度、 $c$ = 每個元素的位元組數。由於每層、每方向都要對整塊 activation 做 all-reduce，TP 是**頻寬密集**的。
@@ -104,6 +111,10 @@ $$
 $$
 
 其中 $p$ = 管線階段數、$m$ = microbatch 數。提高 $m$ 即可壓低 bubble （$m \to \infty$ 時 bubble $\to 0$）。
+
+!!! Example "數值例子：要多少 microbatch 才有 10% bubble"
+    若 pipeline 有 $p=8$ 個 stage，要讓 $\frac{p-1}{m+p-1}\le0.1$，需
+    $7/(m+7)\le0.1$，也就是 $m\ge63$。這代表 PP 需要足夠多 microbatch 才有效；若 batch 太小，bubble 會吞掉大量算力，即使每張 GPU 上的 kernel 都很快。
 
 - ✅ 通訊量低（只在階段邊界傳 activation），可跨節點擴展。
 - ❌ 管線 **bubble** 浪費算力；需要足夠多的 microbatch 來攤銷。 DeepSeek 的 **DualPipe** 是一種專為隱藏 MoE all-to-all 而設計的 PP 排程。
@@ -163,7 +174,7 @@ for x, y in sharded_loader:                      # each rank gets a batch slice
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/performance.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 證明 all-reduce = reduce-scatter + all-gather，並用它說明 ZeRO-2 的 通訊量與普通 DDP 相比如何。
@@ -173,8 +184,16 @@ for x, y in sharded_loader:                      # each rank gets a batch slice
 
 ## 參考文獻
 
-- Shoeybi 等人。 _Megatron-LM。_ 2019；Narayanan 等人。 _Efficient Large-Scale LM Training on GPU Clusters。_ 2021。
-- Rajbhandari 等人。 _ZeRO。_ 2020；Zhao 等人。 _PyTorch FSDP。_ 2023。
-- Huang 等人。 _GPipe。_ 2019。
-- Liu 等人。 _Ring Attention。_ 2023；Korthikanti 等人。 _Sequence Parallelism / Activation Recomputation。_ 2022。
-- DeepSeek-AI。 _DeepSeek-V3 / DualPipe。_ 2024。
+[1] M. Shoeybi *et al.*, "Megatron-LM: Training multi-billion parameter language models using model parallelism," *arXiv:1909.08053*, 2019.
+
+[2] D. Narayanan *et al.*, "Efficient large-scale language model training on GPU clusters using Megatron-LM," in *Proc. SC*, 2021.
+
+[3] S. Rajbhandari *et al.*, "ZeRO: Memory optimizations toward training trillion parameter models," in *Proc. SC*, 2020.
+
+[4] Y. Zhao *et al.*, "PyTorch FSDP: Experiences on scaling fully sharded data parallel," *Proc. VLDB Endow.*, vol. 16, no. 12, pp. 3848-3860, 2023.
+
+[5] Y. Huang *et al.*, "GPipe: Efficient training of giant neural networks using pipeline parallelism," in *Proc. NeurIPS*, 2019.
+
+[6] H. Liu, M. Zaharia, and P. Abbeel, "Ring attention with blockwise transformers for near-infinite context," *arXiv:2310.01889*, 2023.
+
+[7] DeepSeek-AI, "DeepSeek-V3 technical report," *arXiv:2412.19437*, 2024.

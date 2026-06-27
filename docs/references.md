@@ -2,7 +2,7 @@
 
 依主題分組、附簡短註解的精選閱讀清單。這些是手冊背後的一手來源 —— 想看原始細節時從這裡開始。引用採 **IEEE 格式**並全域連續編號 [1]–[41]；每條後附簡短中文註解，說明*為什麼重要*。 （請自行找最新的版本／出處；arXiv 編號與會議卷期會隨修訂而變。）
 
-!!! note "怎麼用這份清單"
+!!! Note "怎麼用這份清單"
     MoE 的閱讀順序建議：[11] → [13]／[12] → [16] → [21] → [18]。kernel 則先讀 [20] 與其官方教學，再讀 [8]。
 
 ## 基礎：系統、scaling、精度
@@ -21,17 +21,17 @@
 - **[9]** N. Shazeer, "Fast transformer decoding: One write-head is all you need," *arXiv:1911.02150* (MQA), 2019；J. Ainslie *et al.*, "GQA: Training generalized multi-query transformer models from multi-head checkpoints," in *Proc. EMNLP*, 2023. —— 架構層級的 KV cache 縮減。
 - **[10]** W. Kwon *et al.*, "Efficient memory management for large language model serving with PagedAttention," in *Proc. SOSP*, 2023 (vLLM). —— KV cache 的分頁。
 
-## Mixture-of-Experts：演算法
+## MoE (Mixture of Experts)：演算法
 
 - **[11]** N. Shazeer *et al.*, "Outrageously large neural networks: The sparsely-gated mixture-of-experts layer," in *Proc. ICLR*, 2017. —— 源頭：gating、top-$k$、負載平衡損失。
-- **[12]** D. Lepikhin *et al.*, "GShard: Scaling giant models with conditional computation and automatic sharding," *arXiv:2006.16668*, 2020. —— capacity、token drop、規模化的 all-to-all dispatch。
-- **[13]** W. Fedus, B. Zoph, and N. Shazeer, "Switch Transformer: Scaling to trillion parameter models with simple and efficient sparsity," *J. Mach. Learn. Res.*, 2022. —— top-1 routing、本手冊採用的簡化 auxiliary loss、初始化/穩定性技巧。
-- **[14]** B. Zoph *et al.*, "ST-MoE: Designing stable and transferable sparse expert models," *arXiv:2202.08906*, 2022. —— router z-loss 與穩定/可遷移性的經驗。
-- **[15]** Y. Zhou *et al.*, "Mixture-of-experts with expert choice routing," in *Proc. NeurIPS*, 2022. —— expert-choice，token-choice 的對偶。
+- **[12]** D. Lepikhin *et al.*, "GShard: Scaling giant models with conditional computation and automatic sharding," *arXiv:2006.16668*, 2020. —— Capacity、token drop、規模化的 all-to-all dispatch。
+- **[13]** W. Fedus, B. Zoph, and N. Shazeer, "Switch Transformer: Scaling to trillion parameter models with simple and efficient sparsity," *J. Mach. Learn. Res.*, 2022. —— Top-1 routing、本手冊採用的簡化 auxiliary loss、初始化/穩定性技巧。
+- **[14]** B. Zoph *et al.*, "ST-MoE: Designing stable and transferable sparse expert models," *arXiv:2202.08906*, 2022. —— Router z-loss 與穩定/可遷移性的經驗。
+- **[15]** Y. Zhou *et al.*, "Mixture-of-experts with expert choice routing," in *Proc. NeurIPS*, 2022. —— Expert-choice，token-choice 的對偶。
 - **[16]** D. Dai *et al.*, "DeepSeekMoE: Towards ultimate expert specialization in mixture-of-experts language models," in *Proc. ACL*, 2024. —— 細粒度 + 共享 expert；現代配方的基礎。
 - **[17]** A. Clark *et al.*, "Unified scaling laws for routed language models," in *Proc. ICML*, 2022. —— 稀疏模型如何 scaling。
 
-## Mixture-of-Experts：系統與 kernel
+## MoE (Mixture of Experts)：系統與 kernel
 
 - **[18]** T. Gale, D. Narayanan, C. Young, and M. Zaharia, "MegaBlocks: Efficient sparse training with mixture-of-experts," in *Proc. MLSys*, 2023. —— 區塊稀疏、dropless MoE；grouped GEMM 的思路。
 - **[19]** S. Rajbhandari *et al.*, "DeepSpeed-MoE: Advancing mixture-of-experts inference and training to power next-generation AI scale," in *Proc. ICML*, 2022. —— 大規模 serve MoE 的 training 與 inference 系統。
@@ -40,19 +40,19 @@
 
 ## 分散式訓練
 
-- **[22]** M. Shoeybi *et al.*, "Megatron-LM: Training multi-billion parameter language models using model parallelism," *arXiv:1909.08053*, 2019；D. Narayanan *et al.*, "Efficient large-scale language model training on GPU clusters using Megatron-LM," in *Proc. SC*, 2021. —— tensor + pipeline 並行與 N 維組合。
+- **[22]** M. Shoeybi *et al.*, "Megatron-LM: Training multi-billion parameter language models using model parallelism," *arXiv:1909.08053*, 2019；D. Narayanan *et al.*, "Efficient large-scale language model training on GPU clusters using Megatron-LM," in *Proc. SC*, 2021. —— Tensor + pipeline 並行與 N 維組合。
 - **[23]** S. Rajbhandari, J. Rasley, O. Ruwase, and Y. He, "ZeRO: Memory optimizations toward training trillion parameter models," in *Proc. SC*, 2020；Y. Zhao *et al.*, "PyTorch FSDP: Experiences on scaling fully sharded data parallel," *Proc. VLDB Endow.*, 2023. —— 切分 optimizer/梯度/參數狀態。
-- **[24]** Y. Huang *et al.*, "GPipe: Efficient training of giant neural networks using pipeline parallelism," in *Proc. NeurIPS*, 2019. —— pipeline 並行與 micro-batching。
+- **[24]** Y. Huang *et al.*, "GPipe: Efficient training of giant neural networks using pipeline parallelism," in *Proc. NeurIPS*, 2019. —— Pipeline 並行與 micro-batching。
 - **[25]** H. Liu, M. Zaharia, and P. Abbeel, "Ring attention with blockwise transformers for near-infinite context," *arXiv:2310.01889*, 2023；V. A. Korthikanti *et al.*, "Reducing activation recomputation in large transformer models," in *Proc. MLSys*, 2023. —— 長上下文並行與 activation 記憶體。
 
 ## 壓縮與 inference
 
 - **[26]** E. Frantar, S. Ashkboos, T. Hoefler, and D. Alistarh, "GPTQ: Accurate post-training quantization for generative pre-trained transformers," in *Proc. ICLR*, 2023. —— 誤差修正的低位元權重量化。
-- **[27]** J. Lin *et al.*, "AWQ: Activation-aware weight quantization for LLM compression and acceleration," in *Proc. MLSys*, 2024. —— activation-aware 權重量化。
+- **[27]** J. Lin *et al.*, "AWQ: Activation-aware weight quantization for LLM compression and acceleration," in *Proc. MLSys*, 2024. —— Activation-aware 權重量化。
 - **[28]** G. Xiao *et al.*, "SmoothQuant: Accurate and efficient post-training quantization for large language models," in *Proc. ICML*, 2023. —— 為 W8A8 把 activation 離群值遷移出去。
 - **[29]** G.-I. Yu *et al.*, "Orca: A distributed serving system for transformer-based generative models," in *Proc. OSDI*, 2022. —— 迭代級（continuous）batching。
 - **[30]** Y. Leviathan, M. Kalman, and Y. Matias, "Fast inference from transformers via speculative decoding," in *Proc. ICML*, 2023；C. Chen *et al.*, "Accelerating large language model decoding with speculative sampling," *arXiv:2302.01318*, 2023. 另見 Medusa (T. Cai *et al.*, 2024) 與 EAGLE (Y. Li *et al.*, 2024). —— 無損的 draft-then-verify。
-- **[31]** Y. Zhong *et al.*, "DistServe: Disaggregating prefill and decoding for goodput-optimized large language model serving," in *Proc. OSDI*, 2024；P. Patel *et al.*, "Splitwise: Efficient generative LLM inference using phase splitting," in *Proc. ISCA*, 2024. —— prefill/decode 拆分。
+- **[31]** Y. Zhong *et al.*, "DistServe: Disaggregating prefill and decoding for goodput-optimized large language model serving," in *Proc. OSDI*, 2024；P. Patel *et al.*, "Splitwise: Efficient generative LLM inference using phase splitting," in *Proc. ISCA*, 2024. —— Prefill/decode 拆分。
 - **[32]** G. Hinton, O. Vinyals, and J. Dean, "Distilling the knowledge in a neural network," *arXiv:1503.02531*, 2015. —— 知識蒸餾的源頭。
 
 ## 案例研究引用的模型

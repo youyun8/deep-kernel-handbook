@@ -62,7 +62,7 @@ for step, (xb, yb) in enumerate(loader):
 
 盯著 [健康指標](../moe/load-balancing.md)：損失下降、**負載 CV** 趨近 0、**drop rate** 維持低、 **routing 熵**穩定（不崩塌）。若看到尖峰/NaN，回去看 [訓練穩定性](../moe/training-stability.md) （z-loss、FP32 router、初始化、梯度裁剪）。
 
-??? success "你應該看到什麼"
+??? Success "你應該看到什麼"
     在玩具任務上，訓練損失應平穩下降，負載 CV 應在幾百步內從初始值降到約 0.1–0.2（偏差控制器 在發揮作用），drop rate 維持低。把平衡關掉「看它崩塌」 —— 少數 expert 吃掉一切、熵崩潰 —— 平衡機制的價值就具體了。
 
 ## 第 3 步 — 優化並量測
@@ -105,7 +105,7 @@ for step, (xb, yb) in enumerate(loader):
 
 ## 練習
 
-!!! tip "解答"
+!!! Tip "解答"
     參考解答在 [解答頁](../solutions/capstones.md)。請先試做每一題，再展開對照。
 
 1. 跑參考實作，再拿掉平衡、量化它的崩塌（熵、負載 CV、最終損失）。
@@ -113,8 +113,16 @@ for step, (xb, yb) in enumerate(loader):
 3. 在生成迴圈加上 KV cache，量測 decode latency，並與「每步全部重算」的基線比較。
 4. 把 expert 量化成 int8，回報品質（val 損失）與速度。
 
-## 參考
+## 參考文獻
 
-- 整個[MoE 篇](../moe/index.md)與[效能工程篇](../performance/index.md)。
-- Karpathy. _nanoGPT_（可擴充的密集骨架）。
-- Gale et al. _MegaBlocks_；Jiang et al. _Mixtral_；DeepSeek-AI _DeepSeek-V3_。
+[1] Deep Kernel Handbook, "MoE," 2026. [Online]. Available: ../moe/index.md
+
+[2] Deep Kernel Handbook, "Performance engineering," 2026. [Online]. Available: ../performance/index.md
+
+[3] A. Karpathy, "nanoGPT," GitHub repository, 2022.
+
+[4] T. Gale, D. Narayanan, C. Young, and M. Zaharia, "MegaBlocks: Efficient sparse training with mixture-of-experts," *arXiv:2211.15841*, 2022.
+
+[5] A. Q. Jiang *et al.*, "Mixtral of experts," *arXiv:2401.04088*, 2024.
+
+[6] DeepSeek-AI, "DeepSeek-V3 technical report," *arXiv:2412.19437*, 2024.

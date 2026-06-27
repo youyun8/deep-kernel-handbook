@@ -12,7 +12,7 @@
 
 對於一個 normal number，給定符號位 $s$、指數欄位 $e$（bias 為 $b$），以及小數欄位 $f$（含隱含前導 1 共 $p$ 個 mantissa bits），其值為：
 
-$$ x = (-1)^s \,(1 + f)\, 2^{\,e-b}, \qquad f=\sum\_{i=1}^{p-1} d_i 2^{-i} $$
+$$ x = (-1)^s \,(1 + f)\, 2^{\,e-b}, \qquad f=\sum_{i=1}^{p-1} d_i 2^{-i} $$
 
 其中 $d_i \in \{0,1\}$ 為小數位元。對於 subnormal（指數欄位為全零）則去除隱含前導 1：
 
@@ -48,16 +48,19 @@ $$ \frac{|\mathrm{fl}(x)-x|}{|x|} \le u = \tfrac12 \varepsilon_m = 2^{-p} $$
 
 代入各格式：FP32（$p=24$）有 $u\approx 6\times10^{-8}$；BF16（$p=8$）有 $u\approx 4\times10^{-3}$，這正是其僅 ~2 位十進位有效位數的來源。
 
+!!! Example "數值例子：BF16 為何會吃掉小增量"
+    BF16 的 $\varepsilon_m=2^{-7}\approx0.0078$。在 1.0 附近，相鄰可表示數大約差 0.0078；round-to-nearest 的半格是 $u=0.0039$。因此把 $1.0 + 0.001$ 存成 BF16 時，$0.001<u$，結果仍會捨入回 **1.0**。這就是為什麼殘差、LayerNorm 統計、loss scaling 檢查不能用 BF16 來累加。
+
 ## 為什麼 BF16 在 training 上勝出
 
 大型模型中的梯度與 activation 跨越巨大的動態範圍，並偶爾出現峰值。FP16 狹窄的指數範圍意味著那些尖峰會**溢位到 `inf`**（隨後 `NaN` 傳播到各處），而微小梯度則**下溢到零**。純 FP16 的 training 需要 _損失縮放_ —— 把損失乘以一個大因子 $S$，使梯度落入 FP16 的可表示視窗，反向傳播後再除以 $S$ 還原，並在偵測到溢位時動態調整 $S$。它能運作，但很脆弱。
 
 BF16 擁有 FP32 的範圍，因此幾乎不會溢位；代價是換掉 mantissa bits（較粗的捨入），而下一節的累積策略可掩蓋這一點。結果：**BF16 mixed precision 通常不需要損失縮放**便能「正常運作」。這正是為什麼每個現代加速器（以及 PyTorch AMP 的建議路徑）都預設使用 BF16。
 
-!!! warning "範圍與精度不可互換"
+!!! Warning "範圍與精度不可互換"
     BF16 的 7 位 mantissa（$p=8$）意味著對 $x \lesssim \varepsilon_m = 2^{-7}\approx 0.008$ 而言 $1 + x = 1$（被捨入吸收）。把許多小數字逐一加進 BF16 累加器會讓它們消失 —— 這正是為什麼你絕不以 BF16 累積（見下一節）。
 
-## mixed precision：累加規則
+## Mixed precision：累加規則
 
 「mixed precision」並不表示*一切*都是 16 位元。規則：
 
@@ -70,6 +73,9 @@ BF16 擁有 FP32 的範圍，因此幾乎不會溢位；代價是換掉 mantissa
 $$ \frac{|\hat{s}-s|}{|s|} \lesssim (K-1)\,u $$
 
 其中 $s$ 為精確值、$\hat{s}$ 為浮點計算結果。誤差隨 $K$ 線性增長：以 BF16 累積（$u\approx 4\times10^{-3}$）時，$K$ 達數千的 reduction 會徹底崩壞；以 FP32 累積（$u\approx 6\times10^{-8}$）則仍精確。這就是為什麼低精度 matmul 的輸入是 FP16/BF16/FP8、而累加器是 FP32。Kahan summation（補償求和）追蹤捨入殘差並回補，可把誤差界降到 $O(u)$（與 $K$ 無關），代價是每步額外幾個運算。
+
+!!! Example "數值例子：長度 4096 的 dot product"
+    若用 BF16 直接累加，粗略誤差界是 $(4096-1)\cdot0.0039\approx16$，界限已經大到失去意義；也就是說最壞情況下 reduction 完全不可信。FP32 累加則是 $(4095)\cdot6\times10^{-8}\approx2.5\times10^{-4}$，仍在可控範圍。實際硬體的 Tensor Core/Matrix Core 正是低精度乘法、FP32 累積。
 
 ```mermaid
 flowchart TB
@@ -105,13 +111,16 @@ FP8 的可表示範圍很小，因此需要 **per-tensor 或 per-block 縮放因
 
 微縮放（microscaling）格式把縮放粒度降到區塊層級。在 MXFP4 中，一個 $g=32$ 個元素的區塊共享單一個 E8M0 的縮放值 $S$ —— E8M0 是 8 位、純指數（power-of-two）、以 `uint8` 編碼的格式；每個元素本身則以 FP4（E2M1）儲存。重建值為
 
-$$ x = S \cdot \text{FP4}\_{\text{element}} $$
+$$ x = S \cdot \text{FP4}_{\text{element}} $$
 
 實際儲存成本為每元素的 4 個 FP4 位元，加上每區塊 8 位縮放分攤到 $g$ 個元素：
 
 $$ \text{bits/element} = 4 + \frac{8}{g} = 4 + \frac{8}{32} = 4.25 $$
 
 亦即 4 位的記憶體足跡，卻保有近似 per-block 的動態範圍適配。
+
+!!! Example "數值例子：MXFP4 權重大小"
+    一個 $7168\times512$ 的 expert gate/up 權重若用 BF16，需要 $7168\cdot512\cdot2\approx7.34$ MB。MXFP4 的有效位元是 4.25 bits/element，也就是 $0.53125$ byte/element，因此約 $7168\cdot512\cdot0.53125\approx1.95$ MB。這跟理想 FP4 的 1.84 MB 很接近，但多出的 scale 成本保留了每 32 個元素的動態範圍。
 
 ### 量化 SNR 的經驗法則
 
@@ -126,22 +135,22 @@ $$ \mathrm{SQNR} \approx 6.02\,n + 1.76\ \text{dB} $$
 - **在 softmax / cross-entropy 的 `exp` 前永遠先減去最大值**（見 [FlashAttention](flashattention.md)）。略過它，數百個 logits 就會溢位 FP16 甚至 BF16。
 - **LayerNorm / RMSNorm 統計量以 FP32 計算。** 以 BF16 計算 BF16 activation 的變異數會得到垃圾結果。
 - **不要在 16 位元中累積長 reduction。** 使用 FP32（或 Kahan / pairwise summation）。
-- **MoE 的 router/gating logits 與 auxiliary loss 以 FP32 計算** —— routing 決策是離散的，捨入雜訊打破平手會破壞 load balancing 的穩定性（見 [training stability](../moe/training-stability.md)）。
+- **MoE 的 router/gating logits 與 auxiliary loss 以 FP32 計算** —— Routing 決策是離散的，捨入雜訊打破平手會破壞 load balancing 的穩定性（見 [training stability](../moe/training-stability.md)）。
 - **留意 `bf16` 權重更新的下溢**：保留 FP32 主副本。
 
-!!! tip "30 秒自我檢測"
+!!! Tip "30 秒自我檢測"
     如果模型在 FP32 下訓練良好、但在 16 位元下產生 `NaN`，罪魁禍首幾乎總是 (a) FP16 溢位 → 切換到 BF16 或加入損失縮放，或 (b) 某個留在 16 位元的 reduction / normalization → 強制其改為 FP32。
 
 ## 要點
 
 - 指數位 = 範圍，mantissa bits = 精度。**BF16 以 mantissa 換取與 FP32 相等的範圍**，這就是為什麼它在 training 上勝過 FP16（沒有損失縮放的脆弱性）。
-- mixed precision = 低精度**儲存 / matmul** + FP32**累積** + FP32**主權重**。
+- Mixed precision = 低精度**儲存 / matmul** + FP32**累積** + FP32**主權重**。
 - FP8 對 training 而言已是真實可行，但需要仔細的 per-tensor / per-block 縮放與高精度累積。
 - 多數「低精度發散」錯誤源自溢位（FP16）或某個殘留在 16 位元的 reduction；minus-the-max 與 accumulate-in-FP32 可修復大部分。
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/foundations.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 求 FP16 與 BF16 中 `exp` 有限的最大 logit 值。 將其與指數位計數相關聯。
@@ -151,9 +160,14 @@ $$ \mathrm{SQNR} \approx 6.02\,n + 1.76\ \text{dB} $$
 
 ## 參考文獻
 
-- Micikevicius 等人。 _Mixed Precision Training。_ 2017。
-- Kalamkar 等人。 _A Study of BFLOAT16 for Deep Learning Training。_ 2019。
-- Micikevicius 等人。 _FP8 Formats for Deep Learning。_ 2022。
-- Open Compute Project。 _OCP Microscaling Formats (MX) Specification_（MXFP8 / MXFP4、E8M0 block scale）。 2023。
-- NVIDIA Transformer Engine 文件（FP8 delayed scaling）。
-- DeepSeek-AI。 _DeepSeek-V3 Technical Report_（FP8 training 配方）。 2024。
+[1] P. Micikevicius *et al.*, "Mixed precision training," in *Proc. ICLR*, 2018.
+
+[2] D. Kalamkar *et al.*, "A study of BFLOAT16 for deep learning training," *arXiv:1905.12322*, 2019.
+
+[3] P. Micikevicius *et al.*, "FP8 formats for deep learning," *arXiv:2209.05433*, 2022.
+
+[4] Open Compute Project, "OCP microscaling formats (MX) specification," Specification, 2023.
+
+[5] NVIDIA, "NVIDIA Transformer Engine: FP8 training," Documentation, 2024.
+
+[6] DeepSeek-AI, "DeepSeek-V3 technical report," *arXiv:2412.19437*, 2024.

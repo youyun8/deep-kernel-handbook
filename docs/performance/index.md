@@ -14,16 +14,16 @@
 
 **規模**
 
-4. [分散式訓練](distributed-training.md) —— data/tensor/pipeline/sequence/expert 並行、ZeRO，以及 底層的 collective。
+4. [分散式訓練](distributed-training.md) —— Data/tensor/pipeline/sequence/expert 並行、ZeRO，以及 底層的 collective。
 
 **部署**
 
 5. [量化與壓縮](quantization.md) —— PTQ/QAT、GPTQ/AWQ、剪枝、蒸餾。
-6. [推論最佳化](inference-optimization.md) —— Continuous Batching、speculative decoding、KV cache 管理、serving 系統。
+6. [Inference 優化](inference-optimization.md) —— Continuous batching、speculative decoding、KV cache 管理、serving 系統。
 
 **永遠**
 
 7. [Profiling 與方法論](profiling.md) —— 如何量測、該相信什麼，以及會造出假加速的 benchmark 陷阱。 **這篇要趁早讀。**
 
-!!! tip "貫穿全部的那條線"
+!!! Tip "貫穿全部的那條線"
     這裡每一頁都是 [roofline](../foundations/transformer-systems.md) 的應用：kernel 提高算術強度、 並行把計算換成通訊、量化減少 bytes、profiling 告訴你自己到底在撞哪一面牆。

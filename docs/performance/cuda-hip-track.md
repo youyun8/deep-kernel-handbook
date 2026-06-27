@@ -111,7 +111,7 @@ mod = load(name="myk", sources=["myk.cu"],   # hipify handles ROCm builds
 
 ## 練習
 
-!!! tip "解答"
+!!! Tip "解答"
     參考解答在 [解答頁](../solutions/performance.md)。請先試做每一題，再展開對照。
 
 1. 把分塊 matmul 移植到 HIP，用 `hipcc` 建置（或透過 ROCm 上的 PyTorch），並對照 cuBLAS/hipBLAS 驗證。
@@ -121,6 +121,16 @@ mod = load(name="myk", sources=["myk.cu"],   # hipify handles ROCm builds
 
 ## 參考文獻
 
-- NVIDIA CUDA C++ Programming Guide；CUTLASS 文件。
-- AMD HIP Programming Guide；ROCm `hipify`；Composable Kernel；rocWMMA。
-- NVIDIA _cp.async_/TMA 與 CDNA3 _MFMA_ ISA 參考。
+[1] NVIDIA, "CUDA C++ programming guide," Documentation, 2024.
+
+[2] NVIDIA, "CUTLASS: CUDA templates for linear algebra subroutines," Documentation, 2024.
+
+[3] AMD, "ROCm HIP programming guide," Documentation, 2024.
+
+[4] AMD, "hipify," Documentation, 2024.
+
+[5] AMD, "Composable Kernel and rocWMMA," Documentation, 2024.
+
+[6] NVIDIA, "Asynchronous copy and tensor memory accelerator programming," Documentation, 2024.
+
+[7] AMD, "AMD CDNA3 instruction set architecture," Reference Manual, 2023.

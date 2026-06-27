@@ -1,6 +1,6 @@
-# Mixture-of-Experts
+# MoE (Mixture of Experts)
 
-這是手冊的核心。Mixture-of-Experts（MoE）把一個密集 FFN 換成許多個「expert」FFN，再讓 每個 token 只走其中幾個 —— 藉此**把總參數量（容量）和每個 token 的計算量（FLOP）解耦**。 前沿的開放權重模型（DeepSeek-V3、Qwen3-MoE、Kimi-K2）幾乎全是 MoE，原因正在於此。
+這是手冊的核心。MoE (Mixture of Experts) 把一個密集 FFN 換成許多個「expert」FFN，再讓 每個 token 只走其中幾個 —— 藉此**把總參數量（容量）和每個 token 的計算量（FLOP）解耦**。 前沿的開放權重模型（DeepSeek-V3、Qwen3-MoE、Kimi-K2）幾乎全是 MoE，原因正在於此。
 
 但稀疏化不是免費的午餐。它換來一整套密集模型從來不會遇到的系統問題：負載不平衡、離散 routing 的訓練不穩定、all-to-all 通訊、巨大的記憶體足跡，以及不規則的 GEMM。本篇把 MoE 當成一個**完整系統**來拆解 —— 從建模到 kernel 到 serving。
 
@@ -23,31 +23,31 @@
 
 - :material-layers-triple-outline: **[從零實作 MoE layer](moe-from-scratch.md)**
 
-    expert + router + top-$k$ + 合併，可讀版與 dispatch 版兩種實作。
+    Expert + router + top-$k$ + 合併，可讀版與 dispatch 版兩種實作。
 
 - :material-scale: **[負載平衡](load-balancing.md)**
 
-    auxiliary loss、capacity、token drop，與 aux-loss-free 偏差控制器。
+    Auxiliary loss、capacity、token drop，與 aux-loss-free 偏差控制器。
 
 - :material-call-split: **[Routing 變體](routing-variants.md)**
 
-    token-choice vs expert-choice、共享 expert、細粒度 expert。
+    Token-choice vs expert-choice、共享 expert、細粒度 expert。
 
 - :material-shield-check-outline: **[訓練穩定性](training-stability.md)**
 
-    router z-loss、精度紀律、初始化與實務護欄。
+    Router z-loss、精度紀律、初始化與實務護欄。
 
 - :material-lan: **[系統與 expert parallelism](systems-ep.md)**
 
-    all-to-all dispatch/combine、通訊重疊、grouped GEMM、capacity 取捨。
+    All-to-all dispatch/combine、通訊重疊、grouped GEMM、capacity 取捨。
 
 - :material-chip: **[MoE kernels](kernels.md)**
 
-    permute 與 grouped GEMM 在 Triton / CUDA / HIP 上的實作。
+    Permute 與 grouped GEMM 在 Triton / CUDA / HIP 上的實作。
 
 - :material-server-network: **[推論與 serving](inference-serving.md)**
 
-    expert 記憶體、offload、量化與 batch 動態。
+    Expert 記憶體、offload、量化與 batch 動態。
 
 - :material-book-open-page-variant-outline: **[案例研究](case-studies.md)**
 
@@ -59,5 +59,5 @@
 
 </div>
 
-!!! tip "和效能工程篇一起讀"
+!!! Tip "和效能工程篇一起讀"
     本篇後半（系統、kernel、serving）會直接連回[效能工程](../performance/index.md)的 collective、Triton/CUDA 與 profiling 章節，兩篇並行閱讀效果最好。讀完之後， [AITER](../aiter/index.md) 會把這些觀念對到一條真實的 Kimi K2.5 decode 執行路徑上。

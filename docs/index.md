@@ -74,7 +74,7 @@ hide:
 <section class="curriculum-card curriculum-card--feature" markdown>
 <span class="curriculum-card__eyebrow">主線 · 稀疏模型系統</span>
 
-### :material-expansion-card: Mixture-of-Experts
+### :material-expansion-card: MoE (Mixture of Experts)
 
 從稀疏化、routing、load balancing 到 expert parallelism、MoE kernels 與 serving，把 MoE 看成完整系統。
 
@@ -116,8 +116,8 @@ hide:
 <div class="ml-stat"><strong>11-18%</strong><span>TP all-reduce 在 decode 中不易隨 batch 攤平</span></div>
 </div>
 
-!!! tip "閱讀建議"
-若你剛開始，先照 [閱讀路線](reading-path.md) 建立系統語彙；若你正在處理 Kimi K2.5 / SGLang / AITER profiling，直接看 [Kimi K2.5 decode 概觀](aiter/index.md)， 再回到 MoE 與效能章節補齊背景。
+!!! Tip "閱讀建議"
+    若你剛開始，先照 [閱讀路線](reading-path.md) 建立系統語彙；若你正在處理 Kimi K2.5 / SGLang / AITER profiling，直接看 [Kimi K2.5 decode 概觀](aiter/index.md)， 再回到 MoE 與效能章節補齊背景。
 
 ---
 

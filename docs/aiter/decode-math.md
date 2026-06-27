@@ -33,7 +33,7 @@ flowchart TD
 
 ## 序章：embedding lookup + KV metadata
 
-decode 的新 token 先做 embedding lookup；位置、sequence 與 cache slot 則進入後續 paged-KV metadata。
+Decode 的新 token 先做 embedding lookup；位置、sequence 與 cache slot 則進入後續 paged-KV metadata。
 
 $$
 h_{0,t} = E[x_t], \qquad
@@ -117,7 +117,7 @@ z_{\ell,t,r}
 = \sum_{u \le t} \alpha_{\ell,t,u,r}\,\hat c_{\ell,u}.
 $$
 
-**$W^{UV}$ absorb + $o\_proj$**。value up-projection 與 output projection 可吸收成 一個 per-head 輸出矩陣：
+**$W^{UV}$ absorb + $o_{\text{proj}}$**。value up-projection 與 output projection 可吸收成 一個 per-head 輸出矩陣：
 
 $$
 \tilde W^O_{\ell,r}=W^{UV}_{\ell,r} W^O_{\ell,r}, \qquad
@@ -164,6 +164,9 @@ $$
 =\{(t,e,g_{\ell,t,e}) : e\in\mathcal{R}_{\ell,t}\}.
 $$
 
+!!! Example "數值例子：一個 decode batch 會產生多少 expert rows"
+    若 decode batch 有 $B=256$ 個 token、$k=8$、$E=384$，每層 routed assignment 數是 $B k=2048$。均勻分散時，每個 routed expert 平均只有 $2048/384\approx5.3$ rows；若 shared-expert fusion 開啟，還會多 $B=256$ 個 shared rows，合計 2304 rows。這就是 trace 裡 grouped GEMM row 很碎、需要 sort/pack 的原因。
+
 **expert-input quant（FP4）**。AITER 對 expert activation 做 per-1x32 block 的 MXFP4 動態量化。對 block $B_b$：
 
 $$
@@ -173,6 +176,9 @@ $$
 = Q_{\mathrm{FP4}}\!\left(\frac{u_{\ell,t,i}}{\Delta_{\ell,t,b}}\right),
 \quad i\in B_b.
 $$
+
+!!! Example "數值例子：per-1x32 scale 不是免費的"
+    Hidden size $H=7168$、block size 32 時，每個 expert row 有 $7168/32=224$ 個 scale。上例 2048 個 routed rows 需要 $2048\cdot224=458{,}752$ 個 scale bytes（若每個 scale 用 uint8，約 0.44 MB）。FP4 activation 本體是 $2048\cdot7168\cdot0.5\approx7.34$ MB，所以 scale overhead 約 6%。它不主導頻寬，但會影響 packing layout 與 kernel 設計。
 
 **routed GEMM1（gate+up）**。每個被選中的 expert 用自己的 $W_{13}^{(e)}$ 做 gate/up 合併 GEMM：
 
@@ -212,7 +218,7 @@ o^{\mathrm{MoE}}_{\ell,t}
 \quad g_{\ell,t,s}=1.
 $$
 
-fusion 關閉時，shared expert 是獨立分支：
+Fusion 關閉時，shared expert 是獨立分支：
 
 $$
 o^{\mathrm{MoE}}_{\ell,t}

@@ -4,7 +4,7 @@
 
 ## TP communication（all-reduce）
 
-每層有 **2 次 all-reduce**：一次在 attention o_proj 後，一次在 MoE down + combine 後。 trace 中對應兩個 `allreduce_fusion_kernel_1stage`。decode 的 hidden-state 訊息很小：
+每層有 **2 次 all-reduce**：一次在 attention o_proj 後，一次在 MoE down + combine 後。 Trace 中對應兩個 `allreduce_fusion_kernel_1stage`。decode 的 hidden-state 訊息很小：
 
 $$
 \text{每次 all-reduce bytes} = \text{bs} \cdot 7168 \cdot 2
@@ -57,5 +57,5 @@ python3 decode_analysis/parse_decode_layer.py --full shared_expert_fusion_on/...
 python3 decode_analysis/parse_decode_layer.py --full shared_expert_fusion_off/.../conc_4_isl_1024_osl_1024/*/<ts>-TP-0.trace.json.gz
 ```
 
-!!! note "判讀邊界"
-這裡的 kernel 名稱與順序對應 Kimi K2.5（MXFP4 權重）、gfx950、TP4（attention）/ moe_tp_size=8（MoE）、KV cache fp8_e4m3、conc4 / ISL1024。架構結論可遷移，但具體 tile、kernel 名稱與比例會隨 hidden / intermediate size、top-k、context length、batch 與 tuned config 改變。若要把這條 decode 路徑放回更一般的脈絡，回頭看 [MoE decode 剖析](../moe/decode-anatomy.md) 與 [Profiling 與方法論](../performance/profiling.md)。
+!!! Note "判讀邊界"
+    這裡的 kernel 名稱與順序對應 Kimi K2.5（MXFP4 權重）、gfx950、TP4（attention）/ moe_tp_size=8（MoE）、KV cache fp8_e4m3、conc4 / ISL1024。架構結論可遷移，但具體 tile、kernel 名稱與比例會隨 hidden / intermediate size、top-k、context length、batch 與 tuned config 改變。若要把這條 decode 路徑放回更一般的脈絡，回頭看 [MoE decode 剖析](../moe/decode-anatomy.md) 與 [Profiling 與方法論](../performance/profiling.md)。

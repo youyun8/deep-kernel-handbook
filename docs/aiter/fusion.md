@@ -1,6 +1,6 @@
 # Shared-expert fusion 開 / 關對照
 
-這頁把 decode 一層的實際 GPU kernel 順序攤開，並用 **shared-expert fusion 開啟 / 關閉** 兩組 trace 對照。數學路徑見 [Decode 算子數學對照](decode-math.md)，模型維度見 [概觀與模型組態](index.md)。
+這頁把 decode 一層的實際 GPU kernel 順序攤開，並用 **shared-expert fusion 開啟 / 關閉** 兩組 trace 對照。數學路徑見 [decode 算子數學對照](decode-math.md)，模型維度見 [概觀與模型組態](index.md)。
 
 ## 怎麼從 trace 框出 decode 一層
 
@@ -13,7 +13,7 @@ SGLang 已經用 `record_function("Decode")` 包住 decode 路徑，因此 trace
 
 ## Shared-expert fusion 開啟
 
-baseline 啟動參數如下；此時 shared expert 被放進 routed path，成為固定的第 9 個 assignment：
+Baseline 啟動參數如下；此時 shared expert 被放進 routed path，成為固定的第 9 個 assignment：
 
 ```bash
 python3 -m sglang.launch_server --host 0.0.0.0 --port 31999 \
@@ -78,7 +78,7 @@ flowchart TB
 
 </div>
 
-關鍵觀察：fusion 開啟後，**MoE 段只剩 4 個 kernel**（sort → quant → GEMM1 → GEMM2）。 shared expert 不再以獨立 kernel 出現；它被 append 成第 385 個 expert，也就是 top-k 的 第 9 個 assignment，並與 384 個 routed experts 一起在 `mfma_moe1/2` 中完成。單層中最重的 兩個 kernel 是 `mfma_moe1`（26 µs）與 `mfma_moe2`（16 µs）。
+關鍵觀察：fusion 開啟後，**MoE 段只剩 4 個 kernel**（sort → quant → GEMM1 → GEMM2）。 Shared expert 不再以獨立 kernel 出現；它被 append 成第 385 個 expert，也就是 top-k 的 第 9 個 assignment，並與 384 個 routed experts 一起在 `mfma_moe1/2` 中完成。單層中最重的 兩個 kernel 是 `mfma_moe1`（26 µs）與 `mfma_moe2`（16 µs）。
 
 ## Shared-expert fusion 關閉
 
@@ -142,10 +142,10 @@ flowchart TB
 
 </div>
 
-**Fusion 開 / 關的數學等價**。令 routed experts 集合為 $\mathcal{R}$（$|\mathcal{R}|=8$），routing 權重為 $g_i$，shared expert 為 $E_s$。 fusion 關閉時，shared expert 是一條獨立加法分支：
+**Fusion 開 / 關的數學等價**。令 routed experts 集合為 $\mathcal{R}$（$|\mathcal{R}|=8$），routing 權重為 $g_i$，shared expert 為 $E_s$。 Fusion 關閉時，shared expert 是一條獨立加法分支：
 
 $$
-o_{\text{off}}
+O_{\text{off}}
   = \sum_{i \in \mathcal{R}} g_i\, E_i(h)
   + E_s(h),
 $$
@@ -153,7 +153,7 @@ $$
 其中 $\sum_{i \in \mathcal{R}} g_i\, E_i(h)$ 對應 routed grouped GEMM（kernel 16–21）， $E_s(h)$ 對應 standalone shared stage（kernel 10–15）。fusion 開啟時，shared expert 被設為固定權重 $g_s=1$ 的「第 9 名」，併入同一個集合 $\mathcal{R}^{+}=\mathcal{R}\cup\{s\}$：
 
 $$
-o_{\text{on}} = \sum_{j \in \mathcal{R}^{+}} g_j\, E_j(h),
+O_{\text{on}} = \sum_{j \in \mathcal{R}^{+}} g_j\, E_j(h),
 \qquad g_s = 1,\;\; |\mathcal{R}^{+}| = 9.
 $$
 

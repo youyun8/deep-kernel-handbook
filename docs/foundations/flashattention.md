@@ -8,7 +8,7 @@
 
 FlashAttention 是 roofline 劇本的教科書範例：它算出*完全相同*的 attention 輸出，卻 **從不把 $N\times N$ 分數矩陣寫進 HBM**，於是把一個 memory-bound 的操作變成 compute-bound。 訣竅是 **online softmax** —— 用單次串流傳遞算出數值穩定的 softmax —— 再搭配 **tiling（分塊）**。 本頁會把兩者都推導出來，並給一份可執行、可對照 PyTorch 驗證的 NumPy 參考實作。
 
-## naive attention 的問題
+## Naive attention 的問題
 
 單一 query 區塊的標準 attention：
 
@@ -20,7 +20,10 @@ O = P @ V                  # [N, d]
 
 分數矩陣 $S$ 是 $N\times N$。在 $N=8192$ 時就有 6700 萬個元素 —— 要寫進 HBM、為了 softmax 再 讀回、又寫出、再讀進來算 $PV$。相比之下 matmul 本身很便宜；我們是被這個二次大小的張量 **memory-bound** 住了。我們想算出 $O$，卻只在晶片上的 SRAM 裡放 $S$ 的小*分塊*。
 
-障礙在於：**softmax 需要對整列做歸一化**（$\sum_j e^{s_j}$），這看起來得拿到整個 $S$ 才行。 online softmax 正是用來消除這個障礙。
+!!! Example "數值例子：$N\times N$ 分數矩陣有多貴"
+    若 $N=8192$、BF16，單一 $S$ 矩陣大小是 $8192^2\cdot2\approx134$ MB。naive attention 至少會把 $S$ 寫一次、讀回做 softmax、再把 softmax 後的 $P$ 寫/讀，光這些中間矩陣就接近 **500 MB** 的 HBM 往返，還不含 Q/K/V/O。FlashAttention 的目標不是減少 FLOP，而是讓這 500 MB 的中間結果根本不要進 HBM。
+
+障礙在於：**softmax 需要對整列做歸一化**（$\sum_j e^{s_j}$），這看起來得拿到整個 $S$ 才行。 Online softmax 正是用來消除這個障礙。
 
 ## 線上 softmax：running-max 技巧
 
@@ -28,19 +31,19 @@ O = P @ V                  # [N, d]
 
 維護一個 running max $m$ 與 running 分母 $\ell$。處理完區塊 1 之後：
 
-$$ m*1 = \max(x^{(1)}), \qquad \ell_1 = \sum*{j} e^{x^{(1)}\_j - m_1}. $$
+$$ m_1 = \max(x^{(1)}), \qquad \ell_1 = \sum_{j} e^{x^{(1)}_j - m_1}. $$
 
 當區塊 2 帶著局部最大值 $m_2' = \max(x^{(2)})$ 到來，**新的全域最大值**是 $m_2 = \max(m_1, m_2')$。舊分母是用*舊*最大值算的，所以在加入新區塊的貢獻之前，先把它 乘上 $e^{m_1 - m_2}$ **重新縮放**：
 
-$$ \ell_2 = e^{m_1 - m_2}\,\ell_1 + \sum_j e^{x^{(2)}\_j - m_2}. $$
+$$ \ell_2 = e^{m_1 - m_2}\,\ell_1 + \sum_j e^{x^{(2)}_j - m_2}. $$
 
 校正因子 $e^{m_{\text{old}} - m_{\text{new}}}$ 就是整個點子。它讓我們一次摺疊一個區塊，最後 得到*精確的* softmax 分母 —— 而且從不需要同時持有整個 $x$。
 
 ### 擴展到加權和$O = PV$
 
-attention 要的不只是分母，還要 $O = \sum_j p_j v_j$，其中 $p_j = e^{s_j - m}/\ell$。我們維護 一個**未歸一化**的 running 輸出 $\tilde{O} = \sum_j e^{s_j - m} v_j$，並在每次更新最大值時用 「同一個」因子重新縮放它：
+Attention 要的不只是分母，還要 $O = \sum_j p_j v_j$，其中 $p_j = e^{s_j - m}/\ell$。我們維護 一個**未歸一化**的 running 輸出 $\tilde{O} = \sum_j e^{s_j - m} v_j$，並在每次更新最大值時用 「同一個」因子重新縮放它：
 
-$$ \tilde{O} \leftarrow e^{m*{\text{old}} - m*{\text{new}}}\,\tilde{O} + \sum*{j \in \text{block}} e^{s_j - m*{\text{new}}}\, v_j. $$
+$$ \tilde{O} \leftarrow e^{m_{\text{old}} - m_{\text{new}}}\,\tilde{O} + \sum_{j \in \text{block}} e^{s_j - m_{\text{new}}}\, v_j. $$
 
 最後 $O = \tilde{O} / \ell$。現在我們有了一個串流演算法，每個 key/value 區塊只碰一次。
 
@@ -86,7 +89,10 @@ flowchart TB
 
 現在 HBM 記憶體流量是 $O(N d)$（$Q,K,V$ 各讀一次、$O$ 寫一次），而不是 $O(N^2)$。分數區塊 在 SRAM 裡生成又消失。FLOP 完全沒變 —— 所以在 roofline 上，我們大幅往**右**移（強度更高）， kernel 變成 compute-bound。整個勝利就在這裡。
 
-!!! note "反向傳播"
+!!! Example "數值例子：流量從二次降到線性"
+    令 $N=8192$、$d=128$、BF16。FlashAttention 讀 $Q,K,V$ 並寫 $O$，粗略為 $4\cdot8192\cdot128\cdot2\approx8.4$ MB。和上面 naive 只算 $S/P$ 中間矩陣就接近 500 MB 相比，HBM traffic 約少 **60 倍**。這就是為什麼兩者 FLOP 相同，實測時間卻可以差很多。
+
+!!! Note "反向傳播"
     反向傳播會即時重算 $S$ 的分塊（很便宜），而不是把它們存起來 —— 用一點額外計算換大量 記憶體。FlashAttention-2 改良了工作切分（更少重新縮放、沿序列維度平行化）； FlashAttention-3 用上 Hopper 的非同步複製（TMA）與 FP8。_上面這套數學在所有版本中都一樣_。
 
 ## 參考實作（可運行）
@@ -138,14 +144,14 @@ GPU 版本（真正分塊的 Triton kernel）在 [Triton 路線](../performance/
 
 ## 要點
 
-- softmax 的列歸一化看似擋住了串流，但 **online softmax** 靠 running max $m$、running 分母 $\ell$ 與校正因子 $e^{m_{\text{old}}-m_{\text{new}}}$，一次傳遞就算出精確結果。
+- Softmax 的列歸一化看似擋住了串流，但 **online softmax** 靠 running max $m$、running 分母 $\ell$ 與校正因子 $e^{m_{\text{old}}-m_{\text{new}}}$，一次傳遞就算出精確結果。
 - FlashAttention 把 $Q,K,V$ 分塊、分數分塊只留在 SRAM，於是 HBM 流量從 $O(N^2)$ 降到 $O(Nd)$ —— 這是 roofline 上由 memory-bound 轉成 compute-bound 的轉變。
 - 輸出與樸素 attention **數值相同**（差在 fp 捨入）；這是系統優化，不是近似。
 - FA-2/FA-3 以及每一個融合的 attention kernel（包括 MoE 友善版本）用的都是同一套演算法。
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/foundations.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 證明 online-softmax 組合器是精確的：說明按區塊摺疊會得到與在整列上計算 softmax 相同的 $\ell$ 與 $\tilde O$。
@@ -155,8 +161,12 @@ GPU 版本（真正分塊的 Triton kernel）在 [Triton 路線](../performance/
 
 ## 參考文獻
 
-- Milakov & Gimelshein. _Online Normalizer Calculation for Softmax._ 2018。
-- Dao, Fu, Ermon, Rudra, Ré. _FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness._ 2022。
-- Dao. _FlashAttention-2._ 2023。
-- Shah et al. _FlashAttention-3._ 2024。
-- Rabe & Staats. _Self-attention Does Not Need $O(n^2)$ Memory._ 2021。
+[1] M. Milakov and N. Gimelshein, "Online normalizer calculation for softmax," *arXiv:1805.02867*, 2018.
+
+[2] T. Dao, D. Y. Fu, S. Ermon, A. Rudra, and C. Re, "FlashAttention: Fast and memory-efficient exact attention with IO-awareness," in *Proc. NeurIPS*, 2022.
+
+[3] T. Dao, "FlashAttention-2: Faster attention with better parallelism and work partitioning," *arXiv:2307.08691*, 2023.
+
+[4] J. Shah *et al.*, "FlashAttention-3: Fast and accurate attention with asynchrony and low-precision," *arXiv:2407.08608*, 2024.
+
+[5] M. N. Rabe and C. Staats, "Self-attention does not need $O(n^2)$ memory," *arXiv:2112.05682*, 2021.

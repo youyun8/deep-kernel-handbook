@@ -6,7 +6,7 @@
   <span class="chip"><strong>硬體：</strong> 多 GPU（概念適用於 1 個 GPU）</span>
 </div>
 
-experts 保存了 MoE 的大部分參數，因此我們將它們跨 GPU 分片： **expert parallelism (EP)**。但 routing 是與資料相關的 — token 的 expert 可能 運行在另一個 GPU 上，因此每個 MoE 層都需要 **all-to-all** 來把 tokens 運送 到它們的 experts，並將結果送回。此頁面建立 EP 的 dispatch 形式，推導 all-to-all 資料流，並涵蓋下列最佳化， 以避免它主導執行時間：**通訊/計算重疊、grouped GEMM、 MegaBlocks 區塊稀疏視圖，以及 capacity/padding 權衡。**
+Experts 保存了 MoE 的大部分參數，因此我們將它們跨 GPU 分片： **expert parallelism (EP)**。但 routing 是與資料相關的 — token 的 expert 可能 運行在另一個 GPU 上，因此每個 MoE 層都需要 **all-to-all** 來把 tokens 運送 到它們的 experts，並將結果送回。此頁面建立 EP 的 dispatch 形式，推導 all-to-all 資料流，並涵蓋下列最佳化， 以避免它主導執行時間：**通訊/計算重疊、grouped GEMM、 MegaBlocks 區塊稀疏視圖，以及 capacity/padding 權衡。**
 
 ## 用一張圖看 expert parallelism
 
@@ -30,7 +30,7 @@ flowchart TB
 1. **dispatch（all-to-all）**：每個 GPU 將其本地路由的 tokens 傳送到 擁有目標 expert 的 GPU。
 2. **combine（all-to-all）**：experts 運算後，將輸出送回 tokens 的原始 GPU，並匯總到殘差中。
 
-## all-to-all，精確地說
+## All-to-all，精確地說
 
 從 [dispatch form](moe-from-scratch.md) 開始：在每個 GPU 上我們有本地 tokens，各自分配給 $k$ 個 experts。要送出它們：
 
@@ -51,25 +51,30 @@ flowchart TD
     class D flagship;
 ```
 
-模式是 **permute → all-to-all → grouped GEMM → all-to-all → unpermute**。 permute 在 [kernels](kernels.md) 頁面討論；all-to-all 的系統成本 是我們現在要攻克的對象。
+模式是 **permute → all-to-all → grouped GEMM → all-to-all → unpermute**。 Permute 在 [kernels](kernels.md) 頁面討論；all-to-all 的系統成本 是我們現在要攻克的對象。
 
-## all-to-all 的通訊量
+## All-to-all 的通訊量
 
 設定符號：$T$ 為每個 device 的本地 token 數，$k$ 為 top-$k$ routing 中 每個 token 選取的 expert 數，$H$ 為 hidden dimension，$c$ 為每個元素的位元組數 （BF16 為 $c=2$）。
 
-dispatch all-to-all 將每個 token 複製到它的 $k$ 個 experts，因此每個 device 送出約
+Dispatch all-to-all 將每個 token 複製到它的 $k$ 個 experts，因此每個 device 送出約
 
-$$ B\_{\text{dispatch}} \approx T\,k\,H\,c \quad\text{(bytes/device)} $$
+$$ B_{\text{dispatch}} \approx T\,k\,H\,c \quad\text{(bytes/device)} $$
 
-combine all-to-all 是對稱的（把 expert 輸出沿反向排列送回），再送出約 相同的量：
+Combine all-to-all 是對稱的（把 expert 輸出沿反向排列送回），再送出約 相同的量：
 
-$$ B\_{\text{combine}} \approx T\,k\,H\,c \quad\text{(bytes/device)} $$
+$$ B_{\text{combine}} \approx T\,k\,H\,c \quad\text{(bytes/device)} $$
 
 因此每個 MoE 層共有 **兩個 all-to-all**，合計約 $2\,T\,k\,H\,c$ bytes/device。 其中 $B_{\text{dispatch}}$、$B_{\text{combine}}$ 分別為 dispatch、combine 階段 每個 device 的位元組量。
 
+!!! Example "數值例子：一層 EP 要搬多少資料"
+    設 $T=4096$ tokens/GPU、$k=2$、$H=4096$、BF16 $c=2$ bytes。單次 dispatch 為
+    $4096\cdot2\cdot4096\cdot2 \approx 67$ MB/device；combine 再來一次，所以一個 MoE layer 約 **134 MB/device**。
+    若模型有 60 個 MoE layers，每個 generated token chunk 對應的累積 all-to-all payload 量級就是 $134\text{ MB}\cdot60 \approx 8.0$ GB/device。這說明為什麼 EP 的關鍵不是只把 GEMM 寫快，而是把 all-to-all 與 GEMM 疊起來。
+
 ## 為什麼 all-to-all 很貴 —— 以及如何隱藏它
 
-all-to-all _每層兩次_ 在 GPU 間互連（節點內 NVLink/Infinity Fabric、 跨節點 InfiniBand/RoCE）上搬移 $O(T\,k\,H)$ 個元素。對於每層都有 MoE 的 深度模型，這可與 expert 計算相當甚至超過它。三個槓桿：
+All-to-all _每層兩次_ 在 GPU 間互連（節點內 NVLink/Infinity Fabric、 跨節點 InfiniBand/RoCE）上搬移 $O(T\,k\,H)$ 個元素。對於每層都有 MoE 的 深度模型，這可與 expert 計算相當甚至超過它。三個槓桿：
 
 ### 1. 通訊與計算重疊
 
@@ -107,7 +112,7 @@ TP 與 EP 切分模型的方式不同，付出的通訊代價也不同。 設 $b
 
 - **TP**：每層透過 all-reduce 交換 activations，每次 reduce 約搬移
 
-  $$ B\_{\text{TP}} \approx b\,s\,H\,c \quad\text{(bytes)} $$
+  $$ B_{\text{TP}} \approx b\,s\,H\,c \quad\text{(bytes)} $$
 
   在小型 decode 訊息上是 latency-bound（受訊息延遲而非頻寬限制）。
 
@@ -117,7 +122,7 @@ EP 讓每個 expert 的權重 _不被切分_（GEMM 效率較佳），但要付 
 
 ## Grouped GEMM：計算端
 
-dispatch 之後，每個 expert 拿到「可變」數量的 tokens —— 一個參差不齊的批次。 三種計算方式，由差到好：
+Dispatch 之後，每個 expert 拿到「可變」數量的 tokens —— 一個參差不齊的批次。 三種計算方式，由差到好：
 
 - **GEMM 迴圈**（每個 expert 一個 matmul）：簡單，但 kernel 啟動開銷大， 對小型 experts 的利用率較差。（[naive reference](moe-from-scratch.md)。）
 - **帶 padding 的 batched GEMM**：把每個 expert padding 到 capacity $C$，執行一個 batched matmul。規整，但在 padding 上浪費 FLOP（capacity/padding 權衡）。
@@ -149,11 +154,14 @@ $$ \text{capacity} = C \cdot \frac{T\,k}{E} \quad\text{(tokens/expert)} $$
 
 ### Load imbalance
 
-even 有了 capacity，實際的 routing 也很少是均勻的。設 expert $i$ 收到 全部路由 tokens 中的比例 $p_i$（$\sum_i p_i = 1$）。由於一層要等到最忙的 expert 完成，其有效時間隨 **imbalance factor** 縮放：
+Even 有了 capacity，實際的 routing 也很少是均勻的。設 expert $i$ 收到 全部路由 tokens 中的比例 $p_i$（$\sum_i p_i = 1$）。由於一層要等到最忙的 expert 完成，其有效時間隨 **imbalance factor** 縮放：
 
 $$ \frac{\max_i p_i}{1/E} = E \max_i p_i $$
 
 完美平衡（$p_i = 1/E$）時此值為 $1$；越偏斜則越大。這正是 auxiliary load-balancing loss 所要對付的目標 —— 將 $p_i$ 推向均勻， 以縮小最忙 expert 帶來的拖累。
+
+!!! Example "數值例子：最忙 expert 拖慢多少"
+    若 $E=64$，完美平均每個 expert 只有 $1/64=1.56\%$ 的 routed assignments。假設最忙 expert 拿到 $4\%$，imbalance factor 就是 $64\cdot0.04=2.56$。也就是說，即使總 FLOP 沒變，這一層也可能因為最忙 expert 而接近 **2.6 倍** 慢；capacity、aux loss、bias controller 都是在降低這個倍率。
 
 ## 最小的 all-to-all dispatch（單一行程模擬）
 
@@ -178,12 +186,12 @@ dist.all_to_all_single(recv_buf, send_buf,
 
 - **expert parallelism** 跨 GPU 分片 experts；每個 MoE 層需要 **兩個 all-to-all**（dispatch + combine），因為 routing 依賴資料，合計約 $2\,T\,k\,H\,c$ bytes/device。
 - 資料流是 **permute → all-to-all → grouped GEMM → all-to-all → unpermute。**
-- all-to-all 會主宰執行時間；**把它與計算重疊**（分塊管線、 DualPipe/DeepEP）、**用 node-limited routing 約束它**，並 **以映射到網路拓撲的 TP/PP/DP 來組成 EP**。
+- All-to-all 會主宰執行時間；**把它與計算重疊**（分塊管線、 DualPipe/DeepEP）、**用 node-limited routing 約束它**，並 **以映射到網路拓撲的 TP/PP/DP 來組成 EP**。
 - 可變的 tokens-per-expert 由 **grouped GEMM** 或 **MegaBlocks 區塊稀疏** 配方（dropless）處理。**capacity factor** 聯合權衡 品質、throughput 與記憶體；**load imbalance** 讓一層慢到最忙 expert 的速度。
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/moe.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 對於 $T{=}4096$ tokens/GPU、$H{=}4096$、BF16，估計每層兩個 all-to-all 搬移的位元組數。在 60 層上，將其與 H100 上的 expert GEMM FLOP-time 比較。 該層是受 communication-bound 還是 compute-bound？
@@ -193,8 +201,12 @@ dist.all_to_all_single(recv_buf, send_buf,
 
 ## 參考文獻
 
-- Lepikhin et al. _GShard._ 2020（all-to-all dispatch/combine）。
-- Fedus, Zoph, Shazeer. _Switch Transformer._ 2021。
-- Gale et al. _MegaBlocks: Efficient Sparse Training with MoE._ 2022（區塊稀疏，dropless）。
-- Rajbhandari et al. _DeepSpeed-MoE._ 2022。
-- DeepSeek-AI. _DeepSeek-V3_ + _DeepEP_（node-limited routing、DualPipe 重疊）。2024。
+[1] D. Lepikhin *et al.*, "GShard: Scaling giant models with conditional computation and automatic sharding," in *Proc. ICLR*, 2021.
+
+[2] W. Fedus, B. Zoph, and N. Shazeer, "Switch Transformers: Scaling to trillion parameter models with simple and efficient sparsity," *J. Mach. Learn. Res.*, vol. 23, no. 120, pp. 1-39, 2022.
+
+[3] T. Gale, D. Narayanan, C. Young, and M. Zaharia, "MegaBlocks: Efficient sparse training with mixture-of-experts," *arXiv:2211.15841*, 2022.
+
+[4] S. Rajbhandari *et al.*, "DeepSpeed-MoE: Advancing mixture-of-experts inference and training to power next-generation AI scale," in *Proc. ICML*, 2022.
+
+[5] DeepSeek-AI, "DeepSeek-V3 technical report," *arXiv:2412.19437*, 2024.

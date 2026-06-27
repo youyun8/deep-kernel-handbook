@@ -8,7 +8,7 @@
 
 [上一個實戰專案](build-moe.md) 建好並優化了單 GPU 的 MoE LM。這一篇是把 [並行技術](../performance/distributed-training.md)與 [expert-parallel all-to-all](../moe/systems-ep.md)套到多 GPU 的**規劃與實作指南**，結構安排成一條 你可以套用到任何模型/叢集的決策流程。
 
-!!! warning "部分實作"
+!!! Warning "部分實作"
     要完整跑這套，需要一個多 GPU（最好多節點）的 叢集。下面的*推理、規劃與程式碼骨架*是完整的、可以骨架形式執行；量測到的多節點數字留給你在 硬體上填。這裡沒有任何東西藏在「TODO」後面 —— 只有叢集規模的 benchmark 表要由你填上。
 
 ## 步驟 1 — 決定分片內容以及原因
@@ -94,7 +94,7 @@ MFU 的成敗就在這裡（[系統與 EP](../moe/systems-ep.md)）：
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/capstones.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 為你的模型估算每張 GPU 的記憶體，分別為 8 卡與 64 卡選一組並行配置，並說明每個維度的理由。
@@ -104,6 +104,12 @@ MFU 的成敗就在這裡（[系統與 EP](../moe/systems-ep.md)）：
 
 ## 參考文獻
 
-- [分散式訓練](../performance/distributed-training.md)與[系統與 EP](../moe/systems-ep.md) （本實戰專案的基礎）。
-- Rajbhandari et al. _DeepSpeed-MoE._ 2022；Shoeybi et al. _Megatron-LM._ 2019。
-- DeepSeek-AI. _DeepSeek-V3 / DeepEP / DualPipe._ 2024。
+[1] Deep Kernel Handbook, "Distributed training," 2026. [Online]. Available: ../performance/distributed-training.md
+
+[2] Deep Kernel Handbook, "Systems and expert parallelism," 2026. [Online]. Available: ../moe/systems-ep.md
+
+[3] S. Rajbhandari *et al.*, "DeepSpeed-MoE: Advancing mixture-of-experts inference and training to power next-generation AI scale," in *Proc. ICML*, 2022.
+
+[4] M. Shoeybi *et al.*, "Megatron-LM: Training multi-billion parameter language models using model parallelism," *arXiv:1909.08053*, 2019.
+
+[5] DeepSeek-AI, "DeepSeek-V3 technical report," *arXiv:2412.19437*, 2024.

@@ -6,7 +6,7 @@
   <span class="chip"><strong>硬體：</strong> 無</span>
 </div>
 
-attention 是系統故事開始變得有趣的地方，因為**同一個操作在 training 時 compute-bound、在 inference 時 memory-bound**。這一頁談 KV cache（為什麼存在、成本多少）、為什麼 decode 會 撞上記憶體牆，以及 PagedAttention 如何在不浪費記憶體的前提下管理快取。
+Attention 是系統故事開始變得有趣的地方，因為**同一個操作在 training 時 compute-bound、在 inference 時 memory-bound**。這一頁談 KV cache（為什麼存在、成本多少）、為什麼 decode 會 撞上記憶體牆，以及 PagedAttention 如何在不浪費記憶體的前提下管理快取。
 
 ## 回顧：縮放點積 attention
 
@@ -18,7 +18,7 @@ $$ \text{Attn}(Q,K,V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d}} + M\right
 
 ## KV 快取：用記憶體換取 FLOP
 
-inference 時，我們一次生成一個 token。最笨的做法是：要產生 token $t$，就在整段前綴上重算 attention —— 每一步都把先前所有 token 的 key 和 value 重新投影一遍，這是 $O(N^2)$ 的浪費。 取而代之，我們**快取**已經看過的每個位置的 key 與 value。於是 step $t$ 變成：
+Inference 時，我們一次生成一個 token。最笨的做法是：要產生 token $t$，就在整段前綴上重算 attention —— 每一步都把先前所有 token 的 key 和 value 重新投影一遍，這是 $O(N^2)$ 的浪費。 取而代之，我們**快取**已經看過的每個位置的 key 與 value。於是 step $t$ 變成：
 
 1. 只投影*新* token，得到 $q_t, k_t, v_t$。
 2. 把 $k_t, v_t$ 接到快取尾端。
@@ -40,9 +40,14 @@ flowchart TB
 
 每個 token、每層，快取存下 $K$ 和 $V$ 共 $2 \cdot n_{kv} \cdot d_h$ 個值，其中 $n_{kv}$ 是 **KV 頭**數、$d_h$ 是頭維度。換算成 bytes（BF16 為 2）：
 
-$$ \text{cache bytes} = 2 \cdot L \cdot n\_{kv} \cdot d_h \cdot 2 \cdot N \cdot B. $$
+$$ \text{cache bytes} = 2 \cdot L \cdot n_{kv} \cdot d_h \cdot 2 \cdot N \cdot B. $$
 
 以 Llama-2-13B 級的模型（$L=40$、$n_{kv}=40$ 頭、$d_h=128$）為例，在 $N=4096$、$B=1$ 時： $2\cdot40\cdot40\cdot128\cdot2\cdot4096 \approx 3.4$ GB —— 而且這只是*單一序列*。一旦 $B$ 或 $N$ 往上推，限制你記憶體的就會是 KV cache 而非權重。這條式子催生了：
+
+!!! Example "數值例子：GQA 的 KV cache 能省多少"
+    用一個 32 層、GQA $n_{kv}=8$、$d_h=128$ 的 7B 級模型，假設 $N=8192$、$B=16$、BF16：
+    $2\cdot32\cdot8\cdot128\cdot2\cdot8192\cdot16 \approx 17.2$ GB。
+    若同樣模型改成 MHA、$n_{kv}=32$，KV cache 會變成 **68.7 GB**。也就是說，光是把 KV 頭數從 32 降到 8，就替同一張 GPU 釋出約 51 GB 的空間，這通常比微調 kernel 還更有決定性。
 
 - **Multi-Query Attention（MQA）** —— 所有 query 頭共用一個 KV 頭（$n_{kv}=1$）。
 - **Grouped-Query Attention（GQA）** —— 少數幾個 KV 頭，各由一組 query 頭共用（現代預設）。
@@ -83,10 +88,14 @@ flowchart TD
 
 套用 roofline。在 decode step $t$、batch $B=1$ 時，attention 執行 $O(t\cdot d_h\cdot n_{heads})$ FLOP，卻必須**讀進**整個 KV cache，即 $O(t\cdot n_{kv}\cdot d_h)$ 個值。算術強度是 $O(1)$ —— 與 $t$ 無關而且很小。所以 attention 步驟（其實是整個 decode step，因為它還要把所有模型權重重讀一遍才能生出一個 token）是 **bandwidth-bound**。
 
+!!! Example "數值例子：decode step 讀多少 KV"
+    若 $t=8192$、$n_{kv}=8$、$d_h=128$、BF16，單層單序列每一步要讀的 K/V 約為
+    $2\cdot8192\cdot8\cdot128\cdot2 \approx 33.6$ MB。32 層就是約 **1.07 GB/token** 的 KV 讀取量。即使 attention FLOP 不大，HBM 也已經被每 token 的讀取量拖住；這就是 batch-1 decode 很難靠提高算力解決的原因。
+
 由此推出的結論驅動了整個 LLM serving：
 
 - **每 token latency 由讀進的 bytes 決定，而非 FLOP。** 把權重 bytes 減半（例如 int8/FP8 權重），在 batch 1 時大約把 decode latency 也減半。
-- **throughput 來自批次。** 把 $B$ 個請求一起跑，讀權重的成本攤到 $B$ 個 token 上，強度 往脊點方向提升 —— 這就是 [Continuous Batching](../performance/inference-optimization.md) 的基礎。
+- **throughput 來自批次。** 把 $B$ 個請求一起跑，讀權重的成本攤到 $B$ 個 token 上，強度 往脊點方向提升 —— 這就是 [continuous batching](../performance/inference-optimization.md) 的基礎。
 - **prefill ≠ decode。** prefill 一次處理整段 prompt（很多 token、compute-bound）；decode 一次一個 token（memory-bound）。好的 serving 系統會分別排程它們，甚至把兩者 [拆到不同硬體](../performance/inference-optimization.md)上跑。
 
 ## 分頁 attention：停止浪費緩存
@@ -96,8 +105,8 @@ flowchart TD
 **PagedAttention**（出自 vLLM）借用了虛擬記憶體的點子：把 KV cache 切成固定大小的 **區塊（block）**（例如 16 個 token），並為每個請求維護一張**區塊表（block table）**， 把邏輯位置映射到實體區塊。於是：
 
 - 區塊按需配置 → 內部碎片趨近於零（只浪費每個序列最後一個沒填滿的區塊）。
-- beam search／平行取樣／共享系統提示可以用 copy-on-write **共享**實體區塊。
-- attention kernel 透過 block table 去 gather K/V，而不是假設它們連續。
+- Beam search／平行取樣／共享系統提示可以用 copy-on-write **共享**實體區塊。
+- Attention kernel 透過 block table 去 gather K/V，而不是假設它們連續。
 
 ```mermaid
 flowchart TB
@@ -124,7 +133,7 @@ flowchart TB
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/foundations.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 用 $L=32$、$n_{kv}=8$、$d_h=128$，在 $N=8192$、$B=16$、BF16 下計算一個 GQA 模型的 KV cache 大小，並與模型權重（約 7B 參數）相比。
@@ -134,8 +143,14 @@ flowchart TB
 
 ## 參考文獻
 
-- Shazeer. _Fast Transformer Decoding: One Write-Head Is All You Need（MQA）._ 2019。
-- Ainslie et al. _GQA: Training Generalized Multi-Query Transformer Models._ 2023。
-- Dao et al. _FlashAttention._ 2022（下一頁會推導）。
-- Kwon et al. _Efficient Memory Management for LLM Serving with PagedAttention（vLLM）._ 2023。
-- DeepSeek-AI. _DeepSeek-V2 / V3 Technical Report（MLA）._ 2024。
+[1] N. Shazeer, "Fast transformer decoding: One write-head is all you need," *arXiv:1911.02150*, 2019.
+
+[2] J. Ainslie *et al.*, "GQA: Training generalized multi-query transformer models from multi-head checkpoints," in *Proc. EMNLP*, 2023.
+
+[3] T. Dao, D. Y. Fu, S. Ermon, A. Rudra, and C. Re, "FlashAttention: Fast and memory-efficient exact attention with IO-awareness," in *Proc. NeurIPS*, 2022.
+
+[4] W. Kwon *et al.*, "Efficient memory management for large language model serving with PagedAttention," in *Proc. SOSP*, 2023.
+
+[5] DeepSeek-AI, "DeepSeek-V2: A strong, economical, and efficient mixture-of-experts language model," *arXiv:2405.04434*, 2024.
+
+[6] DeepSeek-AI, "DeepSeek-V3 technical report," *arXiv:2412.19437*, 2024.

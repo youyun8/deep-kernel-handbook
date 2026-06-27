@@ -27,5 +27,5 @@
 
 </div>
 
-!!! tip "怎麼用這些解答"
+!!! Tip "怎麼用這些解答"
     這些數字用的是整數化的硬體規格（例如 A100 ≈ 312 TFLOP/s BF16 / 2 TB/s；H100 ≈ 990 TFLOP/s / 3.35 TB/s；MI300X ≈ 1.3 PFLOP/s / 5.3 TB/s）。你的確切數字會隨假設的晶片而變 —— 該對得上的是 **機制**（memory-bound vs compute-bound）與**數量級**。

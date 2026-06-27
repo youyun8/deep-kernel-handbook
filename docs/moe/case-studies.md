@@ -8,7 +8,7 @@
 
 把每個元件都做過一遍之後，現在可以來讀真正的前沿 MoE，看看它們做了*哪些*設計選擇、又是 _為什麼_。我們拆解四個：**Mixtral**（乾淨的經典）、**DeepSeek-V3**（系統協同設計的旗艦）、 **Qwen-MoE**（務實的量產者），以及 **Kimi K2/K2.5**（兆級規模下的極端稀疏）。
 
-!!! warning "確切數字請以一手來源為準"
+!!! Warning "確切數字請以一手來源為準"
     以下組態反映截至 2026 年初公布的技術報告，目的是說明*設計模式*，不是當規格表用。較新的 小改版（例如 K2.5 刷新）可能調整過某些數字。引用前請務必在對應論文／模型卡上確認。
 
 ## 跨模型比較
@@ -73,8 +73,8 @@ Moonshot 的 Kimi K2 把稀疏性推到極致：總參數約 **~1T、僅約 32B 
 
 K2.5 是同系列的後續改進；把具體數字當成版本相關，請依 Moonshot 當前的模型卡確認。但*架構上 的教訓*是穩定的：極端稀疏是可行的 —— 當（且唯當）平衡、穩定性與 serving 記憶體問題一起被解決。
 
-!!! tip "逐 kernel 看它怎麼跑"
-    [MoE decode 剖析](decode-anatomy.md) 描述的正是這一類模型（MLA + 細粒度 MoE + 共享 expert）的 decode 步驟，顯示時間實際花在哪 —— routing、grouped expert GEMM、共享 expert、每層 all-reduce —— 以及會移動這些比例的融合與並發槓桿。
+!!! Tip "逐 kernel 看它怎麼跑"
+    [MoE decode 剖析](decode-anatomy.md) 描述的正是這一類模型（MLA + 細粒度 MoE + 共享 expert）的 decode 步驟，顯示時間實際花在哪 —— Routing、grouped expert GEMM、共享 expert、每層 all-reduce —— 以及會移動這些比例的融合與並發槓桿。
 
 ## 拿走什麼
 
@@ -84,7 +84,7 @@ K2.5 是同系列的後續改進；把具體數字當成版本相關，請依 Mo
 2. **sigmoid gating + aux-loss-free 偏差**比重 auxiliary loss 平衡得更好。
 3. **壓縮 attention**（MLA/GQA），免得 KV cache 把省下來的空間又吃回去。
 4. **系統工作（all-to-all 重疊、node-limited routing、FP8）不是可選項** —— 正是它讓 FLOP 解耦在 碰到真實硬體時還能成立。
-5. **穩定性工程隨規模放大** —— z-loss、FP32 routing、謹慎的 optimizer（MuonClip）會隨 $E$ 與總參數 成長而越來越重要。
+5. **穩定性工程隨規模放大** —— Z-loss、FP32 routing、謹慎的 optimizer（MuonClip）會隨 $E$ 與總參數 成長而越來越重要。
 
 ## 要點
 
@@ -96,7 +96,7 @@ K2.5 是同系列的後續改進；把具體數字當成版本相關，請依 Mo
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/moe.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 為每個模型計算 expert 組合數 $\binom{E}{k}$，並把它連到細粒度的品質論證。
@@ -106,8 +106,14 @@ K2.5 是同系列的後續改進；把具體數字當成版本相關，請依 Mo
 
 ## 參考文獻
 
-- Jiang et al. _Mixtral of Experts._ 2024。
-- DeepSeek-AI. _DeepSeek-V3 Technical Report._ 2024（MLA、aux-loss-free、FP8、DualPipe、MTP）。
-- Dai et al. _DeepSeekMoE._ 2024。
-- Qwen Team. _Qwen2 / Qwen3 Technical Report._ 2024–2025。
-- Moonshot AI. _Kimi K2 Technical Report_（MuonClip、大型 MoE）。2025。
+[1] A. Q. Jiang *et al.*, "Mixtral of experts," *arXiv:2401.04088*, 2024.
+
+[2] DeepSeek-AI, "DeepSeek-V3 technical report," *arXiv:2412.19437*, 2024.
+
+[3] D. Dai *et al.*, "DeepSeekMoE: Towards ultimate expert specialization in mixture-of-experts language models," *arXiv:2401.06066*, 2024.
+
+[4] Qwen Team, "Qwen2 technical report," *arXiv:2407.10671*, 2024.
+
+[5] Qwen Team, "Qwen3 technical report," Technical Report, 2025.
+
+[6] Moonshot AI, "Kimi K2 technical report," Technical Report, 2025.

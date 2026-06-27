@@ -20,9 +20,9 @@ MoE 比密集模型更難訓練，因為 **routing 既離散又會自我強化**
 
 ## Router z 損失
 
-router z-loss（出自 ST-MoE）直接懲罰過大的 router logits，讓 softmax 保持清醒。對每個 token 的 logits $x \in \mathbb{R}^{E}$：
+Router z-loss（出自 ST-MoE）直接懲罰過大的 router logits，讓 softmax 保持清醒。對每個 token 的 logits $x \in \mathbb{R}^{E}$：
 
-$$ \mathcal{L}_{z} = \frac{\beta}{T}\sum_{t=1}^{T}\Big(\log\sum*{e=1}^{E} e^{x*{t,e}}\Big)^{2}. $$
+$$ \mathcal{L}_{z} = \frac{\beta}{T}\sum_{t=1}^{T}\Big(\log\sum_{e=1}^{E} e^{x_{t,e}}\Big)^{2}. $$
 
 其中 $\log\sum_e e^{x_e}$ 是 log-partition（softmax 的歸一化器）；對它平方並懲罰，會把 logits 往較小的值拉。效果：
 
@@ -39,7 +39,7 @@ def router_z_loss(logits, beta=1e-3):
 
 MoE training 的總損失：
 
-$$ \mathcal{L} = \mathcal{L}_{\text{LM}} + \alpha\,\mathcal{L}_{\text{aux}} + \beta\,\mathcal{L}\_{z}, $$
+$$ \mathcal{L} = \mathcal{L}_{\text{LM}} + \alpha\,\mathcal{L}_{\text{aux}} + \beta\,\mathcal{L}_{z}, $$
 
 （$\mathcal{L}_{\text{aux}}$ 可選擇換成 [aux-loss-free 偏差](load-balancing.md)）。即使在 aux-loss-free 的配方裡，z-loss 仍會保留 —— 它處理的是 logit 大小，這跟平衡是兩個不同的問題。
 
@@ -51,12 +51,12 @@ $$ \mathcal{L} = \mathcal{L}_{\text{LM}} + \alpha\,\mathcal{L}_{\text{aux}} + \b
 - **偏差控制器的計數必須以 FP32 reduce 並跨 data-parallel rank 同步**，否則不同 rank 會朝不同 目標平衡。
 - 在任何 softmax 之前都先減掉 max（用 `logsumexp`／`log_softmax` 即免費取得）。
 
-!!! warning "經典的無聲 bug"
+!!! Warning "經典的無聲 bug"
     在 BF16 裡做 routing，可能讓兩個 expert 的 logit 打平（BF16 只有約 7 個 mantissa bit），於是 決勝（argmax/topk）變得任意、而且在 data parallel 下依 rank 而異 —— 不同副本把同一個 token 路由到不同地方，破壞平衡統計。用 FP32 做 router 數學可以避免。
 
 ## 初始化
 
-routing 在**早期**最脆弱，也就是 expert 還沒分化的時候。良好實務：
+Routing 在**早期**最脆弱，也就是 expert 還沒分化的時候。良好實務：
 
 - **小的 router 初始化。** 用小尺度初始化 router 權重（例如 $\text{std}\sim 0.01$–$d^{-1/2}$ 再額外縮小），讓初始 logit 接近零 → routing 接近均勻 → 每個 expert 都拿到梯度、在迴圈崩塌前 先分化開來。（Switch 用截斷常態並刻意縮小初始化尺度，正是為此。）
 - **標準的 expert 初始化。** expert 就是普通 FFN，照密集 FFN 的方式初始化即可。
@@ -90,7 +90,7 @@ routing 在**早期**最脆弱，也就是 expert 還沒分化的時候。良好
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/moe.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 證明最小化 $\mathcal{L}_z$ 會縮小 $\|x\|$、把 softmax 從 one-hot 拉開。routing 分佈的熵會怎麼 變？
@@ -100,8 +100,12 @@ routing 在**早期**最脆弱，也就是 expert 還沒分化的時候。良好
 
 ## 參考文獻
 
-- Zoph et al. _ST-MoE: Designing Stable and Transferable Sparse Expert Models_（router z-loss）。2022。
-- Fedus, Zoph, Shazeer. _Switch Transformer_（初始化、jitter、選擇性 FP32）。2021。
-- Lepikhin et al. _GShard._ 2020。
-- DeepSeek-AI. _DeepSeek-V3_（偏差控制器、穩定性配方）。2024。
-- Micikevicius et al. _Mixed Precision Training._ 2017。
+[1] B. Zoph *et al.*, "ST-MoE: Designing stable and transferable sparse expert models," *arXiv:2202.08906*, 2022.
+
+[2] W. Fedus, B. Zoph, and N. Shazeer, "Switch Transformers: Scaling to trillion parameter models with simple and efficient sparsity," *J. Mach. Learn. Res.*, vol. 23, no. 120, pp. 1-39, 2022.
+
+[3] D. Lepikhin *et al.*, "GShard: Scaling giant models with conditional computation and automatic sharding," in *Proc. ICLR*, 2021.
+
+[4] DeepSeek-AI, "DeepSeek-V3 technical report," *arXiv:2412.19437*, 2024.
+
+[5] P. Micikevicius *et al.*, "Mixed precision training," in *Proc. ICLR*, 2018.

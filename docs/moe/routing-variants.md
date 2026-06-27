@@ -8,7 +8,7 @@
 
 「在 softmax 上取 top-$k$」只是設計空間裡的一個點。本頁畫出現代 MoE 變化的幾條主軸： **誰挑誰**（token-choice vs expert-choice）、**共享 expert**，以及 **expert 粒度**（細粒度 expert）。每一條都是 [負載平衡](load-balancing.md)那種平衡／品質／系統取捨上的槓桿。
 
-## token-選擇 vs expert-選擇
+## Token-選擇 vs expert-選擇
 
 基本問題：是每個 **token 挑自己的 expert**，還是每個 **expert 挑自己的 token**？
 
@@ -48,7 +48,7 @@ flowchart TB
 
 **共享 expert（shared expert）**是一個*每個* token 都會經過的 FFN，疊加在它的路由 expert 之上（DeepSeekMoE、Qwen-MoE）：
 
-$$ y = \underbrace{\text{shared}(h)}_{\text{always on}} + \sum_{e\in\text{TopK}} g_e\,\text{expert}\_e(h). $$
+$$ y = \underbrace{\text{shared}(h)}_{\text{always on}} + \sum_{e\in\text{TopK}} g_e\,\text{expert}_e(h). $$
 
 動機：如果每個路由 expert 都得各自重學每個 token 都需要的*通用*知識（基本語法、常識先驗）， 那很浪費。把這些共通負載交給一個共享 expert 吸收，路由 expert 的容量就不會耗在重複的東西上、 得以專注於*獨特*的模式。好處：
 
@@ -95,7 +95,7 @@ DeepSeekMoE 證明，在同等計算下，細粒度 + 共享 expert 大幅勝過
 
 ## 練習
 
-!!! tip "解決方案"
+!!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/moe.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 計算 expert 組合數：（8, top-2）、（64, top-8）、（256, top-8）。把它跟細粒度帶來的品質增益 關聯起來。
@@ -105,8 +105,14 @@ DeepSeekMoE 證明，在同等計算下，細粒度 + 共享 expert 大幅勝過
 
 ## 參考文獻
 
-- Zhou et al. _Mixture-of-Experts with Expert Choice Routing._ 2022。
-- Dai et al. _DeepSeekMoE: Towards Ultimate Expert Specialization_（共享 + 細粒度）。2024。
-- DeepSeek-AI. _DeepSeek-V3._ 2024（node-limited routing、sigmoid + 偏差）。
-- Qwen Team. _Qwen2-MoE / Qwen3 Technical Report._ 2024–2025。
-- Jiang et al. _Mixtral of Experts._ 2024。
+[1] Y. Zhou *et al.*, "Mixture-of-experts with expert choice routing," in *Proc. NeurIPS*, 2022.
+
+[2] D. Dai *et al.*, "DeepSeekMoE: Towards ultimate expert specialization in mixture-of-experts language models," *arXiv:2401.06066*, 2024.
+
+[3] DeepSeek-AI, "DeepSeek-V3 technical report," *arXiv:2412.19437*, 2024.
+
+[4] Qwen Team, "Qwen2 technical report," *arXiv:2407.10671*, 2024.
+
+[5] Qwen Team, "Qwen3 technical report," Technical Report, 2025.
+
+[6] A. Q. Jiang *et al.*, "Mixtral of experts," *arXiv:2401.04088*, 2024.
