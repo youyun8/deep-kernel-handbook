@@ -353,7 +353,7 @@
   height: 1rem;
 }
 
-/* Sidebar: roomier, rounded active pills, clearer hierarchy. */
+/* Sidebar: quiet document navigation with clear hierarchy. */
 .md-nav {
   font-family: var(--ml-sidebar-font);
   font-size: 0.7rem;
@@ -369,7 +369,11 @@
 }
 
 .md-sidebar {
-  padding-top: 1.4rem;
+  padding-top: 1.1rem;
+}
+
+.md-nav--primary > .md-nav__list {
+  padding-right: 0.2rem;
 }
 
 .md-nav__title {
@@ -382,31 +386,22 @@
 
 /* Every clickable row: comfortable padding, rounded hit area, smooth states. */
 .md-nav__item .md-nav__link {
-  border-radius: 0.55rem;
-  padding: 0.34rem 0.62rem;
-  margin: 0.08rem 0;
+  border: 1px solid transparent;
+  border-radius: 0.45rem;
+  padding: 0.32rem 0.58rem;
+  margin: 0.04rem 0;
   color: var(--md-default-fg-color--light);
   transition:
     background-color 140ms ease,
+    border-color 140ms ease,
     color 140ms ease,
+    box-shadow 140ms ease,
     padding-left 140ms ease;
 }
 
 .md-nav--primary .md-nav__item .md-nav__link {
   display: flex;
   align-items: center;
-  gap: 0.42rem;
-}
-
-.md-nav--primary .md-nav__item .md-nav__link::before {
-  content: "";
-  flex: 0 0 0.42rem;
-  width: 0.42rem;
-  height: 0.42rem;
-  border-radius: 0.12rem;
-  background: currentColor;
-  opacity: 0.38;
-  transform: rotate(45deg);
 }
 
 .md-nav--primary .md-nav__item .md-nav__link > .md-ellipsis {
@@ -418,41 +413,38 @@
 }
 
 .md-nav__link:hover {
-  background: var(--ml-surface);
+  border-color: color-mix(in srgb, var(--ml-accent-cool) 16%, transparent);
+  background: color-mix(in srgb, var(--ml-accent-cool) 7%, transparent);
   color: var(--md-default-fg-color);
 }
 
-/* Active page: a soft tinted pill with an accent rail on the leading edge. */
+/* Active page: a restrained tinted row with a leading accent rail. */
 .md-nav__link--active,
 .md-nav__link[aria-current="page"] {
   position: relative;
-  background: color-mix(in srgb, var(--ml-accent-cool) 12%, transparent);
-  color: var(--ml-accent-cool) !important;
+  border-color: color-mix(in srgb, var(--ml-accent-cool) 18%, transparent);
+  background: color-mix(in srgb, var(--ml-accent-cool) 10%, transparent);
+  color: var(--md-default-fg-color) !important;
   font-weight: 500;
 }
 
 .md-nav--primary .md-nav__item .md-nav__link--active,
 .md-nav--primary .md-nav__item .md-nav__link[aria-current="page"] {
-  box-shadow: inset 3px 0 0 var(--ml-accent-cool);
+  box-shadow: inset 2px 0 0 var(--ml-accent-cool);
 }
 
-.md-nav--primary .md-nav__item .md-nav__link--active::before,
-.md-nav--primary .md-nav__item .md-nav__link[aria-current="page"]::before {
-  opacity: 0.68;
-}
-
-/* Top-level section labels read as quiet, confident group headers. */
+/* Top-level section labels are calm anchors, not bold chapter banners. */
 .md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link,
 .md-nav--primary
   > .md-nav__list
   > .md-nav__item
   > .md-nav__container
   > .md-nav__link {
-  margin-top: 0.7rem;
-  padding-left: 0.62rem;
+  margin-top: 0.58rem;
+  padding: 0.36rem 0.58rem;
   font-family: var(--ml-sidebar-font);
   font-size: 0.72rem;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0;
   color: var(--md-default-fg-color);
 }
@@ -463,9 +455,20 @@
 
 /* Nested children: a faint guide rail so hierarchy is legible at a glance. */
 .md-nav--primary .md-nav__item .md-nav__list {
-  margin-left: 0.62rem;
-  padding-left: 0.55rem;
-  border-left: 1px solid var(--ml-border);
+  margin: 0.12rem 0 0.36rem 0.42rem;
+  padding-left: 0.62rem;
+  border-left: 1px solid
+    color-mix(in srgb, var(--ml-accent-cool) 18%, var(--ml-border));
+}
+
+.md-nav--primary .md-nav__item .md-nav__list .md-nav__link {
+  padding-top: 0.28rem;
+  padding-bottom: 0.28rem;
+  font-size: 0.68rem;
+}
+
+.md-nav--primary .md-nav__item .md-nav__list .md-nav__link:hover {
+  padding-left: 0.7rem;
 }
 
 /* Expand/collapse chevrons inherit the muted ink and animate gently. */
