@@ -1,5 +1,5 @@
 /* ============================================================================
-   深核手冊 — visual system on top of Material for MkDocs.
+   深核效能手冊 — visual system on top of Material for MkDocs.
    Sections:
      1. Design tokens (light + slate)
      2. Diagram tokens (Mermaid / roofline)
@@ -1635,9 +1635,16 @@ body.ml-settings-open {
 
 /* ---------- 9. Responsive ------------------------------------------------ */
 @media screen and (max-width: 76.1875em) {
-  /* Drawer nav on tablet/mobile. */
+  /* Drawer nav on tablet/mobile. The title bar uses the deep-blue primary as
+     its background, so its text + back-arrow must be light to stay legible
+     (otherwise it renders as dark ink on dark blue). */
   .md-nav--primary .md-nav__title {
     background: var(--md-primary-fg-color);
+    color: var(--md-primary-bg-color, #fff);
+  }
+  .md-nav--primary .md-nav__title .md-nav__icon,
+  .md-nav--primary .md-nav__title .md-nav__button {
+    color: var(--md-primary-bg-color, #fff);
   }
 }
 

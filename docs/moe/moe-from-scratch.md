@@ -6,16 +6,16 @@
   <span class="chip"><strong>程式碼：</strong> <code>code/moe/</code>（CPU、已測試）</span>
 </div>
 
-現在我們用 PyTorch 把一個完整的 MoE 層做出來——expert、router/gate、top-$k$ 選擇與加權合併。 先寫一個最乾淨、保證正確的版本，再重構成 [系統章節](systems-ep.md)與 [kernels](kernels.md) 要 優化的那種 dispatch 形式。這裡的所有程式碼都在 CPU 上可跑，並由 [`code/moe/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code/moe) 的測試把關。
+現在我們用 PyTorch 把一個完整的 MoE 層做出來 —— expert、router/gate、top-$k$ 選擇與加權合併。 先寫一個最乾淨、保證正確的版本，再重構成 [系統章節](systems-ep.md)與 [kernels](kernels.md) 要 優化的那種 dispatch 形式。這裡的所有程式碼都在 CPU 上可跑，並由 [`code/moe/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code/moe) 的測試把關。
 
 ## MoE 層的剖析
 
 MoE FFN 把單一前饋 block 換成：
 
-1. **$E$ 個 expert**——各自獨立的 FFN（通常是 SwiGLU）：$\text{expert}_e(h) = W^{down}_e\,\big(\text{SiLU}(W^{gate}_e h)\odot (W^{up}_e h)\big)$。
-2. **router/gate**——一個線性映射 $h \mapsto W_r h \in \mathbb{R}^{E}$，為每個 expert 產生一個 logit。
-3. **top-$k$ 選擇**——為每個 token 挑出得分最高的 $k$ 個 expert。
-4. **合併**——把 token 送過這 $k$ 個 expert，再用（歸一化後的）gate 分數加權求和它們的輸出。
+1. **$E$ 個 expert** —— 各自獨立的 FFN（通常是 SwiGLU）：$\text{expert}_e(h) = W^{down}_e\,\big(\text{SiLU}(W^{gate}_e h)\odot (W^{up}_e h)\big)$。
+2. **router/gate** —— 一個線性映射 $h \mapsto W_r h \in \mathbb{R}^{E}$，為每個 expert 產生一個 logit。
+3. **top-$k$ 選擇** —— 為每個 token 挑出得分最高的 $k$ 個 expert。
+4. **合併** —— 把 token 送過這 $k$ 個 expert，再用（歸一化後的）gate 分數加權求和它們的輸出。
 
 對一個 token 表示 $h\in\mathbb{R}^d$、gate 權重 $g_e$：
 
@@ -35,14 +35,14 @@ $$ p = \text{softmax}(W*r h), \quad g_e = \frac{p_e}{\sum*{j\in\text{TopK}} p_j}
 
 $$ s*e = \sigma(W_r h), \quad g_e = \frac{s_e}{\sum*{j\in\text{TopK}} s_j}. $$
 
-獨立計分把各 expert 解耦（沒有固定預算的零和競爭），這跟**細粒度 expert**與 **aux-loss-free** 的平衡偏差天生契合（見 [負載平衡](load-balancing.md)）——偏差可以直接加到 $s_e$ 上，而不會扭曲 softmax 的歸一化。現代大型 MoE 越來越愛用 sigmoid gating，正是這個原因。
+獨立計分把各 expert 解耦（沒有固定預算的零和競爭），這跟**細粒度 expert**與 **aux-loss-free** 的平衡偏差天生契合（見 [負載平衡](load-balancing.md)） —— 偏差可以直接加到 $s_e$ 上，而不會扭曲 softmax 的歸一化。現代大型 MoE 越來越愛用 sigmoid gating，正是這個原因。
 
 !!! note "top-k *之後*再歸一化"
     兩種變體都會把**選中的** $k$ 個 gate 重新歸一化成總和為 1，這樣層的輸出尺度就不取決於 哪些／多少個 expert 被啟用。要不要重新歸一化是一個真實的設計選擇：Switch（$k=1$）略過它， 大多數 $k\ge2$ 的模型則會做。
 
 ## 參考實作#1：可讀循環
 
-最清楚、最正確的 MoE——容易驗證，而且刻意*不*追求快：
+最清楚、最正確的 MoE —— 容易驗證，而且刻意*不*追求快：
 
 ```python
 import torch, torch.nn as nn, torch.nn.functional as F
@@ -83,11 +83,11 @@ class MoELayerNaive(nn.Module):
         return y
 ```
 
-帶遮罩的 `for e in experts` 迴圈就是概念核心：**每個 expert 只在被 routing 到它的 token 上 執行。** 這是正確的、在 CPU 上拿來學也很好；但在 GPU 上，Python 迴圈加上不規則的 per-expert 批次很慢——這正是後面 grouped GEMM 與 dispatch kernel 的全部動機。
+帶遮罩的 `for e in experts` 迴圈就是概念核心：**每個 expert 只在被 routing 到它的 token 上 執行。** 這是正確的、在 CPU 上拿來學也很好；但在 GPU 上，Python 迴圈加上不規則的 per-expert 批次很慢 —— 這正是後面 grouped GEMM 與 dispatch kernel 的全部動機。
 
 ## 參考實作#2：調度/排列形式
 
-生產版本會按 expert 把 token 排序，於是每個 expert 看到的是一段*連續*的區塊——正是 grouped GEMM 想要的排佈。這個「permute → grouped matmul → unpermute」的模式，就是 [MoE kernels](kernels.md) 要加速、[expert parallelism](systems-ep.md) 要透過網路傳送的東西。
+生產版本會按 expert 把 token 排序，於是每個 expert 看到的是一段*連續*的區塊 —— 正是 grouped GEMM 想要的排佈。這個「permute → grouped matmul → unpermute」的模式，就是 [MoE kernels](kernels.md) 要加速、[expert parallelism](systems-ep.md) 要透過網路傳送的東西。
 
 ```python
 def moe_dispatch(x, topi, topv, experts, n_experts):
@@ -125,7 +125,7 @@ def moe_dispatch(x, topi, topv, experts, n_experts):
 
 ## 將其放入 Transformer 塊中
 
-直接替換：把密集 FFN 子層換成 MoE 層，attention 與 norm 保持不動。許多模型還會在路由 expert 之外加上一個共享 expert——見 [Routing 變體](routing-variants.md)：
+直接替換：把密集 FFN 子層換成 MoE 層，attention 與 norm 保持不動。許多模型還會在路由 expert 之外加上一個共享 expert —— 見 [Routing 變體](routing-variants.md)：
 
 ```python
 class MoEBlock(nn.Module):
@@ -140,7 +140,7 @@ class MoEBlock(nn.Module):
         return x
 ```
 
-完整可訓練的版本——含負載平衡損失與一個跑玩具任務的小型 training 迴圈——放在 [`code/moe/train_tiny_moe.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/moe/train_tiny_moe.py)， 它也是[實戰專案](../capstones/build-moe.md)的起點。
+完整可訓練的版本 —— 含負載平衡損失與一個跑玩具任務的小型 training 迴圈 —— 放在 [`code/moe/train_tiny_moe.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/moe/train_tiny_moe.py)， 它也是[實戰專案](../capstones/build-moe.md)的起點。
 
 ## 要點
 

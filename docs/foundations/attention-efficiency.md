@@ -18,7 +18,7 @@ $$ \text{Attn}(Q,K,V) = \text{softmax}\!\left(\frac{QK^\top}{\sqrt{d}} + M\right
 
 ## KV 快取：用記憶體換取 FLOP
 
-inference 時，我們一次生成一個 token。最笨的做法是：要產生 token $t$，就在整段前綴上重算 attention——每一步都把先前所有 token 的 key 和 value 重新投影一遍，這是 $O(N^2)$ 的浪費。 取而代之，我們**快取**已經看過的每個位置的 key 與 value。於是 step $t$ 變成：
+inference 時，我們一次生成一個 token。最笨的做法是：要產生 token $t$，就在整段前綴上重算 attention —— 每一步都把先前所有 token 的 key 和 value 重新投影一遍，這是 $O(N^2)$ 的浪費。 取而代之，我們**快取**已經看過的每個位置的 key 與 value。於是 step $t$ 變成：
 
 1. 只投影*新* token，得到 $q_t, k_t, v_t$。
 2. 把 $k_t, v_t$ 接到快取尾端。
@@ -42,11 +42,11 @@ flowchart TB
 
 $$ \text{cache bytes} = 2 \cdot L \cdot n\_{kv} \cdot d_h \cdot 2 \cdot N \cdot B. $$
 
-以 Llama-2-13B 級的模型（$L=40$、$n_{kv}=40$ 頭、$d_h=128$）為例，在 $N=4096$、$B=1$ 時： $2\cdot40\cdot40\cdot128\cdot2\cdot4096 \approx 3.4$ GB——而且這只是*單一序列*。一旦 $B$ 或 $N$ 往上推，限制你記憶體的就會是 KV cache 而非權重。這條式子催生了：
+以 Llama-2-13B 級的模型（$L=40$、$n_{kv}=40$ 頭、$d_h=128$）為例，在 $N=4096$、$B=1$ 時： $2\cdot40\cdot40\cdot128\cdot2\cdot4096 \approx 3.4$ GB —— 而且這只是*單一序列*。一旦 $B$ 或 $N$ 往上推，限制你記憶體的就會是 KV cache 而非權重。這條式子催生了：
 
-- **Multi-Query Attention（MQA）**——所有 query 頭共用一個 KV 頭（$n_{kv}=1$）。
-- **Grouped-Query Attention（GQA）**——少數幾個 KV 頭，各由一組 query 頭共用（現代預設）。
-- **Multi-head Latent Attention（MLA）**——DeepSeek 對 KV cache 的低秩壓縮（見 [case studies](../moe/case-studies.md)）。
+- **Multi-Query Attention（MQA）** —— 所有 query 頭共用一個 KV 頭（$n_{kv}=1$）。
+- **Grouped-Query Attention（GQA）** —— 少數幾個 KV 頭，各由一組 query 頭共用（現代預設）。
+- **Multi-head Latent Attention（MLA）** —— DeepSeek 對 KV cache 的低秩壓縮（見 [case studies](../moe/case-studies.md)）。
 
 ```mermaid
 flowchart TD
@@ -77,16 +77,16 @@ flowchart TD
 
 更少的 KV 頭 → 更小的快取 → 每個 decode 步驟搬移的頻寬更少，代價是少許品質。GQA 是大多數 量產模型的折衷點；MLA 更進一步，把 KV 壓成低秩 latent。
 
-用 $n_{kv}=8$ 取代 40，GQA 把快取砍掉 5 倍、品質幾乎沒損失——這是純粹寫在架構裡的系統 勝利。
+用 $n_{kv}=8$ 取代 40，GQA 把快取砍掉 5 倍、品質幾乎沒損失 —— 這是純粹寫在架構裡的系統 勝利。
 
 ## 為什麼 decoding 受記憶體限制
 
-套用 roofline。在 decode step $t$、batch $B=1$ 時，attention 執行 $O(t\cdot d_h\cdot n_{heads})$ FLOP，卻必須**讀進**整個 KV cache，即 $O(t\cdot n_{kv}\cdot d_h)$ 個值。算術強度是 $O(1)$——與 $t$ 無關而且很小。所以 attention 步驟（其實是整個 decode step，因為它還要把所有模型權重重讀一遍才能生出一個 token）是 **bandwidth-bound**。
+套用 roofline。在 decode step $t$、batch $B=1$ 時，attention 執行 $O(t\cdot d_h\cdot n_{heads})$ FLOP，卻必須**讀進**整個 KV cache，即 $O(t\cdot n_{kv}\cdot d_h)$ 個值。算術強度是 $O(1)$ —— 與 $t$ 無關而且很小。所以 attention 步驟（其實是整個 decode step，因為它還要把所有模型權重重讀一遍才能生出一個 token）是 **bandwidth-bound**。
 
 由此推出的結論驅動了整個 LLM serving：
 
 - **每 token latency 由讀進的 bytes 決定，而非 FLOP。** 把權重 bytes 減半（例如 int8/FP8 權重），在 batch 1 時大約把 decode latency 也減半。
-- **throughput 來自批次。** 把 $B$ 個請求一起跑，讀權重的成本攤到 $B$ 個 token 上，強度 往脊點方向提升——這就是 [Continuous Batching](../performance/inference-optimization.md) 的基礎。
+- **throughput 來自批次。** 把 $B$ 個請求一起跑，讀權重的成本攤到 $B$ 個 token 上，強度 往脊點方向提升 —— 這就是 [Continuous Batching](../performance/inference-optimization.md) 的基礎。
 - **prefill ≠ decode。** prefill 一次處理整段 prompt（很多 token、compute-bound）；decode 一次一個 token（memory-bound）。好的 serving 系統會分別排程它們，甚至把兩者 [拆到不同硬體](../performance/inference-optimization.md)上跑。
 
 ## 分頁 attention：停止浪費緩存
@@ -109,11 +109,11 @@ flowchart TB
     t2 -.block table.-> p9[Phys block 9]
 ```
 
-這常常能讓 serving throughput 翻倍，在同樣的 HBM 裡塞進更多並發序列。我們會在 [inference & serving](../moe/inference-serving.md) 再回到這裡——在 MoE 上，_expert_ 的記憶體 壓力會疊加在 KV 壓力之上。
+這常常能讓 serving throughput 翻倍，在同樣的 HBM 裡塞進更多並發序列。我們會在 [inference & serving](../moe/inference-serving.md) 再回到這裡 —— 在 MoE 上，_expert_ 的記憶體 壓力會疊加在 KV 壓力之上。
 
 ## FlashAttention 適合的地方
 
-上面講的都是 _inference_ 的記憶體。**FlashAttention** 攻打的是另一種成本：在 _training/prefill_ 時，$N\times N$ 的分數矩陣很大，把它寫進 HBM 才是瓶頸。下一頁會從零 推導 FlashAttention——它用 **online softmax** 和 **tiling**，把所有東西留在晶片上的 SRAM、 從不具現化分數矩陣。這是「靠融合提高算術強度」的教科書案例，直接出自 roofline 劇本。
+上面講的都是 _inference_ 的記憶體。**FlashAttention** 攻打的是另一種成本：在 _training/prefill_ 時，$N\times N$ 的分數矩陣很大，把它寫進 HBM 才是瓶頸。下一頁會從零 推導 FlashAttention —— 它用 **online softmax** 和 **tiling**，把所有東西留在晶片上的 SRAM、 從不具現化分數矩陣。這是「靠融合提高算術強度」的教科書案例，直接出自 roofline 劇本。
 
 ## 要點
 

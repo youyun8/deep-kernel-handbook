@@ -32,7 +32,7 @@
 - **GQA** attention，壓住 KV cache。
 - 用標準的 **auxiliary 負載平衡損失**訓練。
 
-為什麼它在教學上重要：它是能在規模上跑起來的最小 SMoE，因此把核心觀念（稀疏 FFN routing） 孤立出來，不疊加後來的複雜性。約 47B 參數、但每個 token 只用約 13B—— [為什麼需要稀疏化](why-sparsity.md)最單純形式的解耦。它的侷限（只有 8 個粗 expert → 只有 28 種 expert 組合）正是細粒度設計要改進的地方。
+為什麼它在教學上重要：它是能在規模上跑起來的最小 SMoE，因此把核心觀念（稀疏 FFN routing） 孤立出來，不疊加後來的複雜性。約 47B 參數、但每個 token 只用約 13B —— [為什麼需要稀疏化](why-sparsity.md)最單純形式的解耦。它的侷限（只有 8 個粗 expert → 只有 28 種 expert 組合）正是細粒度設計要改進的地方。
 
 ## DeepSeek-V3 — 端對端系統協同設計
 
@@ -40,26 +40,26 @@
 
 **架構**
 
-- **DeepSeekMoE**：256 個細粒度路由 expert + **1 個共享 expert**、top-8 routing——數十億種 expert 組合，對比 Mixtral 的 28 種（[Routing 變體](routing-variants.md)）。
-- **Sigmoid gating** 搭配 **aux-loss-free** 平衡：per-expert 的 [偏差控制器](load-balancing.md)調整選擇，而不會像大 auxiliary loss 那樣扭曲目標——平衡*與* 品質都更好。
-- **Multi-head Latent Attention（MLA）**：把 K/V 壓成低秩 latent，大幅縮小 [KV cache](../foundations/attention-efficiency.md)——對長上下文與便宜的 decode 至關重要。
+- **DeepSeekMoE**：256 個細粒度路由 expert + **1 個共享 expert**、top-8 routing —— 數十億種 expert 組合，對比 Mixtral 的 28 種（[Routing 變體](routing-variants.md)）。
+- **Sigmoid gating** 搭配 **aux-loss-free** 平衡：per-expert 的 [偏差控制器](load-balancing.md)調整選擇，而不會像大 auxiliary loss 那樣扭曲目標 —— 平衡*與* 品質都更好。
+- **Multi-head Latent Attention（MLA）**：把 K/V 壓成低秩 latent，大幅縮小 [KV cache](../foundations/attention-efficiency.md) —— 對長上下文與便宜的 decode 至關重要。
 - **Multi-Token Prediction（MTP）**：額外的頭一次預測多個未來 token，提升資料效率，並能做類似 speculative 的 inference。
 
 **系統**（這裡最相關的部分）
 
-- **FP8 training**：GEMM 走 FP8、累積走高精度，敏感部件留 BF16/FP32——前沿等級的 [數值](../foundations/numerics-precision.md)配方。
+- **FP8 training**：GEMM 走 FP8、累積走高精度，敏感部件留 BF16/FP32 —— 前沿等級的 [數值](../foundations/numerics-precision.md)配方。
 - **node-limited routing**：一個 token 的 expert 最多跨 ≤4 個節點，壓低跨節點的 [all-to-all](systems-ep.md) 流量。
-- **DualPipe + DeepEP**：管線排程加通訊函式庫，把 **all-to-all 與計算幾乎完全重疊**——量產化的 最大單一 EP 優化。
+- **DualPipe + DeepEP**：管線排程加通訊函式庫，把 **all-to-all 與計算幾乎完全重疊** —— 量產化的 最大單一 EP 優化。
 
-總共 671B／**37B 活躍**：你付的是約 37B 模型的 inference 計算，換到的卻是更大模型的品質—— *因為*系統工作把 EP 開銷壓得夠小。
+總共 671B／**37B 活躍**：你付的是約 37B 模型的 inference 計算，換到的卻是更大模型的品質 —— *因為*系統工作把 EP 開銷壓得夠小。
 
 ## Qwen-MoE — 務實的生產者
 
 Qwen MoE 系列（Qwen1.5-MoE-A2.7B → Qwen2-57B-A14B → Qwen3-235B-A22B）展示了當**廣泛部署與 工具生態**很重要時，團隊會做的設計選擇：
 
-- **細粒度 expert**（例如 128 個路由、top-8）——採納「許多小 expert」的路線。
+- **細粒度 expert**（例如 128 個路由、top-8） —— 採納「許多小 expert」的路線。
 - **GQA** attention（到處都有良好支援），而非更奇特的 MLA。
-- 標準的 **auxiliary loss** 平衡——穩健、好推理，把可靠性看得比榨出最後一點平衡更重。
+- 標準的 **auxiliary loss** 平衡 —— 穩健、好推理，把可靠性看得比榨出最後一點平衡更重。
 - 強大的**生態系支援**（量化變體、serving 整合），這本身就是一個系統決策：架構再好，也只能 和跑它的 kernel 與 server 一樣好用。
 
 重點：存在一條光譜，一端是「奇特的研究前沿」（DeepSeek/Kimi），另一端是「久經考驗、可移植」 （Qwen）；該選哪一端，取決於你是否掌控整個堆疊。
@@ -68,13 +68,13 @@ Qwen MoE 系列（Qwen1.5-MoE-A2.7B → Qwen2-57B-A14B → Qwen3-235B-A22B）展
 
 Moonshot 的 Kimi K2 把稀疏性推到極致：總參數約 **~1T、僅約 32B 活躍**，靠一個非常大的細粒度 expert 池（約 384 個路由 + 共享 expert、top-8）與 MLA attention。有兩點特別突出：
 
-- **極高的稀疏率**（活躍/總數 ≈ 3%）——比 DeepSeek-V3 更進一步沿著 [為什麼需要稀疏化](why-sparsity.md)的軸走，重押「便宜的記憶體容量能買到品質」。
-- **這種規模的 training 穩定性工程**，包括 **MuonClip** optimizer／裁剪法，據報能壓制困擾兆級 參數 MoE training 的損失尖峰與 attention-logit 膨脹——直接對應我們在 [穩定性病態](training-stability.md)講的那些問題。
+- **極高的稀疏率**（活躍/總數 ≈ 3%） —— 比 DeepSeek-V3 更進一步沿著 [為什麼需要稀疏化](why-sparsity.md)的軸走，重押「便宜的記憶體容量能買到品質」。
+- **這種規模的 training 穩定性工程**，包括 **MuonClip** optimizer／裁剪法，據報能壓制困擾兆級 參數 MoE training 的損失尖峰與 attention-logit 膨脹 —— 直接對應我們在 [穩定性病態](training-stability.md)講的那些問題。
 
-K2.5 是同系列的後續改進；把具體數字當成版本相關，請依 Moonshot 當前的模型卡確認。但*架構上 的教訓*是穩定的：極端稀疏是可行的——當（且唯當）平衡、穩定性與 serving 記憶體問題一起被解決。
+K2.5 是同系列的後續改進；把具體數字當成版本相關，請依 Moonshot 當前的模型卡確認。但*架構上 的教訓*是穩定的：極端稀疏是可行的 —— 當（且唯當）平衡、穩定性與 serving 記憶體問題一起被解決。
 
 !!! tip "逐 kernel 看它怎麼跑"
-    [MoE decode 剖析](decode-anatomy.md) 描述的正是這一類模型（MLA + 細粒度 MoE + 共享 expert）的 decode 步驟，顯示時間實際花在哪——routing、grouped expert GEMM、共享 expert、每層 all-reduce—— 以及會移動這些比例的融合與並發槓桿。
+    [MoE decode 剖析](decode-anatomy.md) 描述的正是這一類模型（MLA + 細粒度 MoE + 共享 expert）的 decode 步驟，顯示時間實際花在哪 —— routing、grouped expert GEMM、共享 expert、每層 all-reduce —— 以及會移動這些比例的融合與並發槓桿。
 
 ## 拿走什麼
 
@@ -83,8 +83,8 @@ K2.5 是同系列的後續改進；把具體數字當成版本相關，請依 Mo
 1. **許多細粒度 expert + 共享 expert** 勝過少數粗 expert。
 2. **sigmoid gating + aux-loss-free 偏差**比重 auxiliary loss 平衡得更好。
 3. **壓縮 attention**（MLA/GQA），免得 KV cache 把省下來的空間又吃回去。
-4. **系統工作（all-to-all 重疊、node-limited routing、FP8）不是可選項**——正是它讓 FLOP 解耦在 碰到真實硬體時還能成立。
-5. **穩定性工程隨規模放大**——z-loss、FP32 routing、謹慎的 optimizer（MuonClip）會隨 $E$ 與總參數 成長而越來越重要。
+4. **系統工作（all-to-all 重疊、node-limited routing、FP8）不是可選項** —— 正是它讓 FLOP 解耦在 碰到真實硬體時還能成立。
+5. **穩定性工程隨規模放大** —— z-loss、FP32 routing、謹慎的 optimizer（MuonClip）會隨 $E$ 與總參數 成長而越來越重要。
 
 ## 要點
 

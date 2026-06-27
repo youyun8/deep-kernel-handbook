@@ -6,7 +6,7 @@ hide:
 <section class="home-hero" markdown="0">
 <div class="home-hero__copy">
 
-<p class="home-kicker">深核手冊 · ML 系統效能路線</p>
+<p class="home-kicker">深核效能手冊 · ML 系統效能路線</p>
 
 <h1 class="home-title">從模型數學到 <span class="home-title__hl">GPU Kernel</span></h1>
 
@@ -15,7 +15,7 @@ hide:
 <p class="home-sub">每個主題分成「直覺 → 數學 → 參考實作 → 效能化版本」，並把 profiling 結果對應回可修改的原始碼。</p>
 
 <div class="home-actions">
-<a class="md-button md-button--primary" href="reading-path/">開始閱讀路線&nbsp;→</a> <a class="md-button" href="aiter/">Kimi-K2.5 MXFP4</a>
+<a class="md-button md-button--primary" href="reading-path/">開始閱讀路線&nbsp;→</a> <a class="md-button" href="aiter/">Kimi K2.5</a>
 </div>
 
 <ul class="home-points"> <li><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="15.5 8.5 11 11 8.5 15.5 13 13" fill="currentColor" stroke="none"/></svg></span> 從共同語彙到 roofline，先建立分析直覺</li> <li><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 14l4-4 3 3 5-6"/></svg></span> 每個結論都能回到 trace、kernel 與 shape</li> <li><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 8 5 12 9 16"/><polyline points="15 8 19 12 15 16"/></svg></span> 從 profiling bucket 直接跳到可 tune 的原始碼</li> </ul>
@@ -24,7 +24,7 @@ hide:
 
 <aside class="home-hero__panel" aria-label="核心深挖">
 <div class="home-panel__eyebrow">核心深挖</div>
-<div class="home-panel__title">Kimi-K2.5 · MoE · AITER</div>
+<div class="home-panel__title">Kimi K2.5 · MoE · AITER</div>
 <p class="home-panel__copy">從 routing、top-k、sort、MXFP4 quant 到 stage-1 / stage-2 MoE GEMM，使用真實 decode trace 串起整條執行路徑。</p>
 <div class="home-metrics">
 <div class="home-metric"><strong>5</strong><span>主題章節</span></div>
@@ -96,11 +96,11 @@ hide:
 <section class="curriculum-card curriculum-card--feature" markdown>
 <span class="curriculum-card__eyebrow">實戰 · production trace</span>
 
-### :material-chart-timeline-variant: Kimi-K2.5 MXFP4
+### :material-chart-timeline-variant: Kimi K2.5
 
-用 Kimi-K2.5 MXFP4 decode trace 解析 AITER MoE stack：MoE GEMM 1、 MoE GEMM 2、routing/sort/quant、shared expert 與 all-reduce fusion。
+用 Kimi K2.5（MXFP4 權重）decode trace 解析 AITER MoE stack：MoE GEMM 1、 MoE GEMM 2、routing/sort/quant、shared expert 與 all-reduce fusion。
 
-[閱讀 Kimi-K2.5 章節](aiter/index.md){ .md-button .md-button--primary }
+[閱讀 Kimi K2.5 章節](aiter/index.md){ .md-button .md-button--primary }
 
 </section>
 
@@ -117,7 +117,7 @@ hide:
 </div>
 
 !!! tip "閱讀建議"
-若你剛開始，先照 [閱讀路線](reading-path.md) 建立系統語彙；若你正在處理 Kimi-K2.5 / SGLang / AITER profiling，直接看 [AITER decode 一層的 kernel 流程](aiter/index.md)， 再回到 MoE 與效能章節補齊背景。
+若你剛開始，先照 [閱讀路線](reading-path.md) 建立系統語彙；若你正在處理 Kimi K2.5 / SGLang / AITER profiling，直接看 [Kimi K2.5 decode 概觀](aiter/index.md)， 再回到 MoE 與效能章節補齊背景。
 
 ---
 

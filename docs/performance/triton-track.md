@@ -44,11 +44,11 @@ def add(x, y):
     return out
 ```
 
-這是 memory-bound 的（每 1 FLOP 搬 3 個 byte）——它唯一的用途就是示範 load／compute／store 的 模式與遮罩。
+這是 memory-bound 的（每 1 FLOP 搬 3 個 byte） —— 它唯一的用途就是示範 load／compute／store 的 模式與遮罩。
 
 ## 等級 2 — fused softmax（第一個真正的勝利）
 
-對一列做樸素 softmax，要讀一次列找最大值、再讀一次做 exp 與求和、再讀一次做除法——多趟 HBM 往返。融合版的 Triton kernel 把每列**只載入一次**進 SRAM，然後在那裡做完 max/exp/sum/divide：
+對一列做樸素 softmax，要讀一次列找最大值、再讀一次做 exp 與求和、再讀一次做除法 —— 多趟 HBM 往返。融合版的 Triton kernel 把每列**只載入一次**進 SRAM，然後在那裡做完 max/exp/sum/divide：
 
 ```python
 @triton.jit
@@ -91,7 +91,7 @@ def matmul_kernel(a_ptr, b_ptr, c_ptr, M, N, K,
     tl.store(c_ptr + rm[:,None]*N + rn[None,:], acc, mask=(rm[:,None]<M)&(rn[None,:]<N))
 ```
 
-`tl.dot` 會自動在 NVIDIA 上降階成 Tensor Core、在 AMD 上降階成 **MFMA 矩陣核心**。 `@triton.autotune` 會為每個 shape 搜尋 tile 尺寸與 `num_warps`——**在 AMD 上要重新自動調參**， 因為 wavefront-64 會改變最佳配置。這個 matmul 就是 [MoE grouped GEMM](../moe/kernels.md) 的骨幹， 也就是「同一個 kernel，只是每個 tile 各自挑出它那個 expert 的權重板」。
+`tl.dot` 會自動在 NVIDIA 上降階成 Tensor Core、在 AMD 上降階成 **MFMA 矩陣核心**。 `@triton.autotune` 會為每個 shape 搜尋 tile 尺寸與 `num_warps` —— **在 AMD 上要重新自動調參**， 因為 wavefront-64 會改變最佳配置。這個 matmul 就是 [MoE grouped GEMM](../moe/kernels.md) 的骨幹， 也就是「同一個 kernel，只是每個 tile 各自挑出它那個 expert 的權重板」。
 
 ## 等級 4 — attention 與 grouped GEMM
 
@@ -99,16 +99,16 @@ def matmul_kernel(a_ptr, b_ptr, c_ptr, M, N, K,
 
 ## 實用要訣
 
-- **在 benchmark 之前一定先用 `torch.allclose` 對照 PyTorch**——又快又錯的 kernel 毫無價值。 我們的 `code/kernels` 測試就是這麼做的。
+- **在 benchmark 之前一定先用 `torch.allclose` 對照 PyTorch** —— 又快又錯的 kernel 毫無價值。 我們的 `code/kernels` 測試就是這麼做的。
 - **`num_warps`／`num_stages`** 是你主要的 throughput 旋鈕；用 autotune 來調。
 - **邊界處一律加遮罩**，否則會越界讀／寫。
-- **用 `triton.testing.do_bench`** 來做 benchmark（它會處理 warmup + CUDA event）——見 [profiling](profiling.md)。
+- **用 `triton.testing.do_bench`** 來做 benchmark（它會處理 warmup + CUDA event） —— 見 [profiling](profiling.md)。
 - **在 AMD 上**：確認裝了 ROCm Triton 後端；重跑 autotune；因為 wavefront 寬度與 LDS 大小不同， 最佳配置通常也不一樣。
 
 ## 要點
 
 - Triton kernel 以 **tile** 為單位寫：取得 program id → 算偏移 → `tl.load` → 計算（`tl.dot`、 reduction）→ `tl.store`，全部帶遮罩。
-- 把多趟 HBM 往返融成一趟晶片內運算（softmax、attention）是核心勝利——又是 roofline 劇本。
+- 把多趟 HBM 往返融成一趟晶片內運算（softmax、attention）是核心勝利 —— 又是 roofline 劇本。
 - `tl.dot` 自動瞄準 Tensor Core / MFMA；**每種架構都要重新 autotune**，因為 wavefront-64 改變了 AMD 上的最佳 tile。
 - Triton 讓你可移植地拿到 CUDA 大部分的效能；只有必要時才伸手去碰 [CUDA/HIP](cuda-hip-track.md)。
 

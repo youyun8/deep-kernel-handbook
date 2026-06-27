@@ -67,13 +67,13 @@ $$ B\_{\text{combine}} \approx T\,k\,H\,c \quad\text{(bytes/device)} $$
 
 因此每個 MoE 層共有 **兩個 all-to-all**，合計約 $2\,T\,k\,H\,c$ bytes/device。 其中 $B_{\text{dispatch}}$、$B_{\text{combine}}$ 分別為 dispatch、combine 階段 每個 device 的位元組量。
 
-## 為什麼 all-to-all 很貴——以及如何隱藏它
+## 為什麼 all-to-all 很貴 —— 以及如何隱藏它
 
 all-to-all _每層兩次_ 在 GPU 間互連（節點內 NVLink/Infinity Fabric、 跨節點 InfiniBand/RoCE）上搬移 $O(T\,k\,H)$ 個元素。對於每層都有 MoE 的 深度模型，這可與 expert 計算相當甚至超過它。三個槓桿：
 
 ### 1. 通訊與計算重疊
 
-第 $\ell$ 層的 dispatch all-to-all 可以與*獨立*的計算重疊： 下一個 micro-batch 的 attention、shared expert FFN，甚至分塊的 expert 計算。框架會將其管線化：把 token 批次切成區塊，當區塊 $i$ 的 tokens 還在傳輸途中時，計算區塊 $i-1$ 的 experts。做得好的話， 通訊幾乎完全隱藏在計算背後——這是最重要的 EP 最佳化。DeepSeek 的 **DualPipe** 與 DeepEP 函式庫的存在就是為了最大化這個 重疊。在 _單一 GPU 內_ 的 decode 也展現相同的重疊與串列切分 ——參見 [Anatomy of an MoE decode](decode-anatomy.md) 裡的兩條 latency 軌跡， 其中約一半的跨堆疊間隙是並發的，而不是 kernel 速度造成的。
+第 $\ell$ 層的 dispatch all-to-all 可以與*獨立*的計算重疊： 下一個 micro-batch 的 attention、shared expert FFN，甚至分塊的 expert 計算。框架會將其管線化：把 token 批次切成區塊，當區塊 $i$ 的 tokens 還在傳輸途中時，計算區塊 $i-1$ 的 experts。做得好的話， 通訊幾乎完全隱藏在計算背後 —— 這是最重要的 EP 最佳化。DeepSeek 的 **DualPipe** 與 DeepEP 函式庫的存在就是為了最大化這個 重疊。在 _單一 GPU 內_ 的 decode 也展現相同的重疊與串列切分 —— 參見 [Anatomy of an MoE decode](decode-anatomy.md) 裡的兩條 latency 軌跡， 其中約一半的跨堆疊間隙是並發的，而不是 kernel 速度造成的。
 
 ```mermaid
 flowchart TB
@@ -91,11 +91,11 @@ flowchart TB
     class G0,G1,G2 flagship;
 ```
 
-每個區塊的 GEMM 在*下一個*區塊仍在傳輸時運行（虛線 hand-off）——通訊與計算重疊而非序列化。
+每個區塊的 GEMM 在*下一個*區塊仍在傳輸時運行（虛線 hand-off） —— 通訊與計算重疊而非序列化。
 
 ### 2. 限制通訊：node-limited routing
 
-如果一個 token 的 $k$ 個 experts 可以落在 $k$ 個不同節點上，就要付出 $k$ 倍的跨節點頻寬。**node-limited routing**（DeepSeek-V3）限制一個 token 可路由到的節點數量（例如 ≤4），因此大部分流量留在快速的節點內 連結。這是由拓樸塑形的 routing——參見 [routing variants](routing-variants.md)。
+如果一個 token 的 $k$ 個 experts 可以落在 $k$ 個不同節點上，就要付出 $k$ 倍的跨節點頻寬。**node-limited routing**（DeepSeek-V3）限制一個 token 可路由到的節點數量（例如 ≤4），因此大部分流量留在快速的節點內 連結。這是由拓樸塑形的 routing —— 參見 [routing variants](routing-variants.md)。
 
 ### 3. 將 EP 與其他 parallelism 組合
 
@@ -117,15 +117,15 @@ EP 讓每個 expert 的權重 _不被切分_（GEMM 效率較佳），但要付 
 
 ## Grouped GEMM：計算端
 
-dispatch 之後，每個 expert 拿到「可變」數量的 tokens——一個參差不齊的批次。 三種計算方式，由差到好：
+dispatch 之後，每個 expert 拿到「可變」數量的 tokens —— 一個參差不齊的批次。 三種計算方式，由差到好：
 
 - **GEMM 迴圈**（每個 expert 一個 matmul）：簡單，但 kernel 啟動開銷大， 對小型 experts 的利用率較差。（[naive reference](moe-from-scratch.md)。）
 - **帶 padding 的 batched GEMM**：把每個 expert padding 到 capacity $C$，執行一個 batched matmul。規整，但在 padding 上浪費 FLOP（capacity/padding 權衡）。
-- **grouped GEMM**：單一 kernel 背靠背執行許多*不同*大小的 matmul， 共享啟動與調度——沒有 padding 浪費，利用率完整。這是主力； [kernels](kernels.md) 頁面用 Triton 實作了一個，並勾勒了 CUDA/HIP 版本。
+- **grouped GEMM**：單一 kernel 背靠背執行許多*不同*大小的 matmul， 共享啟動與調度 —— 沒有 padding 浪費，利用率完整。這是主力； [kernels](kernels.md) 頁面用 Triton 實作了一個，並勾勒了 CUDA/HIP 版本。
 
 ### MegaBlocks 區塊稀疏視圖
 
-MegaBlocks 把整個 MoE FFN 重新表述為 **一個大的區塊稀疏 matmul**。它堆疊 所有 experts 的權重，並把 token→expert 分配視為區塊稀疏的 運算元：每個 token 區塊只與其 expert 的權重區塊相乘。這 **消除了 token 丟棄**（不需要固定 capacity——稀疏運算能處理 可變大小），並映射到高效的區塊稀疏 GEMM kernels。它把 「參差不齊的 grouped GEMM」轉換成「結構化稀疏性」，而 GPU 很擅長後者。
+MegaBlocks 把整個 MoE FFN 重新表述為 **一個大的區塊稀疏 matmul**。它堆疊 所有 experts 的權重，並把 token→expert 分配視為區塊稀疏的 運算元：每個 token 區塊只與其 expert 的權重區塊相乘。這 **消除了 token 丟棄**（不需要固定 capacity —— 稀疏運算能處理 可變大小），並映射到高效的區塊稀疏 GEMM kernels。它把 「參差不齊的 grouped GEMM」轉換成「結構化稀疏性」，而 GPU 很擅長後者。
 
 ```text
 dense view (wasteful):  pad each expert to C, batched GEMM
@@ -153,7 +153,7 @@ even 有了 capacity，實際的 routing 也很少是均勻的。設 expert $i$ 
 
 $$ \frac{\max_i p_i}{1/E} = E \max_i p_i $$
 
-完美平衡（$p_i = 1/E$）時此值為 $1$；越偏斜則越大。這正是 auxiliary load-balancing loss 所要對付的目標——將 $p_i$ 推向均勻， 以縮小最忙 expert 帶來的拖累。
+完美平衡（$p_i = 1/E$）時此值為 $1$；越偏斜則越大。這正是 auxiliary load-balancing loss 所要對付的目標 —— 將 $p_i$ 推向均勻， 以縮小最忙 expert 帶來的拖累。
 
 ## 最小的 all-to-all dispatch（單一行程模擬）
 

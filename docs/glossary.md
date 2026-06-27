@@ -12,17 +12,17 @@
 
 **MFU（模型 FLOP 利用率）** ：達到的模型 FLOP ÷ 峰值 FLOP；training 時 $\approx 6P\cdot\text{tok/s}/\pi$。招牌效率指標。見 [profiling](performance/profiling.md)。
 
-**HBM** ：高頻寬記憶體——GPU 的主 DRAM；就是 roofline 裡的頻寬 $\beta$。
+**HBM** ：高頻寬記憶體 —— GPU 的主 DRAM；就是 roofline 裡的頻寬 $\beta$。
 
 **SRAM / 共享記憶體 / LDS** ：快速的晶片內暫存。「共享記憶體」（NVIDIA）=「LDS」（AMD）。把 tile 暫存在這裡，正是 kernel 提高算術強度的手段。
 
-**warp / wavefront** ：鎖步的 SIMT 執行群組——NVIDIA 上是 **32 個 thread**（warp），AMD CDNA 上是 **64**（wavefront）。 常見的可移植性陷阱。見 [GPU 程式設計](performance/gpu-programming.md)。
+**warp / wavefront** ：鎖步的 SIMT 執行群組 —— NVIDIA 上是 **32 個 thread**（warp），AMD CDNA 上是 **64**（wavefront）。 常見的可移植性陷阱。見 [GPU 程式設計](performance/gpu-programming.md)。
 
 **占用率（occupancy）** ：每個 SM/CU 上常駐的 warp/wavefront 數；它是藏 latency 的手段，不是目標。
 
 **coalescing（合併存取）** ：相鄰 lane 存取相鄰位址，使記憶體交易能被合併。
 
-**算子融合** ：把多個操作合在一起以避免 HBM 往返（例如 FlashAttention、融合 MLP）——提高算術強度。
+**算子融合** ：把多個操作合在一起以避免 HBM 往返（例如 FlashAttention、融合 MLP） —— 提高算術強度。
 
 **FLOP** ：浮點運算次數；matmul $(m{\times}k)(k{\times}n)$ 成本為 $2mkn$。
 
@@ -38,7 +38,7 @@
 
 **KV cache** ：儲存過去 token 的 key/value，使 decode 變成 $O(N)$ 而非 $O(N^2)$；常常是 inference 記憶體的 主角。見 [Attention 效率](foundations/attention-efficiency.md)。
 
-**MQA / GQA / MLA** ：Multi-Query / Grouped-Query / Multi-head Latent Attention——從架構層面縮小 KV cache（減少或壓縮 KV 頭）。
+**MQA / GQA / MLA** ：Multi-Query / Grouped-Query / Multi-head Latent Attention —— 從架構層面縮小 KV cache（減少或壓縮 KV 頭）。
 
 **FlashAttention** ：IO-aware 的 attention，把 $Q,K,V$ 分塊、用 online softmax 避免具現化 $N{\times}N$ 分數矩陣。見 [FlashAttention](foundations/flashattention.md)。
 
@@ -86,7 +86,7 @@
 
 **ZeRO / FSDP** ：在 DP 群組間切分 optimizer 狀態（1）、梯度（2）與參數（3）以省記憶體。
 
-**all-to-all** ：每個 rank 向其他每個 rank 各送一塊不同資料的 collective——MoE dispatch/combine 的原語。
+**all-to-all** ：每個 rank 向其他每個 rank 各送一塊不同資料的 collective —— MoE dispatch/combine 的原語。
 
 **node-limited routing** ：限制一個 token 的 expert 能跨多少節點，以約束跨節點 all-to-all。
 
@@ -100,7 +100,7 @@
 
 **PTQ / QAT** ：訓練後量化（只做校準）vs 量化感知訓練。見 [量化](performance/quantization.md)。
 
-**GPTQ / AWQ / SmoothQuant** ：PTQ 方法——誤差修正的權重量化／activation-aware 權重縮放／把 activation 離群值搬進權重。
+**GPTQ / AWQ / SmoothQuant** ：PTQ 方法 —— 誤差修正的權重量化／activation-aware 權重縮放／把 activation 離群值搬進權重。
 
 **剪枝（pruning）** ：移除權重或結構（非結構化、結構化，或 2:4 半結構化）以壓縮模型。
 
@@ -119,7 +119,7 @@
 | H200 | ~990 TFLOP/s | ~4.8 TB/s | 141 GB | ~206 FLOP/byte |
 | MI300X | ~1.3 PFLOP/s | ~5.3 TB/s | 192 GB | ~245 FLOP/byte |
 
-互連（用於 [分散式訓練](performance/distributed-training.md)）：節點內 **NVLink** ~0.9 TB/s/GPU （NVLink 4）或 MI300 上的 **Infinity Fabric**；跨節點 **InfiniBand/RoCE** ~25–50 GB/s/GPU；主機 **PCIe Gen5** ~64 GB/s。從 HBM → NVLink → IB → PCIe 每一級掉 1–2 個數量級——這正是為什麼要把並行 小心對映，好讓最多話的 collective 走最快的連結。
+互連（用於 [分散式訓練](performance/distributed-training.md)）：節點內 **NVLink** ~0.9 TB/s/GPU （NVLink 4）或 MI300 上的 **Infinity Fabric**；跨節點 **InfiniBand/RoCE** ~25–50 GB/s/GPU；主機 **PCIe Gen5** ~64 GB/s。從 HBM → NVLink → IB → PCIe 每一級掉 1–2 個數量級 —— 這正是為什麼要把並行 小心對映，好讓最多話的 collective 走最快的連結。
 
 !!! note "怎麼用這些數字"
-    數字會隨 SKU、時脈與稀疏性宣稱而變（廠商常引用 2× 結構稀疏——對密集要減半）。你的估計裡該 穩健的是**機制**與**數量級**，而不是第三位有效數字。
+    數字會隨 SKU、時脈與稀疏性宣稱而變（廠商常引用 2× 結構稀疏 —— 對密集要減半）。你的估計裡該 穩健的是**機制**與**數量級**，而不是第三位有效數字。

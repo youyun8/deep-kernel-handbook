@@ -9,7 +9,7 @@
 [上一個實戰專案](build-moe.md) 建好並優化了單 GPU 的 MoE LM。這一篇是把 [並行技術](../performance/distributed-training.md)與 [expert-parallel all-to-all](../moe/systems-ep.md)套到多 GPU 的**規劃與實作指南**，結構安排成一條 你可以套用到任何模型/叢集的決策流程。
 
 !!! warning "部分實作"
-    要完整跑這套，需要一個多 GPU（最好多節點）的 叢集。下面的*推理、規劃與程式碼骨架*是完整的、可以骨架形式執行；量測到的多節點數字留給你在 硬體上填。這裡沒有任何東西藏在「TODO」後面——只有叢集規模的 benchmark 表要由你填上。
+    要完整跑這套，需要一個多 GPU（最好多節點）的 叢集。下面的*推理、規劃與程式碼骨架*是完整的、可以骨架形式執行；量測到的多節點數字留給你在 硬體上填。這裡沒有任何東西藏在「TODO」後面 —— 只有叢集規模的 benchmark 表要由你填上。
 
 ## 步驟 1 — 決定分片內容以及原因
 
@@ -53,7 +53,7 @@ context too long?                   → SP/CP (shard the sequence)
 # 7. unpermute + weighted sum into the residual
 ```
 
-能用現成函式庫就用（Megatron-LM、DeepSpeed-MoE，或為 all-to-all 重疊優化過的 DeepEP），不要手刻 通訊——但搞懂這七步，才有辦法 debug 不平衡與停頓。
+能用現成函式庫就用（Megatron-LM、DeepSpeed-MoE，或為 all-to-all 重疊優化過的 DeepEP），不要手刻 通訊 —— 但搞懂這七步，才有辦法 debug 不平衡與停頓。
 
 ## 第 4 步 — 讓通訊與計算重疊
 
@@ -62,7 +62,7 @@ MFU 的成敗就在這裡（[系統與 EP](../moe/systems-ep.md)）：
 - 把 token batch 分塊、用管線把它和前一塊的 expert grouped GEMM 排在一起。
 - 把 **shared-expert** FFN（密集、無通訊）和路由 expert 的 all-to-all 重疊。
 - 把 DP 的 gradient reduce-scatter 與反向傳播重疊。
-- 看 [timeline](../performance/profiling.md)：序列化的 all-to-all 會在關鍵路徑上顯示成一段空隙—— 那是第一個該解決的東西。
+- 看 [timeline](../performance/profiling.md)：序列化的 all-to-all 會在關鍵路徑上顯示成一段空隙 —— 那是第一個該解決的東西。
 
 ## 步驟 5 — 測量縮放比例
 

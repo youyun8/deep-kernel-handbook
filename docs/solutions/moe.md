@@ -18,7 +18,7 @@
     FLOPs 透過 *active* 參數進行縮放，因此 FLOPs-per-token 比率與密集 （$E{=}1$，即 $8d^2$ 有效）是 $16d^2/8d^2 = \mathbf{2\times}$ — 你付費 $k=2$ experts。但你**儲存**$128\times$ FFN 參數：巨大的容量， 常數計算。這種差距就是稀疏性的全部價值主張。
 
 ??? success "2 — DeepSeek-V3 稀疏性與 Mixtral"
-    DeepSeek-V3：$37/671 \approx 5.5\%$ 活躍（≈**18× 稀疏性**）。混合 8×7B：8 個 experts、$\approx 13/47 \approx 28\%$ 的前 2 個有效（≈ 3.6×）。 V3 是 更稀疏——許多細粒度的 experts 具有低激活——這是 現代趨勢：更多、更小的 experts 提供更多組合（下一個練習） 在相同的主動成本下。
+    DeepSeek-V3：$37/671 \approx 5.5\%$ 活躍（≈**18× 稀疏性**）。混合 8×7B：8 個 experts、$\approx 13/47 \approx 28\%$ 的前 2 個有效（≈ 3.6×）。 V3 是 更稀疏 —— 許多細粒度的 experts 具有低激活 —— 這是 現代趨勢：更多、更小的 experts 提供更多組合（下一個練習） 在相同的主動成本下。
 
 ??? success "3 — 何時更喜歡密集 37B 而不是 671B/37B-主動稀疏"
     相同的活動 FLOP，但稀疏模型需要**~18× 記憶體**來保存所有 experts 居民。在以下情況下首選**密集**：(a) 記憶體張力（單一 GPU / 邊緣）； (b)**batch-1 latency**很重要，你不能攤銷 expert 裝載 — 稀疏的 decode 可能會為少數 tokens 觸及許多 experts，從而損害局部性； (c) 在小資料集上進行**微調**，其中大多數 experts 得到的資訊很少 梯度和風險陳舊性。對於高 throughput serving 和 pretraining 每 FLOP 品質。
@@ -52,7 +52,7 @@
     輔助無損控制器微調每個 expert 偏差： $b_e \leftarrow b_e + \gamma\,\text{sign}(\text{target} - \text{load}_e)$. **Larger $\gamma$**→ 更快的收斂，但圍繞平衡振盪/超調；**較小 $\gamma$**→ 平滑但緩慢。**Sigmoid**門的響應比 **softmax**因為 sigmoid 分數是獨立的－改變一個偏差不會 透過共享標準化器重新調整其他參數，因此控制器的 per-expert 調整不會互相衝突。預計負載 CV 會下降到 ~0.1–0.2 在經過精心調校的 $\gamma$ 上只需幾百步。
 
 ??? success "4 — 玩具 MoE 上的輔助損耗與無輔助損耗"
-    雙向運行 `train_tiny_moe.py`。預期：**aux-loss-free**達到類似水平 或在相同負載 CV 下略微**降低最終 LM 損耗**，因為它平衡了 透過 routing _計數_ 上的偏差，而不添加競爭的梯度項 使用 LM 物鏡（輔助損耗稍微扭曲了損耗表面）。兩者都 負載 CV 應降低至 ~0.1–0.2；輔助無損耗運轉避免了 平衡與質量之間的拉鋸戰。並列報告最終損失和 CV 側面——配對就是重點。
+    雙向運行 `train_tiny_moe.py`。預期：**aux-loss-free**達到類似水平 或在相同負載 CV 下略微**降低最終 LM 損耗**，因為它平衡了 透過 routing _計數_ 上的偏差，而不添加競爭的梯度項 使用 LM 物鏡（輔助損耗稍微扭曲了損耗表面）。兩者都 負載 CV 應降低至 ~0.1–0.2；輔助無損耗運轉避免了 平衡與質量之間的拉鋸戰。並列報告最終損失和 CV 側面 —— 配對就是重點。
 
 ## Routing 變體
 
@@ -88,7 +88,7 @@
     在玩具 MoE 上，用故意大的比例初始化 router， 雙向訓練。預期：**沒有 z 損失**，logits 會提前爆炸 → 頻繁 損失尖峰/NaN 和幾個**死 experts**（飽和門鎖 routing）。 **使用 z 損失**，logits 保持有界 → 峰值很少，死亡 expert 計數接近 零，更平滑的損失。這使得 z-loss 的作用變得具體：它是便宜的保險 反對邏輯膨脹。
 
 ??? success "4 — 為什麼共享 expert 可以簡化冷啟動"
-    在步驟 0 中，路由的 experts 幾乎相同（無差異），因此 路由梯度有雜訊並且幾乎對稱——沒有什麼需要專門研究的訊號。 共享的 expert 位於頂部 $k$ 選擇的**外部**，因此 $\partial \mathcal{L}/\partial\,\text{shared}$ 是**每個**上的全密集梯度 token 從第 0 步開始，為模型提供可靠的學習路徑，而 routing 自行解決。追蹤：$y = \text{shared}(h)+\sum g_e e(h)$ → $\nabla_{\text{shared}}$ 從不依賴（隨機）routing 的決定。
+    在步驟 0 中，路由的 experts 幾乎相同（無差異），因此 路由梯度有雜訊並且幾乎對稱 —— 沒有什麼需要專門研究的訊號。 共享的 expert 位於頂部 $k$ 選擇的**外部**，因此 $\partial \mathcal{L}/\partial\,\text{shared}$ 是**每個**上的全密集梯度 token 從第 0 步開始，為模型提供可靠的學習路徑，而 routing 自行解決。追蹤：$y = \text{shared}(h)+\sum g_e e(h)$ → $\nabla_{\text{shared}}$ 從不依賴（隨機）routing 的決定。
 
 ## 系統和 expert 並行性
 
@@ -96,7 +96,7 @@
     根據 all-to-all，每個 GPU 移動 ≈ 其 tokens × $d$ × 2 B $= 4096\times4096\times2 \approx 3.4\times10^{7}$ B = 34 MB；每層**兩個**（調度+組合）→ ~67 MB/GPU/層。超過 60 層 ≈**4 GB/GPU**流量。在 NVLink 上（~300 GB/s 節點內）約 13 毫秒；跨節點 IB (~50 GB/s) ~80 ms。 expert GEMM 時間：每 token $2\cdot k\cdot 8d^2$ FLOPs；在$k=2$， $T=4096$，就是$\approx 4096\cdot2\cdot8\cdot4096^2 \approx 1.1\times10^{12}$ FLOPs/層 → 在 H100 (~990 TFLOP/s) 上~1.1 ms/層，超過 60 層~66 ms。 因此，**跨節點 EP 是受通訊限制的**（80 毫秒通訊 vs 66 毫秒計算），除非 all-to-all 是重疊/節點限制的；節點內大致平衡 - 這正是重疊和節點限制 routing 很重要的原因。
 
 ??? success "2 — 節點限制 routing 限制跨節點流量"
-    如果每個 token 的$k$ experts 可能登陸$k$不同節點你支付跨節點 每個 token 的頻寬高達 $k$ 倍。將 experts 限制為 $\le M$ 節點邊界 $M$ 處每個 token 最壞情況的跨節點訊息（DeepSeek-V3 使用 $M=4$ $k=8$）。**成本：**router 無法再選擇全球最好的 $k$ experts 如果它們分散在 $>M$ 節點上——一個小的質量打擊會換來一個嚴重的打擊 頻寬上限。
+    如果每個 token 的$k$ experts 可能登陸$k$不同節點你支付跨節點 每個 token 的頻寬高達 $k$ 倍。將 experts 限制為 $\le M$ 節點邊界 $M$ 處每個 token 最壞情況的跨節點訊息（DeepSeek-V3 使用 $M=4$ $k=8$）。**成本：**router 無法再選擇全球最好的 $k$ experts 如果它們分散在 $>M$ 節點上 —— 一個小的質量打擊會換來一個嚴重的打擊 頻寬上限。
 
 ??? success "3 - 填充浪費（批量，cf 2.0）與分組 GEMM（CV 0.5）"
     批量 GEMM 容量因子 2.0 焊盤**每個**expert 至 $2\times$ 均值 負載，因此即使是完美平衡的 expert 也會浪費約 50% 的插槽；和 實際負載填充張量的大小是針對最壞情況 → 大量浪費的 FLOP。 分組 GEMM 恰好在其 token 計數上運行每個 expert（無填充），因此 無論 CV 為何，都會浪費 $\approx 0$。對於 CV = 0.5，批量表單浪費 大致容量與實際的差距（百分之幾十）；分組獲勝明顯－ 現代 MoE kernels 使用分組/可變長度 GEMM 的原因。
@@ -121,7 +121,7 @@
 ## Inference 和 serving
 
 ??? success "1 — DeepSeek-V3 權重的 HBM：BF16 / FP8 / int4"
-    671B 參數：**BF16** $= 671\times2 = 1342$ GB; **FP8** $= 671$ GB; **int4** $\approx 336$ GB。在 80 GB GPU 上（僅權重，KV 之前）：BF16 → $\lceil 1342/80\rceil = 17$; FP8 → 9; int4 → 5。量化直接買給你更少 GPU——MoE serving 嚴重依賴低精度的主要原因。
+    671B 參數：**BF16** $= 671\times2 = 1342$ GB; **FP8** $= 671$ GB; **int4** $\approx 336$ GB。在 80 GB GPU 上（僅權重，KV 之前）：BF16 → $\lceil 1342/80\rceil = 17$; FP8 → 9; int4 → 5。量化直接買給你更少 GPU —— MoE serving 嚴重依賴低精度的主要原因。
 
 ??? success "2 — 隱藏 expert 流的條件"
     當 expert 的**GEMM 時間 ≥ 傳輸時間**時，串流媒體將被隱藏：
@@ -141,7 +141,7 @@
 ## 案例研究
 
 ??? success "1 — 每個模型的 $\binom{E}{k}$ 和細粒度參數"
-    計算每個研究模型的 $\binom{E}{k}$（例如 Mixtral $\binom{8}{2}=28$； DeepSeek-V3 $\binom{256}{8}\approx4\times10^{14}$ 用於路由 experts）。 更多/更精細的 experts ⇒ 天文數字上更多的 token 特定混合物 活躍的$k$——「細粒度 experts」聲明的定量核心和 $E$ 在各代車型中不斷發展的原因。
+    計算每個研究模型的 $\binom{E}{k}$（例如 Mixtral $\binom{8}{2}=28$； DeepSeek-V3 $\binom{256}{8}\approx4\times10^{14}$ 用於路由 experts）。 更多/更精細的 experts ⇒ 天文數字上更多的 token 特定混合物 活躍的$k$ —— 「細粒度 experts」聲明的定量核心和 $E$ 在各代車型中不斷發展的原因。
 
 ??? success "2 — 每 1k tokens 的 KV 快取：MLA、GQA 與 MHA"
     每個 token、每層：**MHA** 快取 $2\,n_h d_h$；**GQA** $2\,n_{kv}d_h$（$n_{kv}\ll n_h$）； **MLA** 只存 latent $d_c$。對 $n_h=128$、$d_h=128$、$n_{kv}=8$、$d_c\approx 512$ 的模型： MHA $=2\cdot128\cdot128=32768$ B；GQA $=2\cdot8\cdot128=2048$ B；MLA 每 token 每層 $\approx512\cdot2=1024$ B。 乘以 $L$ 和 1000 tokens。 MLA 比 GQA 節省約 2 倍，比 MHA 節省約 30 倍 — 使長上下文 DeepSeek serving 價格實惠的槓桿。
@@ -150,12 +150,12 @@
     V3 ≈ 5.5% 活性 (671B/37B)，混合 ≈ 28% (47B/13B)。 V3 激活率低 比率意味著**每個 token 擁有更多內存，但計算量更少**— 有利於 高 throughput，記憶體豐富的 serving（很多 GPU，大批量）。混合的 比率越高，記憶體佔用越少，對較小的部署更友好，並且 第 1 批 latency。有效/總比率是介於 記憶體成本和計算成本。
 
 ??? success "4 — 將一個模型映射回MoE 篇分頁面"
-    例如**DeepSeek-V3**：S 形門 + 偏移控制器 → [負載平衡](../moe/load-balancing.md)；細粒度+共享 experts → [routing variants](../moe/routing-variants.md)； z 損失/FP32 router → [training stability](../moe/training-stability.md)；節點限制 routing + DualPipe → [系統與 EP](../moe/systems-ep.md)；MLA → [attention efficiency](../foundations/attention-efficiency.md)； FP8 → [numerics](../foundations/numerics-precision.md)。每一項生產技巧都能在 trace 上留下痕跡 到一頁——這就是手冊的主題。
+    例如**DeepSeek-V3**：S 形門 + 偏移控制器 → [負載平衡](../moe/load-balancing.md)；細粒度+共享 experts → [routing variants](../moe/routing-variants.md)； z 損失/FP32 router → [training stability](../moe/training-stability.md)；節點限制 routing + DualPipe → [系統與 EP](../moe/systems-ep.md)；MLA → [attention efficiency](../foundations/attention-efficiency.md)； FP8 → [numerics](../foundations/numerics-precision.md)。每一項生產技巧都能在 trace 上留下痕跡 到一頁 —— 這就是手冊的主題。
 
 ## MoE decode 剖析
 
 ??? success "1 — 完全重疊 12% 階段的最大加速"
-    如果舞台的 kernels**完全重疊**另一個串流，則它們 _不在 關鍵路徑_—掛鐘不包括它們。讓他們無限 快速保存端對端 latency 的**~0%**（你只需保存該部分，如果有的話， 這並沒有被隱藏）。這就是 Track A 與 Track B 的差別：12% 是 Track-A（kernel-效率）編號，但其*latency*貢獻已經 由 Track B（並發）支付。你不能將同一時間存入銀行兩次——只能 暴露（非重疊）kernel 時間在縮小時轉換為 latency。
+    如果舞台的 kernels**完全重疊**另一個串流，則它們 _不在 關鍵路徑_—掛鐘不包括它們。讓他們無限 快速保存端對端 latency 的**~0%**（你只需保存該部分，如果有的話， 這並沒有被隱藏）。這就是 Track A 與 Track B 的差別：12% 是 Track-A（kernel-效率）編號，但其*latency*貢獻已經 由 Track B（並發）支付。你不能將同一時間存入銀行兩次 —— 只能 暴露（非重疊）kernel 時間在縮小時轉換為 latency。
 
 ??? success "2 — 將 GEMM1 (15%, ×60) 或 LM 頭減半 (1%, ×1)？"
     將路由的 GEMM1 減半，保存 decode 的$\sim 0.5\times15\% = 7.5\%$； 將 LM 頭減半可節省 $\sim 0.5\times1\% = 0.5\%$。**GEMM1 以 ~15× 獲勝。** 教訓：最佳化**總**（= 呼叫 × 每次呼叫）成本，而不是每次呼叫成本。 每次調用便宜的 kernel 會觸發每一層，而每次調用昂貴的 kernel 則占主導地位 一次觸發－呼叫次數是你絕對不能放棄的乘數。
@@ -165,7 +165,7 @@
 
     $$ S > A \quad\Longleftrightarrow\quad L\sum_i t_i^{\text{removed}} \;>\; \Delta t_{\text{sort}} + \Delta t_{\text{GEMM}}. $$
 
-    在decode的測量跡線$S \approx 19.8\%$和$A \approx 0.7\%$中，所以 淨$\approx 18\%$。這是值得的，因為刪除的工作是*每層並且 冗餘*，而增加的工作對 GEMM 來說只是「小幅邊際」增加， 已經運作了——這裡的不平等非常緩和。
+    在decode的測量跡線$S \approx 19.8\%$和$A \approx 0.7\%$中，所以 淨$\approx 18\%$。這是值得的，因為刪除的工作是*每層並且 冗餘*，而增加的工作對 GEMM 來說只是「小幅邊際」增加， 已經運作了 —— 這裡的不平等非常緩和。
 
 ??? success "4 — 自拍 111% vs 掛鐘 96%"
     **自拍時間**獨立地匯總每個 kernel 的持續時間。如果兩台 kernels 運行 **同時**（不同的流），它們的持續時間都重要，但它們共享 掛鐘，因此自拍時間可以**超過**掛鐘 - 111% 意味著實質性 重疊（時間隱藏 = self − busy 為正）。值**低於 100%** (96%) 表示 kernels 是 ~串列 _且_ 有**空閒間隙**：掛鐘 = busy +idle，且串列時 busy ≈ self，因此 self/wall < 100% 意味著 缺失 ~4% 處於空閒狀態（啟動 latency，同步停止），GPU 不運作任何內容。

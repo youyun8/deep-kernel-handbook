@@ -6,7 +6,7 @@
   <span class="chip"><strong>硬體：</strong> NVIDIA (CUDA) 或 AMD (ROCm/HIP) GPU + 工具鏈</span>
 </div>
 
-當你需要 Triton 沒暴露出來的控制權——自訂資料佈局、特定的矩陣核心指令、細粒度的非同步管線—— 就改用 CUDA 或 HIP。本路線把**跨 NVIDIA 與 AMD 的可移植性當成首要關注**：原始碼幾乎相同，但 調參不同，我們會一路把這些差異標出來。
+當你需要 Triton 沒暴露出來的控制權 —— 自訂資料佈局、特定的矩陣核心指令、細粒度的非同步管線 —— 就改用 CUDA 或 HIP。本路線把**跨 NVIDIA 與 AMD 的可移植性當成首要關注**：原始碼幾乎相同，但 調參不同，我們會一路把這些差異標出來。
 
 ## HIP 就是「換了前綴的 CUDA」
 
@@ -45,11 +45,11 @@ __device__ float warp_reduce_sum(float v) {
 }
 ```
 
-`warpSize` 在 NVIDIA 上是 32、在 AMD 上是 64，所以這個迴圈會自動跑對的步數。把第一個 offset 硬寫成 `16` 在 AMD 上就是個 bug——典型的可移植性錯誤。
+`warpSize` 在 NVIDIA 上是 32、在 AMD 上是 64，所以這個迴圈會自動跑對的步數。把第一個 offset 硬寫成 `16` 在 AMD 上就是個 bug —— 典型的可移植性錯誤。
 
 ## 共享記憶體分塊 matmul（可移植核心）
 
-教科書式的分塊 GEMM，在兩個平台上原始碼相同，只差在啟動方式與調參。每個 block 把 A、B 的 `TILE×TILE` 子區塊載進晶片內記憶體（SMEM/LDS），在內層迴圈反覆重用——把 [黃金法則](gpu-programming.md)具體化：
+教科書式的分塊 GEMM，在兩個平台上原始碼相同，只差在啟動方式與調參。每個 block 把 A、B 的 `TILE×TILE` 子區塊載進晶片內記憶體（SMEM/LDS），在內層迴圈反覆重用 —— 把 [黃金法則](gpu-programming.md)具體化：
 
 ```cpp
 #define TILE 16
@@ -74,11 +74,11 @@ __global__ void matmul_tiled(const float* A, const float* B, float* C,
 }
 ```
 
-這個可移植版本是為了*理解*用的。生產上你會改用矩陣核心：NVIDIA 的 `mma`/`wmma`/CUTLASS、 AMD 的 `mfma`/rocWMMA/Composable Kernel——或直接呼叫 cuBLASLt/hipBLASLt。調參*確實*有差別：
+這個可移植版本是為了*理解*用的。生產上你會改用矩陣核心：NVIDIA 的 `mma`/`wmma`/CUTLASS、 AMD 的 `mfma`/rocWMMA/Composable Kernel —— 或直接呼叫 cuBLASLt/hipBLASLt。調參*確實*有差別：
 
 - **TILE／block 大小**：16×16 block 在 NVIDIA 上是 8 個 warp、在 AMD 上是 4 個 wavefront → 占用 率不同；AMD 通常偏好不同的 tile 形狀。
 - **LDS 大小與 bank conflict** 要依架構調整。
-- **非同步複製／管線**：NVIDIA 的 `cp.async`（與 Hopper TMA）對上 AMD 的非同步 LDS load——同一個 想法、不同的 intrinsic。
+- **非同步複製／管線**：NVIDIA 的 `cp.async`（與 Hopper TMA）對上 AMD 的非同步 LDS load —— 同一個 想法、不同的 intrinsic。
 
 ## 非同步管線與矩陣核心（兩者差最多的地方）
 
@@ -87,7 +87,7 @@ __global__ void matmul_tiled(const float* A, const float* B, float* C,
 - **NVIDIA**：用 `cp.async` 預取 tile、`mma.sync` / `wgmma`（Hopper）做 matmul、TMA 做批量非同步 複製；重活用 CUTLASS 來搭。
 - **AMD（CDNA3/MI300）**：用 `mfma` 指令（例如 16×16×16、32×32×8 等形狀）做 matmul、非同步 LDS load 做預取；用 Composable Kernel 來搭。
 
-手寫一個跨廠商的管線化 GEMM 是件硬差事——這正是為什麼多數人用 Triton（自動對映到兩者）或廠商 的 BLASLt 函式庫，只在追最後幾個百分點、或函式庫沒涵蓋的操作時，才下沉到原始 CUDA/HIP。
+手寫一個跨廠商的管線化 GEMM 是件硬差事 —— 這正是為什麼多數人用 Triton（自動對映到兩者）或廠商 的 BLASLt 函式庫，只在追最後幾個百分點、或函式庫沒涵蓋的操作時，才下沉到原始 CUDA/HIP。
 
 ## 建置並與 PyTorch 整合
 
@@ -100,7 +100,7 @@ mod = load(name="myk", sources=["myk.cu"],   # hipify handles ROCm builds
            extra_cuda_cflags=["-O3"])
 ```
 
-在 ROCm 上，PyTorch 的建置會透明地使用 `hipcc` 與 `hipify_torch`——同一份 `.cu` 通常兩邊都能編。 [MoE permutation kernels](../moe/kernels.md) 同時提供 `.cu` 與 `_hip.cpp` 兩種形式，好把那些（細微的） 差異攤開來看。
+在 ROCm 上，PyTorch 的建置會透明地使用 `hipcc` 與 `hipify_torch` —— 同一份 `.cu` 通常兩邊都能編。 [MoE permutation kernels](../moe/kernels.md) 同時提供 `.cu` 與 `_hip.cpp` 兩種形式，好把那些（細微的） 差異攤開來看。
 
 ## 要點
 

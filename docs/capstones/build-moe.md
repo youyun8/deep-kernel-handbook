@@ -63,11 +63,11 @@ for step, (xb, yb) in enumerate(loader):
 盯著 [健康指標](../moe/load-balancing.md)：損失下降、**負載 CV** 趨近 0、**drop rate** 維持低、 **routing 熵**穩定（不崩塌）。若看到尖峰/NaN，回去看 [訓練穩定性](../moe/training-stability.md) （z-loss、FP32 router、初始化、梯度裁剪）。
 
 ??? success "你應該看到什麼"
-    在玩具任務上，訓練損失應平穩下降，負載 CV 應在幾百步內從初始值降到約 0.1–0.2（偏差控制器 在發揮作用），drop rate 維持低。把平衡關掉「看它崩塌」——少數 expert 吃掉一切、熵崩潰—— 平衡機制的價值就具體了。
+    在玩具任務上，訓練損失應平穩下降，負載 CV 應在幾百步內從初始值降到約 0.1–0.2（偏差控制器 在發揮作用），drop rate 維持低。把平衡關掉「看它崩塌」 —— 少數 expert 吃掉一切、熵崩潰 —— 平衡機制的價值就具體了。
 
 ## 第 3 步 — 優化並量測
 
-現在套用效能工程篇。**好好量測**（warmup、CUDA event、同步、掃描、鎖頻——見 [profiling](../performance/profiling.md)），並回報前後對比。依這個模型大致的報酬順序來優化：
+現在套用效能工程篇。**好好量測**（warmup、CUDA event、同步、掃描、鎖頻 —— 見 [profiling](../performance/profiling.md)），並回報前後對比。依這個模型大致的報酬順序來優化：
 
 1. **用 dispatch 形式取代 Python expert 迴圈**（排序 → grouped 計算 → scatter），依 [從零實作 MoE layer](../moe/moe-from-scratch.md)。
 2. **在 GPU 上為 expert 用 grouped GEMM kernel**（[Triton](../moe/kernels.md)）；把 gather/scatter 融進 kernel。
@@ -75,7 +75,7 @@ for step, (xb, yb) in enumerate(loader):
 4. **CUDA Graph** 包住 decode 步驟（消除啟動開銷）。
 5. **量化 expert**（int8/FP8）做 inference（[量化](../performance/quantization.md)）。
 
-回報一張像這樣的表（填上*你的*量測數字，並註明硬體/shape——下面的值僅供示意）：
+回報一張像這樣的表（填上*你的*量測數字，並註明硬體/shape —— 下面的值僅供示意）：
 
 | 變體 | 訓練步長 (ms) | tok/s | MFU | 備註 |
 | --- | --: | --: | --: | --- |
@@ -89,13 +89,13 @@ for step, (xb, yb) in enumerate(loader):
 
 ## 第 4 步 — 從模型取樣
 
-確認它真的學到了東西：用訓練好的模型生成文字（greedy 或 temperature 取樣）。對小語料上的 char-LM，你應該在本地就能拿到通順的文字。這個生成迴圈也是加上 [Inference 優化](../performance/inference-optimization.md)（KV cache——你會連同 CUDA Graph 一起加） 的下手處。
+確認它真的學到了東西：用訓練好的模型生成文字（greedy 或 temperature 取樣）。對小語料上的 char-LM，你應該在本地就能拿到通順的文字。這個生成迴圈也是加上 [Inference 優化](../performance/inference-optimization.md)（KV cache —— 你會連同 CUDA Graph 一起加） 的下手處。
 
 ## 擴充
 
 - 把 softmax↔sigmoid gating、aux-loss↔aux-loss-free 互換；比較損失與負載 CV。
 - 加入 [expert-choice routing](../moe/routing-variants.md)，觀察 dropless 行為。
-- 把 $E$ 往上擴（細粒度），觀察 routing/通訊開銷如何成長——這是 [擴展到更大規模](scaling.md) 的 動機。
+- 把 $E$ 往上擴（細粒度），觀察 routing/通訊開銷如何成長 —— 這是 [擴展到更大規模](scaling.md) 的 動機。
 
 ## 重點
 

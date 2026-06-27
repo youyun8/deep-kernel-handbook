@@ -1,6 +1,6 @@
-site_name: 深核手冊
+site_name: 深核效能手冊
 site_description: >-
-  深核手冊：從模型數學、乾淨參考實作到多 GPU 效能工程，系統化拆解現代 ML 系統在 GPU kernel 上的效能。核心深度路線：Mixture-of-Experts (MoE) 與 AITER。
+  深核效能手冊：從模型數學、乾淨參考實作到多 GPU 效能工程，系統化拆解現代 ML 系統在 GPU kernel 上的效能。核心深度路線：Mixture-of-Experts (MoE) 與 AITER。
 
 site_author: deep-kernel-handbook contributors
 site_url: https://youyun8.github.io/deep-kernel-handbook/
@@ -136,7 +136,7 @@ nav:
       - Attention 效率: foundations/attention-efficiency.md
       - 從零實作 FlashAttention: foundations/flashattention.md
       - 數值與精度: foundations/numerics-precision.md
-  - Mixture-of-Experts:
+  - MoE:
       - moe/index.md
       - 為什麼需要稀疏化: moe/why-sparsity.md
       - 從零實作 MoE layer: moe/moe-from-scratch.md
@@ -157,8 +157,13 @@ nav:
       - 量化與壓縮: performance/quantization.md
       - Inference 優化: performance/inference-optimization.md
       - Profiling 與方法論: performance/profiling.md
-  - Kimi-K2.5 MXFP4: aiter/index.md
-  - AITER 原始碼解析: aiter/source-breakdown.md
+  - Kimi K2.5 / AITER:
+      - aiter/index.md
+      - Decode 算子數學對照: aiter/decode-math.md
+      - Shared-expert fusion 開 / 關: aiter/fusion.md
+      - MoE GEMM 與吸收式 BMM: aiter/moe-gemm.md
+      - TP 通訊、查表與重現: aiter/comms-repro.md
+      - AITER 原始碼解析: aiter/source-breakdown.md
   - 實戰專案:
       - capstones/index.md
       - 建立小型 MoE LM: capstones/build-moe.md
@@ -166,7 +171,7 @@ nav:
   - 解答:
       - solutions/index.md
       - 基礎: solutions/foundations.md
-      - Mixture-of-Experts: solutions/moe.md
+      - MoE: solutions/moe.md
       - 效能工程: solutions/performance.md
       - 實戰專案: solutions/capstones.md
   - 參考資料:

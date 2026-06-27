@@ -40,7 +40,7 @@ def gather_rows_kernel(src_ptr, dst_ptr, idx_ptr, n_rows, d,
 
 ### Grouped GEMM 的 FLOPs
 
-以 handbook 的 AITER 章節（真實的 Kimi-K2.5-MXFP4 profile）作為貫穿全文的具體 範例。符號定義：$H$ 為 hidden size；$I$ 為每個 partition 的 MoE intermediate size，gate+up 的輸出寬度為 $2I$；$E$ 為 routed experts 數；$k$ 為 top-$k$； $m_e$ 為 expert $e$ 實際處理的 token-row 數。參考值：$H=7168$、$I=256$、 $2I=512$、$E=384$（另含 1 個 fused shared expert）、$k=8$；MXFP4 FP4 權重為 $0.5$ byte/element。
+以 handbook 的 AITER 章節（真實的 Kimi K2.5 MXFP4 profile）作為貫穿全文的具體 範例。符號定義：$H$ 為 hidden size；$I$ 為每個 partition 的 MoE intermediate size，gate+up 的輸出寬度為 $2I$；$E$ 為 routed experts 數；$k$ 為 top-$k$； $m_e$ 為 expert $e$ 實際處理的 token-row 數。參考值：$H=7168$、$I=256$、 $2I=512$、$E=384$（另含 1 個 fused shared expert）、$k=8$；MXFP4 FP4 權重為 $0.5$ byte/element。
 
 每個 expert 的 grouped GEMM 分兩個 stage。stage-1（gate/up，權重形狀 $H\times 2I$）對 $m_e$ 行的成本為
 

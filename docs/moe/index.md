@@ -1,8 +1,8 @@
 # Mixture-of-Experts
 
-這是手冊的核心。Mixture-of-Experts（MoE）把一個密集 FFN 換成許多個「expert」FFN，再讓 每個 token 只走其中幾個——藉此**把總參數量（容量）和每個 token 的計算量（FLOP）解耦**。 前沿的開放權重模型（DeepSeek-V3、Qwen3-MoE、Kimi-K2）幾乎全是 MoE，原因正在於此。
+這是手冊的核心。Mixture-of-Experts（MoE）把一個密集 FFN 換成許多個「expert」FFN，再讓 每個 token 只走其中幾個 —— 藉此**把總參數量（容量）和每個 token 的計算量（FLOP）解耦**。 前沿的開放權重模型（DeepSeek-V3、Qwen3-MoE、Kimi-K2）幾乎全是 MoE，原因正在於此。
 
-但稀疏化不是免費的午餐。它換來一整套密集模型從來不會遇到的系統問題：負載不平衡、離散 routing 的訓練不穩定、all-to-all 通訊、巨大的記憶體足跡，以及不規則的 GEMM。本篇把 MoE 當成一個**完整系統**來拆解——從建模到 kernel 到 serving。
+但稀疏化不是免費的午餐。它換來一整套密集模型從來不會遇到的系統問題：負載不平衡、離散 routing 的訓練不穩定、all-to-all 通訊、巨大的記憶體足跡，以及不規則的 GEMM。本篇把 MoE 當成一個**完整系統**來拆解 —— 從建模到 kernel 到 serving。
 
 讀完本篇，你將能夠：
 
@@ -60,4 +60,4 @@
 </div>
 
 !!! tip "和效能工程篇一起讀"
-    本篇後半（系統、kernel、serving）會直接連回[效能工程](../performance/index.md)的 collective、Triton/CUDA 與 profiling 章節，兩篇並行閱讀效果最好。讀完之後， [AITER](../aiter/index.md) 會把這些觀念對到一條真實的 Kimi-K2.5 decode 執行路徑上。
+    本篇後半（系統、kernel、serving）會直接連回[效能工程](../performance/index.md)的 collective、Triton/CUDA 與 profiling 章節，兩篇並行閱讀效果最好。讀完之後， [AITER](../aiter/index.md) 會把這些觀念對到一條真實的 Kimi K2.5 decode 執行路徑上。

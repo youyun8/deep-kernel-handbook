@@ -10,7 +10,7 @@
 ## GPU 程式設計模型
 
 ??? success "1 — 為什麼 32 通道減少在 CDNA 上是錯誤的"
-    使用 `offset = 16,8,4,2,1` 和 32 頻道遮罩硬編碼減少扭曲 假設 32 寬扭曲 (NVIDIA)。 AMD CDNA 波前是**64 通道**，因此 32 通道隨機播放僅減少波前的「一半」——上面的 32 通道是 被忽略，給出錯誤的（部分）總和。修復：開始隨機播放循環 `warpSize/2` 並且在各處使用 `warpSize` 而非文字 32，因此 相同的代碼可以正確減少 32 或 64 個 lane。
+    使用 `offset = 16,8,4,2,1` 和 32 頻道遮罩硬編碼減少扭曲 假設 32 寬扭曲 (NVIDIA)。 AMD CDNA 波前是**64 通道**，因此 32 通道隨機播放僅減少波前的「一半」 —— 上面的 32 通道是 被忽略，給出錯誤的（部分）總和。修復：開始隨機播放循環 `warpSize/2` 並且在各處使用 `warpSize` 而非文字 32，因此 相同的代碼可以正確減少 32 或 64 個 lane。
 
 ??? success "2 — 佔用限制器（64 個暫存器/線程，48 KB SMEM/區塊）"
     每個 SM：64K 暫存器，100 KB SMEM。取一個 256 線程塊。
@@ -32,7 +32,7 @@
     兩個 Triton kernels 都應將 `torch` 輸出與 BF16/FP32 容差相符。 向量相加受記憶體限制 → 預計 throughput 接近 HBM 頻寬，與 本機操作。 Fused Softmax 應該**擊敗**簡單的三通道火炬 Softmax 頻寬（一次讀 + 一次寫 vs 三次）並且大致平局 `torch.softmax`（本身已熔斷）。
 
 ??? success "2 — 面向 AMD 的自動調整配置"
-    加入不同 `num_warps` (4/8) 和 `BLOCK` 的配置，其中**wavefront-64** 請注意 - 在 CDNA 上，`num_warps=4` 已經意味著 256 個通道/區塊，因此 最佳點塊大小與 NVIDIA 的 32 通道扭曲不同。最好的配置是 GPU 特定；教訓是，在一個供應商上自動調整的配置很少 另一方面是最佳的——總是根據目標重新自動調整。
+    加入不同 `num_warps` (4/8) 和 `BLOCK` 的配置，其中**wavefront-64** 請注意 - 在 CDNA 上，`num_warps=4` 已經意味著 256 個通道/區塊，因此 最佳點塊大小與 NVIDIA 的 32 通道扭曲不同。最好的配置是 GPU 特定；教訓是，在一個供應商上自動調整的配置很少 另一方面是最佳的 —— 總是根據目標重新自動調整。
 ??? success "3 — Softmax，用於比 1 `BLOCK` 寬的行"
     循環遍歷 `BLOCK` 大小的圖塊中的行，保持運行最大值 $m$ 和總和 $\ell$ 通過**online-softmax 組合器**（與 FlashAttention 相同） 例如 1)：對於每個圖塊 $m' = \max(m, \max_{\text{tile}})$，將 $\ell$ 重新縮放 $e^{m-m'}$，增加圖塊的貢獻。第二遍（或緩存的分子） 正常化。這消除了“行必須適合一個塊”的限制。
 
@@ -42,7 +42,7 @@
 ## CUDA / HIP 軌道
 
 ??? success "1 — 埠平鋪 matmul 到 HIP"
-    `hipify`或手口：`__shared__`撐、`cudaMalloc→hipMalloc`、 `<<<>>>` 啟動與 `hipcc` 下的語法相同。使用 `hipcc` 建置（或透過 ROCm 上的 PyTorch）並根據 cuBLAS/hipBLAS 驗證 fp 容差。要點： HIP 是來源相容的——相同的 kernel 在兩個供應商上運行，是唯一真正的 可移植性錯誤是波前寬度（下一個練習）。
+    `hipify`或手口：`__shared__`撐、`cudaMalloc→hipMalloc`、 `<<<>>>` 啟動與 `hipcc` 下的語法相同。使用 `hipcc` 建置（或透過 ROCm 上的 PyTorch）並根據 cuBLAS/hipBLAS 驗證 fp 容差。要點： HIP 是來源相容的 —— 相同的 kernel 在兩個供應商上運行，是唯一真正的 可移植性錯誤是波前寬度（下一個練習）。
 
 ??? success "2 — 32 lane 的 reduction 在 64 寬 wavefront 上會失敗"
     做一個只用 `offset = 16…1` shuffle 的 reduction。在 CDNA 上，64 通道 wavefront 意味著 lane 32–63 從不參與 → 結果只加總了下半部 的一半。用一個長度 64 的全 1 向量做 reduction 來示範：你會得到 32，而不是 64。用 `for (offset = warpSize/2; offset>0; offset>>=1)` 修復。
@@ -72,7 +72,7 @@
 
     $$ \text{bubble} = \frac{P-1}{m + P - 1}. $$
 
-    保留$<10\%$：$\frac{P-1}{m+P-1} < 0.1 \Rightarrow m > 9(P-1)$。所以對於 $P=8$ 你需要 $m > 63$ 微批次；適用於 $P=4$、$m>27$。更多階段⇒許多 需要更多的微批次來攤提填充/排出——核心 PP 張力。
+    保留$<10\%$：$\frac{P-1}{m+P-1} < 0.1 \Rightarrow m > 9(P-1)$。所以對於 $P=8$ 你需要 $m > 63$ 微批次；適用於 $P=4$、$m>27$。更多階段⇒許多 需要更多的微批次來攤提填充/排出 —— 核心 PP 張力。
 
 ??? success 《4－為什麼 TP 可以節點內，EP 可以跨節點》
     **TP**在每層**內執行 all-reduce（兩次：fwd + bwd） 啟動 — 每步都有巨大的、latency 敏感的體積 → 它必須騎在 最快的連結（節點內 NVLink/Infinity Fabric）。**EP**有兩台 all-to-all 每個 MoE 層，但每個 token 有效負載較小，最重要的是，**重疊 具有計算**並且可以是**節點限制\*\*；它可以容忍較慢的跨節點 頻寬。把最多話的 collective（TP）對映到最快的連結，把 可重疊的（EP）放到較慢的網路上。

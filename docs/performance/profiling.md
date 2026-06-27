@@ -33,7 +33,7 @@ $$ t*{\min} = \max\!\bigl(t*{\text{compute}},\, t\_{\text{mem}}\bigr). $$
 
 $$ \text{Efficiency} = \frac{t*{\min}}{t*{\text{measured}}} \in (0, 1]. $$
 
-當 $t_{\text{compute}} > t_{\text{mem}}$ 時 kernel 為 compute-bound，反之為 memory-bound；兩者相等處即為 roofline 的拐點（ridge point）。**一個沒有 附上此比值的測量是沒有意義的**——它無法告訴你距離硬體上限還有多遠。
+當 $t_{\text{compute}} > t_{\text{mem}}$ 時 kernel 為 compute-bound，反之為 memory-bound；兩者相等處即為 roofline 的拐點（ridge point）。**一個沒有 附上此比值的測量是沒有意義的** —— 它無法告訴你距離硬體上限還有多遠。
 
 ### FLOP 計帳
 
@@ -82,7 +82,7 @@ def benchmark(fn, iters=100, warmup=20):
 不可協商的事項：
 
 1. **熱身（warmup）。**第一次呼叫要支付 JIT/autotune、分配器與 cuDNN/cuBLAS 演算法選擇的成本，且 GPU 時鐘可能尚未升頻。丟棄它。
-2. **使用 CUDA events**（`torch.cuda.Event`），而非 `time.time()`——events 量測的是裝置上的時間，且能正確框住非同步工作。
+2. **使用 CUDA events**（`torch.cuda.Event`），而非 `time.time()` —— events 量測的是裝置上的時間，且能正確框住非同步工作。
 3. **計時前後都呼叫 `synchronize()`**；否則你計到的是啟動時間，而非 kernel 執行時間。
 4. **重複並彙總。**報告中位數（對離群值穩健）與分佈。
 5. **若可行，鎖定時鐘**（`nvidia-smi -lgc` / `rocm-smi --setperflevel`）， 讓熱/boost 變化不會偽裝成回歸。
@@ -110,8 +110,8 @@ def benchmark(fn, iters=100, warmup=20):
 
 wall-clock 告訴你*有多慢*；profiler 告訴你*為什麼*。兩種視角：
 
-- **時間軸／系統視圖**（Nsight Systems；rocprof + Perfetto）：顯示 kernels、 memcpy 以及時間線上的空隙。尋找**空隙**（CPU 受限的啟動開銷、 Python、同步點）、**序列化的通訊**（all-reduce/all-to-all 未與計算 重疊——[MoE](../moe/systems-ep.md) 的典型失效模式），以及主導時間的 kernels。
-- **kernel 視圖**（Nsight Compute；Omniperf）：每個 kernel 的計數器——已達成 occupancy、記憶體 throughput 對峰值、計算 throughput 對峰值、 warp（AMD 上的 wavefront）的 stall 原因。這告訴你所處的**régime**：若記憶體 throughput 接近峰值而計算偏低，你是 memory-bound（fuse／提高算術強度）； 反之則是 compute-bound（降精度／減少 FLOP）。
+- **時間軸／系統視圖**（Nsight Systems；rocprof + Perfetto）：顯示 kernels、 memcpy 以及時間線上的空隙。尋找**空隙**（CPU 受限的啟動開銷、 Python、同步點）、**序列化的通訊**（all-reduce/all-to-all 未與計算 重疊 —— [MoE](../moe/systems-ep.md) 的典型失效模式），以及主導時間的 kernels。
+- **kernel 視圖**（Nsight Compute；Omniperf）：每個 kernel 的計數器 —— 已達成 occupancy、記憶體 throughput 對峰值、計算 throughput 對峰值、 warp（AMD 上的 wavefront）的 stall 原因。這告訴你所處的**régime**：若記憶體 throughput 接近峰值而計算偏低，你是 memory-bound（fuse／提高算術強度）； 反之則是 compute-bound（降精度／減少 FLOP）。
 
 ### Amdahl 定律：為何優化非主導階段幫助甚微
 
@@ -123,7 +123,7 @@ $$ S = \frac{1}{(1-p) + p/s}, $$
 - $s$：該階段的局部加速倍數（$s > 1$）。
 - $S$：整體（end-to-end）加速倍數。
 
-當 $s \to \infty$ 時，$S \to 1/(1-p)$。例如一個只佔 $p = 0.2$ 的階段，即使 無限加速也只能換來 $1.25\times$ 的整體提升——這就是為何要先從時間軸找出 *主導*階段，再去微優化 kernel。
+當 $s \to \infty$ 時，$S \to 1/(1-p)$。例如一個只佔 $p = 0.2$ 的階段，即使 無限加速也只能換來 $1.25\times$ 的整體提升 —— 這就是為何要先從時間軸找出 *主導*階段，再去微優化 kernel。
 
 ### Little 定律：serving 的在飛請求數
 
@@ -168,10 +168,10 @@ print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=15))
 
 ## 分析工作流程
 
-1. **先做 roofline**——計算目標時間與預期 régime。
-2. **時間軸視圖**——時間花在 kernels、空隙還是通訊？先修空隙／通訊， 再去微優化 kernels（通常是更大的勝利）。
-3. **kernel 視圖看最重的 kernel**——確認 régime，找出限制器 （記憶體 throughput？occupancy？stall？）。
-4. **優化限制器**，而非舒適的東西——memory-bound 就提高算術強度， compute-bound 就削減 FLOP／降精度，通訊受限就做重疊。
+1. **先做 roofline** —— 計算目標時間與預期 régime。
+2. **時間軸視圖** —— 時間花在 kernels、空隙還是通訊？先修空隙／通訊， 再去微優化 kernels（通常是更大的勝利）。
+3. **kernel 視圖看最重的 kernel** —— 確認 régime，找出限制器 （記憶體 throughput？occupancy？stall？）。
+4. **優化限制器**，而非舒適的東西 —— memory-bound 就提高算術強度， compute-bound 就削減 FLOP／降精度，通訊受限就做重疊。
 5. **正確地重新量測**（warmup、events、sync、掃描）並與目標比較。
 6. **重複**，直到你逼近 roofline 或耗盡可用空間（headroom）。
 
@@ -184,7 +184,7 @@ print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=15))
 
 ## 要點
 
-- **先算 roofline 目標**——沒有對照目標的量測毫無意義；training 要追蹤 **MFU**。
+- **先算 roofline 目標** —— 沒有對照目標的量測毫無意義；training 要追蹤 **MFU**。
 - 用 **warmup + CUDA events + sync + 重複 + 鎖定時鐘**做基準， 並**消耗輸出**，使其不會被優化掉。
 - 大多數「加速」都是假象：沒有 sync、沒有 warmup、死碼消除、 包含傳輸、shape 太小、時鐘漂移。一次只改一個變數。
 - 用**時間軸視圖**找空隙／序列化通訊，用 **kernel 視圖**找每個 kernel 的 限制器；**優化限制器**。計時之前先驗證正確性。

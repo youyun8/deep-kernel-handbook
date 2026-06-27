@@ -133,9 +133,9 @@ AITER 在 MoE 上做的主要優化：
 
 4. **biased grouped top-k**：`grouped_topk`（`aiter/ops/topk.py`、`aiter/ops/moe_op.py`） 一個 kernel 完成 router 選擇 + correction bias。
 
-5. **shared-expert fusion**：把 shared expert append 成 routed path 的「第 9 名」， 讓 384 routed + 1 shared 共用同一組 grouped GEMM（見 [AITER decode 一層的 kernel 流程](index.md) §4 的 trace 對照）。相關實作 `aiter/fused_moe_dp_shared_expert.py`。
+5. **shared-expert fusion**：把 shared expert append 成 routed path 的「第 9 名」， 讓 384 routed + 1 shared 共用同一組 grouped GEMM（見 [Shared-expert fusion 開 / 關](fusion.md) 的 trace 對照）。相關實作 `aiter/fused_moe_dp_shared_expert.py`。
 
-6. **per-shape tuned kernel 選擇**：同一個 MoE layer，不同 batch（padded M）會選不同 tile / split-K / combine（atomic vs reduce）的 kernel——全部由 §2 的 tuning 系統決定。
+6. **per-shape tuned kernel 選擇**：同一個 MoE layer，不同 batch（padded M）會選不同 tile / split-K / combine（atomic vs reduce）的 kernel —— 全部由 §2 的 tuning 系統決定。
 
 ---
 
