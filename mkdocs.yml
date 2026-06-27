@@ -13,7 +13,6 @@ edit_uri: edit/main/docs/
 copyright: >-
   內容採 CC BY 4.0 授權，程式碼採 MIT 授權，詳見 repository LICENSE。
 
-
 theme:
   name: material
   language: zh-TW
@@ -158,9 +157,8 @@ nav:
       - 量化與壓縮: performance/quantization.md
       - Inference 優化: performance/inference-optimization.md
       - Profiling 與方法論: performance/profiling.md
-  - AITER 深入解析:
-      - aiter/index.md
-      - AITER 原始碼 breakdown: aiter/source-breakdown.md
+  - Kimi-K2.5 MXFP4: aiter/index.md
+  - AITER 原始碼解析: aiter/source-breakdown.md
   - 實戰專案:
       - capstones/index.md
       - 建立小型 MoE LM: capstones/build-moe.md

@@ -1,4 +1,4 @@
-# AITER decode 一層的 kernel 流程：Kimi-K2.5 MXFP4 { .nowrap-title }
+# Kimi-K2.5 MXFP4：AITER decode 一層的 kernel 流程 { .nowrap-title }
 
 <div class="page-meta" markdown>
 <span class="chip"><strong>Model:</strong> Kimi-K2.5-MXFP4</span>
@@ -25,18 +25,18 @@ record_function("Decode") window
 
 後面的 shape、FLOPs 與 bandwidth 推導都依賴這些維度。數值來自 runtime log 與模型 config，而不是從 trace 反推。
 
-| 參數 | 值 | 來源 / 備註 |
-| --- | --- | --- |
-| Transformer 層數 | 61（layer 0 dense + 1–60 MoE） | `num_hidden_layers=61`、`first_k_dense_replace=1` |
-| hidden size $H$ | 7168 | `hidden_size=7168` |
-| MoE intermediate（全域） | 2048 | `moe_intermediate_size=2048` |
-| MoE intermediate（每 partition） | $I=256$ | `intermediate_size_per_partition=256`（= 2048 / 8） |
-| routed experts | 384 | `n_routed_experts=384` |
-| fused shared expert | 1 | `n_shared_experts=1`、`num_fused_shared_experts=1` |
-| top-k | 9（8 routed + 1 shared） | `num_experts_per_tok=8`、runtime `top_k=9` |
-| 權重格式 | MXFP4（`per_1x32` block scale） | `w13/w2 = float4_e2m1fn_x2`，scale `uint8` |
-| 每專家 W13（gate+up） | `[512, 7168]` FP4 | `w13_up_dim=512`（= 2×256） |
-| 每專家 W2（down） | `[7168, 256]` FP4 | `w2_down_dim=128`（fp4x2 packed） |
+| 參數                             | 值                              | 來源 / 備註                                         |
+| -------------------------------- | ------------------------------- | --------------------------------------------------- |
+| Transformer 層數                 | 61（layer 0 dense + 1–60 MoE）  | `num_hidden_layers=61`、`first_k_dense_replace=1`   |
+| hidden size $H$                  | 7168                            | `hidden_size=7168`                                  |
+| MoE intermediate（全域）         | 2048                            | `moe_intermediate_size=2048`                        |
+| MoE intermediate（每 partition） | $I=256$                         | `intermediate_size_per_partition=256`（= 2048 / 8） |
+| routed experts                   | 384                             | `n_routed_experts=384`                              |
+| fused shared expert              | 1                               | `n_shared_experts=1`、`num_fused_shared_experts=1`  |
+| top-k                            | 9（8 routed + 1 shared）        | `num_experts_per_tok=8`、runtime `top_k=9`          |
+| 權重格式                         | MXFP4（`per_1x32` block scale） | `w13/w2 = float4_e2m1fn_x2`，scale `uint8`          |
+| 每專家 W13（gate+up）            | `[512, 7168]` FP4               | `w13_up_dim=512`（= 2×256）                         |
+| 每專家 W2（down）                | `[7168, 256]` FP4               | `w2_down_dim=128`（fp4x2 packed）                   |
 
 !!! note "`moe_tp_size=8`"
 
@@ -349,25 +349,25 @@ flowchart TB
 
 <div class="aiter-stage-table" markdown>
 
-| # | 完整 kernel 名稱（trace 原樣） | 功能 | µs |
-| --: | --- | --- | --: |
-| 1 | `_ZN5aiter23fused_qk_rmsnorm_kernelIDF16bLi256ELi8ELb1ELi1EEEvPT_S2_PKS1_S4_S4_S4_ffiiiiiii` | input / QK RMSNorm + quant | 4.1 |
-| 2 | `hgemm_bf16_16x64x64x8_SPK3_W1x2x1_BLDS1_TN_AS1_0` | QKV-A downproj / Q_b upproj | 4.8 |
-| 3 | `_batched_gemm_a16wfp4_kernel_BLOCK_SIZE_M_16_BLOCK_SIZE_N_64_BLOCK_SIZE_K_128_..._GRID_MN_8_PRE_QUANT_1_..._CG` | K-absorb BMM | 4.5 |
-| 4 | `_fused_qk_rope_cat_and_cache_mla_kernel` | RoPE + KV-cache write | 4.2 |
-| 5 | `aiter::mla_a8w8_qh16_qseqlen1_gqaratio16_ps` | MLA core attention（FP8 KV） | 9.4 |
-| 6 | `_Z19kn_mla_reduce_v1_psI23MlaReduceKernelV1TraitsILi512ELi16ELi1EEfDF16bEv23MlaReduceKernelV1Params` | split-KV reduce | 4.6 |
-| 7 | `_batched_gemm_a16wfp4_kernel_BLOCK_SIZE_M_16_BLOCK_SIZE_N_64_BLOCK_SIZE_K_256_..._GRID_MN_2_PRE_QUANT_1_..._CG` | V-absorb BMM | 5.5 |
-| 8 | `hgemm_bf16_16x64x64x8_SPK2_W1x2x1_BLDS1_TN_AS1_0` | o_proj | 8.9 |
-| 9 | `_ZN5aiter30allreduce_fusion_kernel_1stageIDF16bDF16bLi4EEE...` | TP all-reduce ①（attention 後） | 7.8 |
-| 10 | `hgemm_bf16_16x64x128x7_SPK8_W1x1x2_BLDS1_TN_AS1_0` | router gate GEMM | 5.5 |
-| 11 | `void aiter::grouped_topk_kernel<c10::BFloat16, float __vector(4), 1, true, true, false>(...)` | biased grouped top-k | 6.8 |
-| 12 | `void aiter::opus_moe_sorting_entry<aiter::MoeSortingKernel<aiter::MoeSortingProblemEx<int, float, 1, true, false, false, true, 0>>>(...)` | MoE sort（385 experts） | 11.2 |
-| 13 | `_ZN5aiter30fused_mx_quant_moe_sort_kernelIDF16bN4opus5fp4_tELi256ELi32EEE...` | routed+shared input MXFP4 quant | 4.2 |
-| 14 | `mfma_moe1_silu_mul_afp4_wfp4_fp4_t32x128x256_pm1_fp4q_sort_async_v32` | MoE GEMM1 gate/up + SwiGLU | 26.0 |
-| 15 | `mfma_moe2_afp4_wfp4_bf16_cshuffle_t32x256x256_vscale_fix3_pm1` | MoE GEMM2 down + combine | 16.3 |
-| 16 | `_ZN5aiter30allreduce_fusion_kernel_1stageIDF16bDF16bLi4EEE...` | TP all-reduce ②（MoE 後） | 9.1 |
-| 17 | `hgemm_bf16_16x64x64x7_SPK7_W1x2x1_BLDS1_TN_AS1_0` | （下一層的 input projection） | 8.7 |
+|   # | 完整 kernel 名稱（trace 原樣）                                                                                                             | 功能                            |   µs |
+| --: | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------- | ---: |
+|   1 | `_ZN5aiter23fused_qk_rmsnorm_kernelIDF16bLi256ELi8ELb1ELi1EEEvPT_S2_PKS1_S4_S4_S4_ffiiiiiii`                                               | input / QK RMSNorm + quant      |  4.1 |
+|   2 | `hgemm_bf16_16x64x64x8_SPK3_W1x2x1_BLDS1_TN_AS1_0`                                                                                         | QKV-A downproj / Q_b upproj     |  4.8 |
+|   3 | `_batched_gemm_a16wfp4_kernel_BLOCK_SIZE_M_16_BLOCK_SIZE_N_64_BLOCK_SIZE_K_128_..._GRID_MN_8_PRE_QUANT_1_..._CG`                           | K-absorb BMM                    |  4.5 |
+|   4 | `_fused_qk_rope_cat_and_cache_mla_kernel`                                                                                                  | RoPE + KV-cache write           |  4.2 |
+|   5 | `aiter::mla_a8w8_qh16_qseqlen1_gqaratio16_ps`                                                                                              | MLA core attention（FP8 KV）    |  9.4 |
+|   6 | `_Z19kn_mla_reduce_v1_psI23MlaReduceKernelV1TraitsILi512ELi16ELi1EEfDF16bEv23MlaReduceKernelV1Params`                                      | split-KV reduce                 |  4.6 |
+|   7 | `_batched_gemm_a16wfp4_kernel_BLOCK_SIZE_M_16_BLOCK_SIZE_N_64_BLOCK_SIZE_K_256_..._GRID_MN_2_PRE_QUANT_1_..._CG`                           | V-absorb BMM                    |  5.5 |
+|   8 | `hgemm_bf16_16x64x64x8_SPK2_W1x2x1_BLDS1_TN_AS1_0`                                                                                         | o_proj                          |  8.9 |
+|   9 | `_ZN5aiter30allreduce_fusion_kernel_1stageIDF16bDF16bLi4EEE...`                                                                            | TP all-reduce ①（attention 後） |  7.8 |
+|  10 | `hgemm_bf16_16x64x128x7_SPK8_W1x1x2_BLDS1_TN_AS1_0`                                                                                        | router gate GEMM                |  5.5 |
+|  11 | `void aiter::grouped_topk_kernel<c10::BFloat16, float __vector(4), 1, true, true, false>(...)`                                             | biased grouped top-k            |  6.8 |
+|  12 | `void aiter::opus_moe_sorting_entry<aiter::MoeSortingKernel<aiter::MoeSortingProblemEx<int, float, 1, true, false, false, true, 0>>>(...)` | MoE sort（385 experts）         | 11.2 |
+|  13 | `_ZN5aiter30fused_mx_quant_moe_sort_kernelIDF16bN4opus5fp4_tELi256ELi32EEE...`                                                             | routed+shared input MXFP4 quant |  4.2 |
+|  14 | `mfma_moe1_silu_mul_afp4_wfp4_fp4_t32x128x256_pm1_fp4q_sort_async_v32`                                                                     | MoE GEMM1 gate/up + SwiGLU      | 26.0 |
+|  15 | `mfma_moe2_afp4_wfp4_bf16_cshuffle_t32x256x256_vscale_fix3_pm1`                                                                            | MoE GEMM2 down + combine        | 16.3 |
+|  16 | `_ZN5aiter30allreduce_fusion_kernel_1stageIDF16bDF16bLi4EEE...`                                                                            | TP all-reduce ②（MoE 後）       |  9.1 |
+|  17 | `hgemm_bf16_16x64x64x7_SPK7_W1x2x1_BLDS1_TN_AS1_0`                                                                                         | （下一層的 input projection）   |  8.7 |
 
 </div>
 
@@ -419,21 +419,21 @@ flowchart TB
 
 <div class="aiter-stage-table" markdown>
 
-| # | 完整 kernel 名稱（trace 原樣） | 功能 | µs |
-| --: | --- | --- | --: |
-| 10 | `_dynamic_mxfp4_quant_kernel` | shared expert input MXFP4 quant | 4.7 |
-| 11 | `_gemm_afp4wfp4_kernel_BLOCK_SIZE_M_8_BLOCK_SIZE_N_64_BLOCK_SIZE_K_512_..._NUM_KSPLIT_2` | shared MLP GEMM（gate/up，split-K） | 11.6 |
-| 12 | `_gemm_afp4wfp4_reduce_kernel_BLOCK_SIZE_M_16_BLOCK_SIZE_N_64_ACTUAL_KSPLIT_2_..._activation_NONE` | shared split-K reduce | 4.3 |
-| 13 | `_ZN7sgl_hip10activation18act_and_mul_kernelI14__hip_bfloat16...silu...EEEvPS3_PS4_i` | shared SwiGLU（act_and_mul） | 4.4 |
-| 14 | `_dynamic_mxfp4_quant_kernel` | shared down-input MXFP4 quant | 4.4 |
-| 15 | `_gemm_afp4wfp4_kernel_BLOCK_SIZE_M_8_BLOCK_SIZE_N_64_BLOCK_SIZE_K_512_..._NUM_KSPLIT_1` | shared MLP GEMM（down） | 4.2 |
-| 16 | `hgemm_bf16_16x64x128x7_SPK8_W1x1x2_BLDS1_TN_AS1_0` | router gate GEMM | 5.7 |
-| 17 | `void aiter::grouped_topk_kernel<...>(...)` | routed top-k（8 experts） | 6.8 |
-| 18 | `void aiter::opus_moe_sorting_entry<...MoeSortingProblemEx<int, float, 1, true, false, false, true, 0>>>(...)` | routed MoE sort | 10.9 |
-| 19 | `_ZN5aiter30fused_mx_quant_moe_sort_kernelIDF16bN4opus5fp4_tELi256ELi32EEE...` | routed input MXFP4 quant | 4.0 |
-| 20 | `mfma_moe1_silu_mul_afp4_wfp4_fp4_t32x64x256_pm1_fp4q_sort_async_v32` | routed GEMM1 gate/up + SwiGLU | 28.2 |
-| 21 | `mfma_moe2_afp4_wfp4_bf16_cshuffle_t32x128x256_vscale_fix3_pm1` | routed GEMM2 down + combine | 13.8 |
-| 22 | `void at::native::vectorized_elementwise_kernel<8, at::native::CUDAFunctor_add<c10::BFloat16>, std::array<char*, 3ul>>(...)` | routed + shared 相加 | 4.4 |
+|   # | 完整 kernel 名稱（trace 原樣）                                                                                               | 功能                                |   µs |
+| --: | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ---: |
+|  10 | `_dynamic_mxfp4_quant_kernel`                                                                                                | shared expert input MXFP4 quant     |  4.7 |
+|  11 | `_gemm_afp4wfp4_kernel_BLOCK_SIZE_M_8_BLOCK_SIZE_N_64_BLOCK_SIZE_K_512_..._NUM_KSPLIT_2`                                     | shared MLP GEMM（gate/up，split-K） | 11.6 |
+|  12 | `_gemm_afp4wfp4_reduce_kernel_BLOCK_SIZE_M_16_BLOCK_SIZE_N_64_ACTUAL_KSPLIT_2_..._activation_NONE`                           | shared split-K reduce               |  4.3 |
+|  13 | `_ZN7sgl_hip10activation18act_and_mul_kernelI14__hip_bfloat16...silu...EEEvPS3_PS4_i`                                        | shared SwiGLU（act_and_mul）        |  4.4 |
+|  14 | `_dynamic_mxfp4_quant_kernel`                                                                                                | shared down-input MXFP4 quant       |  4.4 |
+|  15 | `_gemm_afp4wfp4_kernel_BLOCK_SIZE_M_8_BLOCK_SIZE_N_64_BLOCK_SIZE_K_512_..._NUM_KSPLIT_1`                                     | shared MLP GEMM（down）             |  4.2 |
+|  16 | `hgemm_bf16_16x64x128x7_SPK8_W1x1x2_BLDS1_TN_AS1_0`                                                                          | router gate GEMM                    |  5.7 |
+|  17 | `void aiter::grouped_topk_kernel<...>(...)`                                                                                  | routed top-k（8 experts）           |  6.8 |
+|  18 | `void aiter::opus_moe_sorting_entry<...MoeSortingProblemEx<int, float, 1, true, false, false, true, 0>>>(...)`               | routed MoE sort                     | 10.9 |
+|  19 | `_ZN5aiter30fused_mx_quant_moe_sort_kernelIDF16bN4opus5fp4_tELi256ELi32EEE...`                                               | routed input MXFP4 quant            |  4.0 |
+|  20 | `mfma_moe1_silu_mul_afp4_wfp4_fp4_t32x64x256_pm1_fp4q_sort_async_v32`                                                        | routed GEMM1 gate/up + SwiGLU       | 28.2 |
+|  21 | `mfma_moe2_afp4_wfp4_bf16_cshuffle_t32x128x256_vscale_fix3_pm1`                                                              | routed GEMM2 down + combine         | 13.8 |
+|  22 | `void at::native::vectorized_elementwise_kernel<8, at::native::CUDAFunctor_add<c10::BFloat16>, std::array<char*, 3ul>>(...)` | routed + shared 相加                |  4.4 |
 
 </div>
 
@@ -457,12 +457,12 @@ $$
 **端到端效果（本機實測，conc4..64，ISL/OSL 1024）。** fusion ON 在所有 concurrency 都比 fusion OFF 快；launch overhead 佔比較高時，差距尤其明顯：
 
 | concurrency | fusion ON output tok/s/GPU | fusion OFF output tok/s/GPU | ON 提升 |
-| --: | --: | --: | --: |
-| 4 | 16.00 | 15.03 | +6.5% |
-| 8 | 44.77 | 31.13 | +43.8% |
-| 16 | 62.71 | 59.21 | +5.9% |
-| 32 | 214.46 | 191.39 | +12.1% |
-| 64 | 281.27 | 241.91 | +16.3% |
+| ----------: | -------------------------: | --------------------------: | ------: |
+|           4 |                      16.00 |                       15.03 |   +6.5% |
+|           8 |                      44.77 |                       31.13 |  +43.8% |
+|          16 |                      62.71 |                       59.21 |   +5.9% |
+|          32 |                     214.46 |                      191.39 |  +12.1% |
+|          64 |                     281.27 |                      241.91 |  +16.3% |
 
 ---
 
@@ -574,19 +574,19 @@ trace 中的 `mfma_moe1/2` 是執行期實際選到的 kernel；選擇邏輯由 
 
 <div class="aiter-stage-table" markdown>
 
-| token（padded M） | kernelName1（stage-1 gate/up+SwiGLU） | kernelName2（stage-2 down+combine） |
-| --: | --- | --- |
-| 1 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w3_kb14_fp4` | `moe_ck2stages_gemm2_64x32x32x128_1x1_MulABScaleExpertWeightShuffled_v1_Nswizzle0_Quant3_MulRoutedWeight1_FP4X2_FP4X2_B16` |
-| 2 | `flydsl_moe1_afp4_wfp4_bf16_t32x64x256_w3_kb4_bnt0_go_fp4` | `moe_ck2stages_gemm2_64x32x32x128_1x1_MulABScaleExpertWeightShuffled_v1_Nswizzle0_Quant3_MulRoutedWeight1_FP4X2_FP4X2_B16` |
-| 4 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w3_kb7_bnt0_fp4` | `flydsl_moe2_afp4_wfp4_bf16_t32x256x256_atomic` |
-| 8 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w2_fp4` | `flydsl_moe2_afp4_wfp4_bf16_t32x128x256_atomic` |
-| 16 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w2_fp4` | `flydsl_moe2_afp4_wfp4_bf16_t32x256x256_atomic` |
-| 32 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w4_fp4` | `flydsl_moe2_afp4_wfp4_bf16_t16x256x256_atomic_bnt2_sbm32` |
-| 64 | `flydsl_moe1_afp4_wfp4_bf16_t32x64x256_w3_fp4` | `flydsl_moe2_afp4_wfp4_bf16_t16x256x256_atomic_bnt2_persist_sbm32` |
-| 128 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w3_fp4` | `flydsl_moe2_afp4_wfp4_bf16_t32x256x256_atomic_bnt2_persist` |
-| 256 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w3_fp4` | `flydsl_moe2_afp4_wfp4_bf16_t16x256x256_atomic_bnt2_persist_sbm32` |
-| 512 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w3_fp4` | `flydsl_moe2_afp4_wfp4_bf16_t32x128x256_atomic_bnt2_persist` |
-| 1024 | `flydsl_moe1_afp4_wfp4_bf16_t64x128x256_w4_fp4` | `flydsl_moe2_afp4_wfp4_bf16_t32x128x256_atomic_persist_sbm64` |
+| token（padded M） | kernelName1（stage-1 gate/up+SwiGLU）                      | kernelName2（stage-2 down+combine）                                                                                        |
+| ----------------: | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+|                 1 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w3_kb14_fp4`       | `moe_ck2stages_gemm2_64x32x32x128_1x1_MulABScaleExpertWeightShuffled_v1_Nswizzle0_Quant3_MulRoutedWeight1_FP4X2_FP4X2_B16` |
+|                 2 | `flydsl_moe1_afp4_wfp4_bf16_t32x64x256_w3_kb4_bnt0_go_fp4` | `moe_ck2stages_gemm2_64x32x32x128_1x1_MulABScaleExpertWeightShuffled_v1_Nswizzle0_Quant3_MulRoutedWeight1_FP4X2_FP4X2_B16` |
+|                 4 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w3_kb7_bnt0_fp4`   | `flydsl_moe2_afp4_wfp4_bf16_t32x256x256_atomic`                                                                            |
+|                 8 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w2_fp4`            | `flydsl_moe2_afp4_wfp4_bf16_t32x128x256_atomic`                                                                            |
+|                16 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w2_fp4`            | `flydsl_moe2_afp4_wfp4_bf16_t32x256x256_atomic`                                                                            |
+|                32 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w4_fp4`            | `flydsl_moe2_afp4_wfp4_bf16_t16x256x256_atomic_bnt2_sbm32`                                                                 |
+|                64 | `flydsl_moe1_afp4_wfp4_bf16_t32x64x256_w3_fp4`             | `flydsl_moe2_afp4_wfp4_bf16_t16x256x256_atomic_bnt2_persist_sbm32`                                                         |
+|               128 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w3_fp4`            | `flydsl_moe2_afp4_wfp4_bf16_t32x256x256_atomic_bnt2_persist`                                                               |
+|               256 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w3_fp4`            | `flydsl_moe2_afp4_wfp4_bf16_t16x256x256_atomic_bnt2_persist_sbm32`                                                         |
+|               512 | `flydsl_moe1_afp4_wfp4_bf16_t32x128x256_w3_fp4`            | `flydsl_moe2_afp4_wfp4_bf16_t32x128x256_atomic_bnt2_persist`                                                               |
+|              1024 | `flydsl_moe1_afp4_wfp4_bf16_t64x128x256_w4_fp4`            | `flydsl_moe2_afp4_wfp4_bf16_t32x128x256_atomic_persist_sbm64`                                                              |
 
 </div>
 
@@ -613,22 +613,22 @@ $$
 
 ## 10. 從 trace 回到原始碼的查表
 
-| trace pattern | 功能 | 優先看的檔案 |
-| --- | --- | --- |
-| `fused_qk_rmsnorm` | input / QK RMSNorm + quant | `aiter/ops/fused_qk_norm_rope_cache_quant.py`、`aiter/ops/rmsnorm.py` |
-| `hgemm_bf16_*` | QKV / o_proj / router GEMM | `aiter/tuned_gemm.py`、`aiter/ops/gemm_op_a16w16.py` |
-| `_batched_gemm_a16wfp4_*` | K-absorb / V-absorb BMM | `aiter/ops/batched_gemm_op_bf16.py`、`aiter/ops/gemm_op_a4w4.py` |
-| `_fused_qk_rope_cat_and_cache_mla` | RoPE + KV cache write | `aiter/ops/rope.py`、`aiter/ops/cache.py` |
-| `mla_a8w8_*` | MLA core attention | `aiter/mla.py`、`aiter/aot/asm_mla_decode_fwd.py`、`csrc/cpp_itfs/mla/*` |
-| `kn_mla_reduce_v1_ps` | split-KV reduce | `aiter/ops/attention.py` |
-| `allreduce_fusion_kernel_1stage` | TP all-reduce fusion | `aiter/ops/custom_all_reduce.py`、`aiter/dist/communication_op.py` |
-| `grouped_topk_kernel` | biased grouped top-k | `aiter/ops/topk.py`、`aiter/ops/moe_op.py` |
-| `opus_moe_sorting_entry` | MoE sort（token→expert 分桶） | `aiter/ops/moe_sorting_opus.py` |
-| `fused_mx_quant_moe_sort` / `mxfp4_moe_sort` | routed input MXFP4 quant + sort | `aiter/ops/quant.py`、`aiter/utility/fp4_utils.py` |
-| `mfma_moe1` / `flydsl_moe1` | MoE GEMM1 gate/up + SwiGLU | `aiter/fused_moe.py`、`aiter/ops/flydsl/kernels/moe_gemm_2stage.py` |
-| `mfma_moe2` / `flydsl_moe2` / `moe_ck2stages_gemm2` | MoE GEMM2 down + combine | `aiter/fused_moe.py`、`csrc/ck_gemm_moe_2stages_codegen/*` |
-| `_dynamic_mxfp4_quant` / `_gemm_afp4wfp4*` | standalone shared expert（fusion 關閉時） | `aiter/ops/quant.py`、`aiter/ops/gemm_op_a4w4.py` |
-| `add_rmsnorm_quant` | residual add + norm + quant | `aiter/ops/rmsnorm.py` |
+| trace pattern                                       | 功能                                      | 優先看的檔案                                                             |
+| --------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
+| `fused_qk_rmsnorm`                                  | input / QK RMSNorm + quant                | `aiter/ops/fused_qk_norm_rope_cache_quant.py`、`aiter/ops/rmsnorm.py`    |
+| `hgemm_bf16_*`                                      | QKV / o_proj / router GEMM                | `aiter/tuned_gemm.py`、`aiter/ops/gemm_op_a16w16.py`                     |
+| `_batched_gemm_a16wfp4_*`                           | K-absorb / V-absorb BMM                   | `aiter/ops/batched_gemm_op_bf16.py`、`aiter/ops/gemm_op_a4w4.py`         |
+| `_fused_qk_rope_cat_and_cache_mla`                  | RoPE + KV cache write                     | `aiter/ops/rope.py`、`aiter/ops/cache.py`                                |
+| `mla_a8w8_*`                                        | MLA core attention                        | `aiter/mla.py`、`aiter/aot/asm_mla_decode_fwd.py`、`csrc/cpp_itfs/mla/*` |
+| `kn_mla_reduce_v1_ps`                               | split-KV reduce                           | `aiter/ops/attention.py`                                                 |
+| `allreduce_fusion_kernel_1stage`                    | TP all-reduce fusion                      | `aiter/ops/custom_all_reduce.py`、`aiter/dist/communication_op.py`       |
+| `grouped_topk_kernel`                               | biased grouped top-k                      | `aiter/ops/topk.py`、`aiter/ops/moe_op.py`                               |
+| `opus_moe_sorting_entry`                            | MoE sort（token→expert 分桶）             | `aiter/ops/moe_sorting_opus.py`                                          |
+| `fused_mx_quant_moe_sort` / `mxfp4_moe_sort`        | routed input MXFP4 quant + sort           | `aiter/ops/quant.py`、`aiter/utility/fp4_utils.py`                       |
+| `mfma_moe1` / `flydsl_moe1`                         | MoE GEMM1 gate/up + SwiGLU                | `aiter/fused_moe.py`、`aiter/ops/flydsl/kernels/moe_gemm_2stage.py`      |
+| `mfma_moe2` / `flydsl_moe2` / `moe_ck2stages_gemm2` | MoE GEMM2 down + combine                  | `aiter/fused_moe.py`、`csrc/ck_gemm_moe_2stages_codegen/*`               |
+| `_dynamic_mxfp4_quant` / `_gemm_afp4wfp4*`          | standalone shared expert（fusion 關閉時） | `aiter/ops/quant.py`、`aiter/ops/gemm_op_a4w4.py`                        |
+| `add_rmsnorm_quant`                                 | residual add + norm + quant               | `aiter/ops/rmsnorm.py`                                                   |
 
 ---
 
@@ -658,4 +658,4 @@ python3 decode_analysis/parse_decode_layer.py --full shared_expert_fusion_off/..
 ```
 
 !!! note "判讀邊界"
-    這裡的 kernel 名稱與順序對應 Kimi-K2.5-MXFP4、gfx950、TP4（attention）/ moe_tp_size=8（MoE）、KV cache fp8_e4m3、conc4 / ISL1024。架構結論可遷移，但具體 tile、kernel 名稱與比例會隨 hidden / intermediate size、top-k、context length、batch 與 tuned config 改變。若要把這條 decode 路徑放回更一般的脈絡，回頭看 [MoE decode 剖析](../moe/decode-anatomy.md) 與 [Profiling 與方法論](../performance/profiling.md)。
+這裡的 kernel 名稱與順序對應 Kimi-K2.5-MXFP4、gfx950、TP4（attention）/ moe_tp_size=8（MoE）、KV cache fp8_e4m3、conc4 / ISL1024。架構結論可遷移，但具體 tile、kernel 名稱與比例會隨 hidden / intermediate size、top-k、context length、batch 與 tuned config 改變。若要把這條 decode 路徑放回更一般的脈絡，回頭看 [MoE decode 剖析](../moe/decode-anatomy.md) 與 [Profiling 與方法論](../performance/profiling.md)。

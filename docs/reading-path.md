@@ -28,7 +28,7 @@ flowchart TD
 5. [從零實作 FlashAttention](foundations/flashattention.md)——你第一個真正的「靠融合省下記憶體流量」勝利。
 
 ??? note "第 1 階段的先備知識"
-    Python 與基本線性代數（矩陣乘法）。不需要任何 Transformer 先備知識——第一頁會從零把它建起來。 不需要 GPU；數學與 NumPy/PyTorch 參考程式碼都能在 CPU 上跑。
+Python 與基本線性代數（矩陣乘法）。不需要任何 Transformer 先備知識——第一頁會從零把它建起來。 不需要 GPU；數學與 NumPy/PyTorch 參考程式碼都能在 CPU 上跑。
 
 ## 第 2 階段 — MoE（中階）
 
@@ -53,15 +53,15 @@ flowchart TD
 3. 部署：[量化](performance/quantization.md) → [推論最佳化](performance/inference-optimization.md)
 4. 永遠：[Profiling 與方法論](performance/profiling.md)——趁早讀、常常回頭重讀。
 
-## 第 4 階段 — AITER（進階）
+## 第 4 階段 — Kimi-K2.5 / AITER（進階）
 
 把前三個階段的觀念對到一條*具名、可量測*的真實執行路徑上。**建議先讀完第 2、3 階段再進來。**
 
 1. [AITER decode 一層的 kernel 流程](aiter/index.md)——以 Kimi-K2.5 MXFP4 的 decode trace 為例，直接從 Chrome trace 解析出 decode 一層的 kernel 順序，並用 shared-expert fusion 開 / 關兩組 trace 對照，搭配 roofline 解釋為何 MoE expert GEMM 是 decode 的主瓶頸。
-2. [AITER 原始碼 breakdown](aiter/source-breakdown.md)——拆解 AITER repo 的架構、內建 tuning 機制與 MoE 優化，並給出「要改 MoE 該動哪些檔案」的切入點。
+2. [AITER 原始碼解析](aiter/source-breakdown.md)——拆解 AITER repo 的架構、內建 tuning 機制與 MoE 優化，並給出「要改 MoE 該動哪些檔案」的切入點。
 
 ??? note "第 4 階段的先備知識"
-    第 1 階段的 roofline 與 KV cache（[作為系統的 Transformer](foundations/transformer-systems.md)、 [Attention 效率](foundations/attention-efficiency.md)）、第 2 階段的 [MoE kernels](moe/kernels.md) 與 [MoE decode 剖析](moe/decode-anatomy.md)，以及第 3 階段的 [Profiling 與方法論](performance/profiling.md)。不需要 AMD GPU 就能讀懂分析；要重現量測才需要 MI355X 等硬體。
+第 1 階段的 roofline 與 KV cache（[作為系統的 Transformer](foundations/transformer-systems.md)、 [Attention 效率](foundations/attention-efficiency.md)）、第 2 階段的 [MoE kernels](moe/kernels.md) 與 [MoE decode 剖析](moe/decode-anatomy.md)，以及第 3 階段的 [Profiling 與方法論](performance/profiling.md)。不需要 AMD GPU 就能讀懂分析；要重現量測才需要 MI355X 等硬體。
 
 ## 第 5 階段 — 實戰專案（進階）
 
