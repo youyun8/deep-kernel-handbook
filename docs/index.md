@@ -15,15 +15,10 @@ hide:
 <p class="home-sub">每個主題分成「直覺 → 數學 → 參考實作 → 效能化版本」，並把 profiling 結果對應回可修改的原始碼。</p>
 
 <div class="home-actions">
-<a class="md-button md-button--primary" href="reading-path/">開始閱讀路線&nbsp;→</a>
-<a class="md-button" href="aiter/">AITER 深入解析</a>
+<a class="md-button md-button--primary" href="reading-path/">開始閱讀路線&nbsp;→</a> <a class="md-button" href="aiter/">AITER 深入解析</a>
 </div>
 
-<ul class="home-points">
-<li><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="15.5 8.5 11 11 8.5 15.5 13 13" fill="currentColor" stroke="none"/></svg></span> 從共同語彙到 roofline，先建立分析直覺</li>
-<li><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 14l4-4 3 3 5-6"/></svg></span> 每個結論都能回到 trace、kernel 與 shape</li>
-<li><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 8 5 12 9 16"/><polyline points="15 8 19 12 15 16"/></svg></span> 從 profiling bucket 直接跳到可 tune 的原始碼</li>
-</ul>
+<ul class="home-points"> <li><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polygon points="15.5 8.5 11 11 8.5 15.5 13 13" fill="currentColor" stroke="none"/></svg></span> 從共同語彙到 roofline，先建立分析直覺</li> <li><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 14l4-4 3 3 5-6"/></svg></span> 每個結論都能回到 trace、kernel 與 shape</li> <li><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 8 5 12 9 16"/><polyline points="15 8 19 12 15 16"/></svg></span> 從 profiling bucket 直接跳到可 tune 的原始碼</li> </ul>
 
 </div>
 
@@ -47,18 +42,15 @@ hide:
 
 - :material-book-open-variant: **讀手冊**
 
-  先建立共同語彙：FLOPs、bytes、roofline、attention memory traffic、
-  MoE routing、expert parallelism 與 all-reduce。
+  先建立共同語彙：FLOPs、bytes、roofline、attention memory traffic、 MoE routing、expert parallelism 與 all-reduce。
 
 - :material-speedometer: **看 profiling**
 
-  每個效能結論都要能回到 trace、kernel 名稱、shape 與測量方法。
-  不只記住「哪裡慢」，也要知道為什麼慢。
+  每個效能結論都要能回到 trace、kernel 名稱、shape 與測量方法。 不只記住「哪裡慢」，也要知道為什麼慢。
 
 - :material-code-braces: **對原始碼**
 
-  章節會標出 AITER / SGLang / kernel wrapper 的實際檔案位置，讓你能
-  從 profiling bucket 直接跳到需要修改或 tune 的路徑。
+  章節會標出 AITER / SGLang / kernel wrapper 的實際檔案位置，讓你能 從 profiling bucket 直接跳到需要修改或 tune 的路徑。
 
 </div>
 
@@ -73,8 +65,7 @@ hide:
 
 ### :material-cube-outline: 基礎
 
-建立效能分析需要的數學與系統直覺：Transformer、attention、precision、
-roofline 與資料搬移。
+建立效能分析需要的數學與系統直覺：Transformer、attention、precision、 roofline 與資料搬移。
 
 [開啟基礎篇](foundations/index.md){ .md-button }
 
@@ -85,8 +76,7 @@ roofline 與資料搬移。
 
 ### :material-expansion-card: Mixture-of-Experts
 
-從稀疏化、routing、load balancing 到 expert parallelism、MoE kernels
-與 serving，把 MoE 看成完整系統。
+從稀疏化、routing、load balancing 到 expert parallelism、MoE kernels 與 serving，把 MoE 看成完整系統。
 
 [開啟 MoE 路線](moe/index.md){ .md-button .md-button--primary }
 
@@ -97,8 +87,7 @@ roofline 與資料搬移。
 
 ### :material-flash: 效能工程
 
-練習 GPU programming、Triton、CUDA/HIP、distributed training、量化與
-profiling 方法論。
+練習 GPU programming、Triton、CUDA/HIP、distributed training、量化與 profiling 方法論。
 
 [開啟效能篇](performance/index.md){ .md-button }
 
@@ -109,8 +98,7 @@ profiling 方法論。
 
 ### :material-chart-timeline-variant: AITER 深入解析
 
-用 Kimi-K2.5 MXFP4 decode trace 解析 AITER MoE stack：moe gemm 1、
-moe gemm 2、routing/sort/quant、shared expert 與 all-reduce fusion。
+用 Kimi-K2.5 MXFP4 decode trace 解析 AITER MoE stack：MoE GEMM 1、 MoE GEMM 2、routing/sort/quant、shared expert 與 all-reduce fusion。
 
 [閱讀 AITER 章節](aiter/index.md){ .md-button .md-button--primary }
 
@@ -129,9 +117,7 @@ moe gemm 2、routing/sort/quant、shared expert 與 all-reduce fusion。
 </div>
 
 !!! tip "閱讀建議"
-    若你剛開始，先照 [閱讀路線](reading-path.md) 建立系統語彙；若你正在處理
-    Kimi-K2.5 / SGLang / AITER profiling，直接看 [AITER decode 一層的 kernel 流程](aiter/index.md)，
-    再回到 MoE 與效能章節補齊背景。
+    若你剛開始，先照 [閱讀路線](reading-path.md) 建立系統語彙；若你正在處理 Kimi-K2.5 / SGLang / AITER profiling，直接看 [AITER decode 一層的 kernel 流程](aiter/index.md)， 再回到 MoE 與效能章節補齊背景。
 
 ---
 

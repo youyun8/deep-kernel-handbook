@@ -16,31 +16,54 @@
 :root {
   --md-code-font: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
-  /* Serif (宋體) display family for site title and page headings. */
-  --ml-serif: "Noto Serif TC", "Songti TC", "Songti SC", "SimSun", "STSong", serif;
+  /* Serif display family for the site title and page headings. */
+  --ml-serif:
+    "Noto Serif TC", "Songti TC", "Songti SC", "SimSun", "STSong", serif;
+  --ml-sidebar-font: var(--md-text-font-family, "Inter", system-ui, sans-serif);
+  --ml-toc-accent: #15803d;
+  --ml-toc-accent-soft: rgba(22, 163, 74, 0.12);
 
   /* Engineering palette: a confident blue lead, teal partner, amber highlight.
      Purple is intentionally kept out so the page does not read as one-note. */
   --ml-accent-warm: #ea8a0b;
-  --ml-accent-cool: #2563eb;   /* primary lead (blue-600) */
-  --ml-accent-blue: #3b82f6;   /* lighter blue */
-  --ml-accent-teal: #0d9488;   /* partner accent */
+  --ml-accent-cool: #2563eb; /* primary lead (blue-600) */
+  --ml-accent-blue: #3b82f6; /* lighter blue */
+  --ml-accent-teal: #0d9488; /* partner accent */
   --ml-accent-soft: #eff5ff;
 
-  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 94%, var(--ml-accent-cool) 6%);
-  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 88%, var(--ml-accent-blue) 12%);
+  --ml-surface: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 94%,
+    var(--ml-accent-cool) 6%
+  );
+  --ml-surface-strong: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 88%,
+    var(--ml-accent-blue) 12%
+  );
   --ml-border: color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
-  --ml-border-strong: color-mix(in srgb, var(--md-default-fg-color) 22%, transparent);
+  --ml-border-strong: color-mix(
+    in srgb,
+    var(--md-default-fg-color) 22%,
+    transparent
+  );
 
-  --ml-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --ml-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.08);
-  --ml-shadow-strong: 0 2px 6px rgba(15, 23, 42, 0.06), 0 20px 48px rgba(15, 23, 42, 0.14);
+  --ml-shadow-sm:
+    0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --ml-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.08);
+  --ml-shadow-strong:
+    0 2px 6px rgba(15, 23, 42, 0.06), 0 20px 48px rgba(15, 23, 42, 0.14);
 
   --ml-radius: 12px;
   --ml-radius-sm: 8px;
   --ml-radius-lg: 18px;
 
-  --ml-gradient: linear-gradient(120deg, var(--ml-accent-cool), var(--ml-accent-teal));
+  --ml-gradient: linear-gradient(
+    120deg,
+    var(--ml-accent-cool),
+    var(--ml-accent-teal)
+  );
 
   /* Diagram palette (light) */
   --ml-diagram-bg: color-mix(in srgb, var(--md-default-bg-color) 96%, white 4%);
@@ -51,7 +74,11 @@
   --ml-diagram-edge: #475569;
   --ml-diagram-text: #111827;
   --ml-diagram-muted-text: #475569;
-  --ml-diagram-label-bg: color-mix(in srgb, var(--md-default-bg-color) 92%, white 8%);
+  --ml-diagram-label-bg: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 92%,
+    white 8%
+  );
   --ml-diagram-cluster-bg: rgba(15, 118, 110, 0.08);
   --ml-diagram-cluster-stroke: rgba(15, 118, 110, 0.42);
   --ml-diagram-accent-bg: #dbeafe;
@@ -69,17 +96,34 @@
   --ml-accent-teal: #2dd4bf;
   --ml-accent-soft: #1e293b;
 
-  --ml-surface: color-mix(in srgb, var(--md-default-bg-color) 86%, var(--ml-accent-cool) 14%);
-  --ml-surface-strong: color-mix(in srgb, var(--md-default-bg-color) 78%, var(--ml-accent-blue) 22%);
+  --ml-surface: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 86%,
+    var(--ml-accent-cool) 14%
+  );
+  --ml-surface-strong: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 78%,
+    var(--ml-accent-blue) 22%
+  );
   --ml-border: color-mix(in srgb, var(--md-default-fg-color) 18%, transparent);
-  --ml-border-strong: color-mix(in srgb, var(--md-default-fg-color) 30%, transparent);
+  --ml-border-strong: color-mix(
+    in srgb,
+    var(--md-default-fg-color) 30%,
+    transparent
+  );
 
   --ml-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --ml-shadow: 0 2px 6px rgba(0, 0, 0, 0.25), 0 10px 28px rgba(0, 0, 0, 0.3);
-  --ml-shadow-strong: 0 4px 10px rgba(0, 0, 0, 0.3), 0 20px 48px rgba(0, 0, 0, 0.4);
+  --ml-shadow-strong:
+    0 4px 10px rgba(0, 0, 0, 0.3), 0 20px 48px rgba(0, 0, 0, 0.4);
 
   /* Diagram palette (dark) */
-  --ml-diagram-bg: color-mix(in srgb, var(--md-default-bg-color) 88%, #ffffff 12%);
+  --ml-diagram-bg: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 88%,
+    #ffffff 12%
+  );
   --ml-diagram-node-bg: #182335;
   --ml-diagram-node-muted-bg: #263244;
   --ml-diagram-node-stroke: #2dd4bf;
@@ -96,6 +140,8 @@
   --ml-roofline-start: #2dd4bf;
   --ml-roofline-mid: #60a5fa;
   --ml-roofline-end: #fbbf24;
+  --ml-toc-accent: #4ade80;
+  --ml-toc-accent-soft: rgba(74, 222, 128, 0.14);
 }
 
 /* Brand-tinted primary so the header/links match the new accent. */
@@ -136,7 +182,11 @@
 
 .md-main {
   background:
-    radial-gradient(60rem 40rem at 100% -10%, color-mix(in srgb, var(--ml-accent-cool) 7%, transparent), transparent 60%),
+    radial-gradient(
+      60rem 40rem at 100% -10%,
+      color-mix(in srgb, var(--ml-accent-cool) 7%, transparent),
+      transparent 60%
+    ),
     color-mix(in srgb, var(--md-default-bg-color) 97%, var(--ml-accent-soft) 3%);
 }
 
@@ -164,6 +214,11 @@
   font-family: var(--ml-serif);
   font-weight: 800;
   letter-spacing: -0.01em;
+}
+
+.md-typeset h1.nowrap-title {
+  max-width: none;
+  white-space: nowrap;
 }
 
 .md-typeset h2 {
@@ -242,7 +297,11 @@
 /* ---------- 4. Header, tabs & sidebar navigation ------------------------- */
 .md-header {
   border-bottom: 1px solid var(--ml-border);
-  background-color: color-mix(in srgb, var(--md-default-bg-color) 80%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--md-default-bg-color) 80%,
+    transparent
+  );
   color: var(--md-default-fg-color);
   backdrop-filter: saturate(160%) blur(18px);
   -webkit-backdrop-filter: saturate(160%) blur(18px);
@@ -266,8 +325,17 @@
 
 /* Sidebar: roomier, rounded active pills, clearer hierarchy. */
 .md-nav {
-  font-size: 0.73rem;
+  font-family: var(--ml-sidebar-font);
+  font-size: 0.7rem;
   line-height: 1.5;
+}
+
+.md-nav--primary {
+  font-size: 0.68rem;
+}
+
+.md-nav--secondary {
+  font-size: 0.72rem;
 }
 
 .md-sidebar {
@@ -288,7 +356,9 @@
   padding: 0.34rem 0.62rem;
   margin: 0.08rem 0;
   color: var(--md-default-fg-color--light);
-  transition: background-color 140ms ease, color 140ms ease,
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
     padding-left 140ms ease;
 }
 
@@ -306,12 +376,8 @@
   font-weight: 700;
 }
 
-.md-nav--primary
-  .md-nav__item
-  .md-nav__link--active::before,
-.md-nav--primary
-  .md-nav__item
-  .md-nav__link[aria-current="page"]::before {
+.md-nav--primary .md-nav__item .md-nav__link--active::before,
+.md-nav--primary .md-nav__item .md-nav__link[aria-current="page"]::before {
   content: "";
   position: absolute;
   left: 0.18rem;
@@ -331,17 +397,14 @@
   > .md-nav__link {
   margin-top: 0.7rem;
   padding-left: 0.62rem;
-  font-family: var(--ml-serif);
-  font-size: 0.78rem;
+  font-family: var(--ml-sidebar-font);
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   color: var(--md-default-fg-color);
 }
 
-.md-nav--primary
-  > .md-nav__list
-  > .md-nav__item:first-child
-  > .md-nav__link {
+.md-nav--primary > .md-nav__list > .md-nav__item:first-child > .md-nav__link {
   margin-top: 0;
 }
 
@@ -371,22 +434,32 @@
 
 /* Right-hand TOC: tighter, with a clear active marker and no heavy pill. */
 .md-nav--secondary .md-nav__title {
-  color: var(--md-default-fg-color--light);
+  color: var(--ml-toc-accent);
 }
 
 .md-nav--secondary .md-nav__link {
-  color: var(--md-default-fg-color--light);
+  color: color-mix(
+    in srgb,
+    var(--ml-toc-accent) 72%,
+    var(--md-default-fg-color) 28%
+  );
 }
 
 .md-nav--secondary .md-nav__link:hover {
   background: transparent;
-  color: var(--md-default-fg-color);
+  color: var(--ml-toc-accent);
 }
 
 .md-nav--secondary .md-nav__link--active {
-  background: transparent;
-  color: var(--ml-accent-cool) !important;
+  background: var(--ml-toc-accent-soft);
+  color: var(--ml-toc-accent) !important;
   font-weight: 700;
+}
+
+@media screen and (max-width: 76.2344em) {
+  .md-typeset h1.nowrap-title {
+    white-space: normal;
+  }
 }
 
 /* ---------- 5. Cards, buttons, tables, figures --------------------------- */
@@ -396,7 +469,10 @@
   padding: 1rem 1.1rem;
   background: var(--md-default-bg-color);
   box-shadow: var(--ml-shadow-sm);
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .md-typeset .grid.cards > :is(ul, ol) > li:hover {
@@ -430,8 +506,12 @@
   font-weight: 650;
   box-shadow: none;
   border-width: 1px;
-  transition: background-color 140ms ease, border-color 140ms ease,
-    color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .md-typeset .md-button:hover {
@@ -446,7 +526,8 @@
 }
 .md-typeset .md-button--primary:hover {
   color: #fff;
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--ml-accent-cool) 40%, transparent);
+  box-shadow: 0 6px 18px
+    color-mix(in srgb, var(--ml-accent-cool) 40%, transparent);
 }
 
 .md-typeset__table {
@@ -515,11 +596,21 @@ figure > figcaption {
   border-radius: var(--ml-radius-lg);
   box-shadow: var(--ml-shadow);
   background:
-    radial-gradient(38rem 26rem at -5% -20%, color-mix(in srgb, var(--ml-accent-cool) 22%, transparent), transparent 55%),
-    radial-gradient(34rem 24rem at 110% 120%, color-mix(in srgb, var(--ml-accent-teal) 18%, transparent), transparent 55%),
-    linear-gradient(135deg,
+    radial-gradient(
+      38rem 26rem at -5% -20%,
+      color-mix(in srgb, var(--ml-accent-cool) 22%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      34rem 24rem at 110% 120%,
+      color-mix(in srgb, var(--ml-accent-teal) 18%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(
+      135deg,
       color-mix(in srgb, var(--ml-accent-cool) 7%, var(--md-default-bg-color)),
-      color-mix(in srgb, var(--ml-accent-warm) 6%, var(--md-default-bg-color)));
+      color-mix(in srgb, var(--ml-accent-warm) 6%, var(--md-default-bg-color))
+    );
 }
 
 .home-hero__copy {
@@ -628,8 +719,7 @@ figure > figcaption {
   border-radius: var(--ml-radius);
   color: #f8fafc;
   overflow: hidden;
-  background:
-    linear-gradient(155deg, #0b2a5e, #0b1220 58%, #052e2b);
+  background: linear-gradient(155deg, #0b2a5e, #0b1220 58%, #052e2b);
   box-shadow: var(--ml-shadow-strong);
 }
 
@@ -638,11 +728,22 @@ figure > figcaption {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(color-mix(in srgb, #fff 8%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, #fff 8%, transparent) 1px, transparent 1px);
+    linear-gradient(
+      color-mix(in srgb, #fff 8%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, #fff 8%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 1.4rem 1.4rem;
   mask-image: radial-gradient(120% 80% at 80% 0%, #000, transparent 75%);
-  -webkit-mask-image: radial-gradient(120% 80% at 80% 0%, #000, transparent 75%);
+  -webkit-mask-image: radial-gradient(
+    120% 80% at 80% 0%,
+    #000,
+    transparent 75%
+  );
   opacity: 0.5;
   pointer-events: none;
 }
@@ -724,7 +825,10 @@ figure > figcaption {
   border-radius: var(--ml-radius);
   background: var(--md-default-bg-color);
   box-shadow: var(--ml-shadow-sm);
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .curriculum-card:hover {
@@ -735,8 +839,11 @@ figure > figcaption {
 
 .curriculum-card--feature {
   border-color: color-mix(in srgb, var(--ml-accent-cool) 40%, var(--ml-border));
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--ml-accent-cool) 9%, var(--md-default-bg-color)), var(--md-default-bg-color));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ml-accent-cool) 9%, var(--md-default-bg-color)),
+    var(--md-default-bg-color)
+  );
 }
 
 .curriculum-card__eyebrow {

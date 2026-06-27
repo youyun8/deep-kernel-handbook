@@ -1,19 +1,17 @@
 # 書目與帶註解的參考資料
 
-依主題分組、附簡短註解的精選閱讀清單。這些是手冊背後的一手來源——想看原始細節時從這裡開始。
-（請自行找最新的版本／出處；arXiv 編號會隨修訂而變。）
+依主題分組、附簡短註解的精選閱讀清單。這些是手冊背後的一手來源——想看原始細節時從這裡開始。 （請自行找最新的版本／出處；arXiv 編號會隨修訂而變。）
 
 !!! note "怎麼用這份清單"
-    每一條都說明*為什麼重要*，方便你排優先序。MoE 的閱讀順序建議：Shazeer 2017 → Switch/GShard
-    → DeepSeekMoE → DeepSeek-V3 → MegaBlocks。kernel 則先讀 Triton 論文 + 教學，再讀 FlashAttention。
+    每一條都說明*為什麼重要*，方便你排優先序。MoE 的閱讀順序建議：Shazeer 2017 → Switch/GShard → DeepSeekMoE → DeepSeek-V3 → MegaBlocks。kernel 則先讀 Triton 論文 + 教學，再讀 FlashAttention。
 
 ## 基礎：系統、scaling、精度
 
 - **Williams, Waterman, Patterson — "Roofline: An Insightful Visual Performance Model"（CACM 2009）。** 整本手冊都圍繞這個模型組織；用來建立算力 vs 頻寬的框架。
 - **Kaplan et al. — "Scaling Laws for Neural Language Models"（2020）。** 冪律損失縮放與 $6P$-FLOP 直覺的出處。
 - **Hoffmann et al. — "Training Compute-Optimal LLMs"（Chinchilla，2022）。** 計算最優的 token/參數取捨；做預算時必讀。
-- **Micikevicius et al. — "Mixed Precision Training"（2017）。** fp16 + fp32 master 權重 + loss scaling 的配方。
-- **Kalamkar et al. — "A Study of BFLOAT16 for Deep Learning Training"（2019）。** 為什麼 training 上 bf16 的範圍勝過 fp16。
+- **Micikevicius et al. — "Mixed Precision Training"（2017）。** FP16 + FP32 master 權重 + loss scaling 的配方。
+- **Kalamkar et al. — "A Study of BFLOAT16 for Deep Learning Training"（2019）。** 為什麼 training 上 BF16 的範圍勝過 FP16。
 - **Micikevicius et al. — "FP8 Formats for Deep Learning"（2022）。** E4M3/E5M2，以及各自用在哪。
 
 ## Attention 效率
@@ -38,7 +36,7 @@
 - **Gale et al. — "MegaBlocks: Efficient Sparse Training with MoE"（2022）。** 區塊稀疏、dropless MoE；grouped GEMM 的思路。
 - **Rajbhandari et al. — "DeepSpeed-MoE"（2022）。** 大規模 serve MoE 的 training 與 inference 系統。
 - **Tillet, Kung, Cox — "Triton"（2019）。** 以 tile 為基礎的 kernel 語言；搭配官方教學一起看。
-- **DeepSeek-AI — "DeepSeek-V3 Technical Report"（2024）。** 旗艦案例：aux-loss-free 平衡、MLA、fp8 training、node-limited routing、DualPipe/DeepEP 重疊、MTP。最有用的現代 MoE 系統論文。
+- **DeepSeek-AI — "DeepSeek-V3 Technical Report"（2024）。** 旗艦案例：aux-loss-free 平衡、MLA、FP8 training、node-limited routing、DualPipe/DeepEP 重疊、MTP。最有用的現代 MoE 系統論文。
 
 ## 分散式訓練
 
@@ -60,7 +58,7 @@
 ## 案例研究引用的模型
 
 - **Jiang et al. — "Mixtral of Experts"（2024）。** 乾淨的開放 SMoE。
-- **DeepSeek-AI — "DeepSeek-V2 / V3 Technical Report"（2024）。** MLA、DeepSeekMoE、fp8，完整的現代堆疊。
+- **DeepSeek-AI — "DeepSeek-V2 / V3 Technical Report"（2024）。** MLA、DeepSeekMoE、FP8，完整的現代堆疊。
 - **Qwen Team — "Qwen2 / Qwen3 Technical Report"（2024–2025）。** 量產化的細粒度 MoE。
 - **Moonshot AI — "Kimi K2 Technical Report"（2025）。** 兆級的極端稀疏；MuonClip 穩定性。（K2.5 細節請以當前模型卡為準。）
 
