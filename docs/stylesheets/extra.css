@@ -453,6 +453,16 @@
   margin-top: 0;
 }
 
+/* Leaf pages with an inline TOC show a toggle label and a page link with the
+   same title — hide the redundant anchor on the active item. */
+.md-nav--primary
+  > .md-nav__list
+  > .md-nav__item--active
+  > .md-nav__link[for="__toc"]
+  + .md-nav__link {
+  display: none;
+}
+
 /* Nested children: a faint guide rail so hierarchy is legible at a glance. */
 .md-nav--primary .md-nav__item .md-nav__list {
   margin: 0.12rem 0 0.36rem 0.42rem;

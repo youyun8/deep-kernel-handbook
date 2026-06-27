@@ -17,45 +17,45 @@
 
 <div class="grid cards" markdown>
 
-- :material-scale-balance:&nbsp;**[為什麼需要稀疏化](why-sparsity.md)**
+- :material-scale-balance: **[為什麼需要稀疏化](why-sparsity.md)**
 
-  容量與 FLOP 的解耦、稀疏率，以及代價的全貌。
+    容量與 FLOP 的解耦、稀疏率，以及代價的全貌。
 
-- :material-layers-triple-outline:&nbsp;**[從零實作 MoE layer](moe-from-scratch.md)**
+- :material-layers-triple-outline: **[從零實作 MoE layer](moe-from-scratch.md)**
 
-  expert + router + top-$k$ + 合併，可讀版與 dispatch 版兩種實作。
+    expert + router + top-$k$ + 合併，可讀版與 dispatch 版兩種實作。
 
-- :material-scale:&nbsp;**[負載平衡](load-balancing.md)**
+- :material-scale: **[負載平衡](load-balancing.md)**
 
-  auxiliary loss、capacity、token drop，與 aux-loss-free 偏差控制器。
+    auxiliary loss、capacity、token drop，與 aux-loss-free 偏差控制器。
 
-- :material-call-split:&nbsp;**[Routing 變體](routing-variants.md)**
+- :material-call-split: **[Routing 變體](routing-variants.md)**
 
-  token-choice vs expert-choice、共享 expert、細粒度 expert。
+    token-choice vs expert-choice、共享 expert、細粒度 expert。
 
-- :material-shield-check-outline:&nbsp;**[訓練穩定性](training-stability.md)**
+- :material-shield-check-outline: **[訓練穩定性](training-stability.md)**
 
-  router z-loss、精度紀律、初始化與實務護欄。
+    router z-loss、精度紀律、初始化與實務護欄。
 
-- :material-lan:&nbsp;**[系統與 expert parallelism](systems-ep.md)**
+- :material-lan: **[系統與 expert parallelism](systems-ep.md)**
 
-  all-to-all dispatch/combine、通訊重疊、grouped GEMM、capacity 取捨。
+    all-to-all dispatch/combine、通訊重疊、grouped GEMM、capacity 取捨。
 
-- :material-chip:&nbsp;**[MoE kernels](kernels.md)**
+- :material-chip: **[MoE kernels](kernels.md)**
 
-  permute 與 grouped GEMM 在 Triton / CUDA / HIP 上的實作。
+    permute 與 grouped GEMM 在 Triton / CUDA / HIP 上的實作。
 
-- :material-server-network:&nbsp;**[推論與 serving](inference-serving.md)**
+- :material-server-network: **[推論與 serving](inference-serving.md)**
 
-  expert 記憶體、offload、量化與 batch 動態。
+    expert 記憶體、offload、量化與 batch 動態。
 
-- :material-book-open-page-variant-outline:&nbsp;**[案例研究](case-studies.md)**
+- :material-book-open-page-variant-outline: **[案例研究](case-studies.md)**
 
-  Mixtral、DeepSeek-V3、Qwen-MoE、Kimi-K2 的設計選擇。
+    Mixtral、DeepSeek-V3、Qwen-MoE、Kimi-K2 的設計選擇。
 
-- :material-pulse:&nbsp;**[MoE decode 剖析](decode-anatomy.md)**
+- :material-pulse: **[MoE decode 剖析](decode-anatomy.md)**
 
-  用真實逐 token decode profile 把所有元件放上時鐘來量。
+    用真實逐 token decode profile 把所有元件放上時鐘來量。
 
 </div>
 
