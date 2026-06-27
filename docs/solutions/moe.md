@@ -1,12 +1,12 @@
-# 解答 — 第二部 · Mixture-of-Experts
+# 解答 — Mixture-of-Experts
 
 <div class="page-meta">
   <span class="chip"><strong>涵蓋：</strong> 全部九個 MoE 頁面</span>
   <span class="chip"><strong>用法：</strong> 先自己試，再對照</span>
 </div>
 
-解答[第二部](../moe/index.md)的練習。部分參考
-到[`code/`](https://github.com/youyun8/ml-perf-handbook/tree/main/code)中的玩具模型；
+解答[MoE 篇](../moe/index.md)的練習。部分參考
+到[`code/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code)中的玩具模型；
 如果推導具有乾淨的封閉形式，我們給出它，否則我們給出
 方法和預期的定性結果。
 
@@ -330,7 +330,7 @@ serving，不是低階 latency 單碼串流。
     第 1 批 latency。有效/總比率是介於
     記憶體成本和計算成本。
 
-??? success "4 — 將一個模型映射回第二部分頁面"
+??? success "4 — 將一個模型映射回MoE 篇分頁面"
     例如**DeepSeek-V3**：S 形門 + 偏移控制器 →
     [負載平衡](../moe/load-balancing.md)；細粒度+共享 experts →
     [routing variants](../moe/routing-variants.md)； z 損失/fp32 router →

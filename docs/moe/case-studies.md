@@ -2,7 +2,7 @@
 
 <div class="page-meta">
   <span class="chip"><strong>等級：</strong>中階→高階</span>
-  <span class="chip"><strong>先備知識：</strong> 第二部前面所有章節</span>
+  <span class="chip"><strong>先備知識：</strong> MoE 篇前面所有章節</span>
   <span class="chip"><strong>硬體：</strong> 無</span>
 </div>
 
@@ -44,7 +44,7 @@ expert 組合）正是細粒度設計要改進的地方。
 
 ## DeepSeek-V3 — 端對端系統協同設計
 
-本部*每一項*技術協同運作的旗艦範例。它值得細讀，因為建模和系統是一起設計的。
+本篇*每一項*技術協同運作的旗艦範例。它值得細讀，因為建模和系統是一起設計的。
 
 **架構**
 
@@ -133,7 +133,7 @@ K2.5 是同系列的後續改進；把具體數字當成版本相關，請依 Mo
 1. 為每個模型計算 expert 組合數 $\binom{E}{k}$，並把它連到細粒度的品質論證。
 2. 估計每個模型每 1k token 的 KV cache 大小；量化 MLA 相對 GQA、再相對普通 MHA 各省多少。
 3. DeepSeek-V3 vs Mixtral：比較活躍/總比，討論它如何改變 serving 記憶體與 latency。
-4. 挑一個模型，把它的每個元件對映回第二部各章（gate、平衡、routing 變體、EP 策略、attention、
+4. 挑一個模型，把它的每個元件對映回MoE 篇各章（gate、平衡、routing 變體、EP 策略、attention、
    精度）。
 
 ## 參考文獻

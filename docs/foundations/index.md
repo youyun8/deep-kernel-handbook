@@ -1,9 +1,9 @@
-# 第一部 · 現代機器學習系統的基礎
+# 基礎：現代機器學習系統
 
 要讓模型跑得更快，你得先能**預測**它*應該*多快，並判斷某個操作是被 GPU 的算術單元卡住、
-還是被它的記憶體匯流排卡住。第一部建立這種流暢度。
+還是被它的記憶體匯流排卡住。基礎篇建立這種流暢度。
 
-讀完本部，你將能夠：
+讀完本篇，你將能夠：
 
 - 從第一原理講清楚 Transformer **是什麼**——token、attention、多頭、FFN、完整 block——並
   端到端追蹤一個 token。
@@ -26,6 +26,6 @@
 5. **[數值與精度](numerics-precision.md)**——浮點格式、mixed precision、數值穩定性。
 
 !!! tip "整本手冊的先備觀念"
-    第一部最有用的兩個觀念是**算術強度**和 **roofline**。後面幾乎每一個優化——FlashAttention、
+    基礎篇最有用的兩個觀念是**算術強度**和 **roofline**。後面幾乎每一個優化——FlashAttention、
     grouped GEMM、融合 MoE router、量化——最終都是對 roofline 的出招。如果你只讀一頁，請讀
     [作為系統的 Transformer](transformer-systems.md)。

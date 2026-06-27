@@ -11,19 +11,19 @@
 
 <div class="grid cards" markdown>
 
-- :material-cube-outline:&nbsp;**[第一部 · 基礎](foundations.md)**
+- :material-cube-outline:&nbsp;**[基礎](foundations.md)**
 
     FLOP/bytes 計數、KV cache、FlashAttention、數值。
 
-- :material-set-split:&nbsp;**[第二部 · Mixture-of-Experts](moe.md)**
+- :material-set-split:&nbsp;**[Mixture-of-Experts](moe.md)**
 
     稀疏數學、平衡、routing、穩定性、EP、kernel、serving。
 
-- :material-speedometer:&nbsp;**[第三部 · 效能](performance.md)**
+- :material-speedometer:&nbsp;**[效能工程](performance.md)**
 
     GPU 模型、Triton/CUDA/HIP、分散式訓練、量化、inference、profiling。
 
-- :material-rocket-launch-outline:&nbsp;**[第五部 · 實戰專案](capstones.md)**
+- :material-rocket-launch-outline:&nbsp;**[實戰專案](capstones.md)**
 
     小型 MoE LM 的端到端建立與量測。
 

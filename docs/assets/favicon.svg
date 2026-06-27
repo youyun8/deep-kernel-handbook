@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Deep Kernel Handbook">
+  <defs>
+    <linearGradient id="dkhBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3949ab"/>
+      <stop offset="1" stop-color="#1e88e5"/>
+    </linearGradient>
+  </defs>
+  <!-- rounded tile background -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#dkhBg)"/>
+  <!-- 3x3 compute grid (kernel / expert tiles) -->
+  <g fill="#ffffff" fill-opacity="0.30">
+    <rect x="14" y="14" width="10" height="10" rx="2"/>
+    <rect x="27" y="14" width="10" height="10" rx="2"/>
+    <rect x="40" y="14" width="10" height="10" rx="2"/>
+    <rect x="14" y="27" width="10" height="10" rx="2"/>
+    <rect x="40" y="27" width="10" height="10" rx="2"/>
+    <rect x="14" y="40" width="10" height="10" rx="2"/>
+    <rect x="27" y="40" width="10" height="10" rx="2"/>
+    <rect x="40" y="40" width="10" height="10" rx="2"/>
+  </g>
+  <!-- highlighted active kernel cell (center) -->
+  <rect x="27" y="27" width="10" height="10" rx="2" fill="#ffffff"/>
+  <!-- routing trace through the active cell -->
+  <path d="M9 32 H27 M37 32 H55 M32 9 V27 M32 37 V55" stroke="#ffffff" stroke-opacity="0.85" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

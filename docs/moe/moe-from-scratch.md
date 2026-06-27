@@ -9,7 +9,7 @@
 現在我們用 PyTorch 把一個完整的 MoE 層做出來——expert、router/gate、top-$k$ 選擇與加權合併。
 先寫一個最乾淨、保證正確的版本，再重構成 [系統章節](systems-ep.md)與 [kernels](kernels.md) 要
 優化的那種 dispatch 形式。這裡的所有程式碼都在 CPU 上可跑，並由
-[`code/moe/`](https://github.com/youyun8/ml-perf-handbook/tree/main/code/moe) 的測試把關。
+[`code/moe/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code/moe) 的測試把關。
 
 ## MoE 層的剖析
 
@@ -137,7 +137,7 @@ def moe_dispatch(x, topi, topv, experts, n_experts):
 變成了「排序 + 密集區塊」。
 
 !!! tip "兩種實作經測試一致"
-    [`code/moe/test_moe.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/moe/test_moe.py)
+    [`code/moe/test_moe.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/moe/test_moe.py)
     斷言 `MoELayerNaive` 與 dispatch 形式在隨機輸入、兩種 gate、數種 $k$ 下產生相同輸出
     （`torch.allclose`），並且單一 expert 在 $E{=}1$ 時退化成普通 FFN。執行 `pytest code/moe`。
 
@@ -150,7 +150,7 @@ def moe_dispatch(x, topi, topv, experts, n_experts):
 class MoEBlock(nn.Module):
     def __init__(self, d_model, d_ff, n_heads, n_experts, top_k):
         super().__init__()
-        self.attn = CausalSelfAttention(d_model, n_heads)   # 來自第一部
+        self.attn = CausalSelfAttention(d_model, n_heads)   # 來自基礎篇
         self.moe  = MoELayer(d_model, d_ff, n_experts, top_k)
         self.n1, self.n2 = nn.RMSNorm(d_model), nn.RMSNorm(d_model)
     def forward(self, x):
@@ -160,7 +160,7 @@ class MoEBlock(nn.Module):
 ```
 
 完整可訓練的版本——含負載平衡損失與一個跑玩具任務的小型 training 迴圈——放在
-[`code/moe/train_tiny_moe.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/moe/train_tiny_moe.py)，
+[`code/moe/train_tiny_moe.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/moe/train_tiny_moe.py)，
 它也是[實戰專案](../capstones/build-moe.md)的起點。
 
 ## 要點

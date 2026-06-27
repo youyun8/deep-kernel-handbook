@@ -1,11 +1,11 @@
-# 解答 — 第三部 · 效能
+# 解答 — 效能工程
 
 <div class="page-meta">
   <span class="chip"><strong>涵蓋：</strong> 全部七個效能頁面</span>
   <span class="chip"><strong>用法：</strong> 先自己試，再對照</span>
 </div>
 
-解答[第三部](../performance/index.md)的練習。kernel
+解答[效能工程篇](../performance/index.md)的練習。kernel
 練習是開放式的（「運行它，對其進行基準測試」）；我們給出了預期的結果
 以及推理，以便你可以檢查你的數字。
 

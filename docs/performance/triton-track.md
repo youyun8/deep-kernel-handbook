@@ -72,7 +72,7 @@ def softmax_kernel(x_ptr, out_ptr, row_stride, n_cols, BLOCK: tl.constexpr):
 
 這是 [online softmax / FlashAttention](../foundations/flashattention.md) 想法的縮影：靠把資料
 留在晶片上，把多趟記憶體往返摺成一趟。可執行、經 PyTorch 驗證的版本在
-[`code/kernels/softmax_triton.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/kernels/softmax_triton.py)。
+[`code/kernels/softmax_triton.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/kernels/softmax_triton.py)。
 
 ## 等級 3 — 分塊與自動調參的 matmul
 

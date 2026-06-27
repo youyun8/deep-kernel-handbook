@@ -72,7 +72,7 @@ $$ \frac{|\hat{s}-s|}{|s|} \lesssim (K-1)\,u $$
 其中 $s$ 為精確值、$\hat{s}$ 為浮點計算結果。誤差隨 $K$ 線性增長：以 bf16 累積（$u\approx 4\times10^{-3}$）時，$K$ 達數千的 reduction 會徹底崩壞；以 fp32 累積（$u\approx 6\times10^{-8}$）則仍精確。這就是為什麼低精度 matmul 的輸入是 fp16/bf16/fp8、而累加器是 fp32。Kahan summation（補償求和）追蹤捨入殘差並回補，可把誤差界降到 $O(u)$（與 $K$ 無關），代價是每步額外幾個運算。
 
 ```mermaid
-flowchart LR
+flowchart TB
     W32[fp32 master weights] -->|cast| W16[bf16 weights]
     W16 --> FWD[forward/backward in bf16<br/>fp32 accumulate]
     FWD --> G16[bf16 grads]

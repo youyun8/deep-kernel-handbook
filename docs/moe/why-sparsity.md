@@ -7,12 +7,12 @@
 </div>
 
 在動手做 MoE 之前，先精確搞清楚稀疏化*解決了什麼問題*、又*付出什麼代價*。一句話：MoE
-把**參數量和每個 token 的 FLOP 數解耦**。這一頁把這句話量化、把取捨講誠實，好讓第二部
+把**參數量和每個 token 的 FLOP 數解耦**。這一頁把這句話量化、把取捨講清楚，好讓後續
 其餘章節有個明確的目標。
 
 ## 密集瓶頸
 
-在密集 Transformer 裡，FFN 主導了參數量與 FLOP。由[第一部](../foundations/transformer-systems.md)：
+在密集 Transformer 裡，FFN 主導了參數量與 FLOP。由[基礎篇](../foundations/transformer-systems.md)：
 前向成本約 $\approx 2P$ FLOP/token，其中 $P$ 是參數量——*每個參數對每個 token 都要動一次*。
 想讓模型「懂更多」，你得增加 $P$，而計算開銷會跟著等比例成長。縮放定律告訴你損失隨參數與
 資料下降，但你實際要付的帳是 $\approx 6 P D$（參數 × token）的計算量。
@@ -51,7 +51,7 @@ $$ \underbrace{P_{\text{total}}}_{\text{capacity / memory}} \;\propto\; E, \qqua
     模型。它的勝利在於**每 FLOP 的品質**與**每元 inference 成本的品質**，而不是每參數的品質。
     你是在用充裕的記憶體，去換稀缺的計算。
 
-## 稀疏性的代價是什麼（第二部分的其餘部分）
+## 稀疏性的代價是什麼（本章其餘部分）
 
 條件計算不是免費的午餐；它帶進一整批密集模型永遠不會碰到的系統問題：
 
@@ -64,7 +64,7 @@ $$ \underbrace{P_{\text{total}}}_{\text{capacity / memory}} \;\propto\; E, \qqua
 | **不規則計算**——可變 tokens-per-expert 破壞密集 GEMM | kernel 效率低下        | [kernels](kernels.md)                                  |
 | **capacity 與 padding**——固定緩衝區浪費或丟 token   | 品質／throughput 取捨   | [負載平衡](load-balancing.md)、[系統](systems-ep.md)   |
 
-MoE 的藝術，就在於把這些代價付得夠便宜，讓「FLOP 解耦」帶來的勝利能撐得住。第二部其餘內容
+MoE 工程的重點，就在於把這些代價付得夠便宜，讓「FLOP 解耦」帶來的優勢能撐得住。MoE 後續章節
 講的全是這件事。
 
 ## 粗略比較
@@ -82,9 +82,9 @@ top-$k$）：
 ## 要點
 
 - MoE **把總參數（容量）和活躍參數（FLOP）解耦**：容量隨 $E$ 擴展，計算隨 $k$ 擴展。
-- 它的勝利是**每 FLOP 的品質／每元 inference 成本的品質**，靠的是買便宜的記憶體、而非昂貴的
+- 它的優勢是**每 FLOP 的品質／每元 inference 成本的品質**，靠的是買便宜的記憶體、而非昂貴的
   算力——這*不是*更好的每參數品質。
-- 稀疏化引入負載平衡、通訊、記憶體與 kernel 不規則性等代價——這就是第二部其餘章節的主題。
+- 稀疏化引入負載平衡、通訊、記憶體與 kernel 不規則性等代價——這就是 MoE 後續章節的主題。
 
 ## 練習
 

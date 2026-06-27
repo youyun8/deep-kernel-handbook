@@ -6,7 +6,7 @@ structure so you can add a page or a code example without guesswork.
 ## Repository layout
 
 ```
-ml-perf-handbook/
+deep-kernel-handbook/
 ├── mkdocs.yml              # site config + the entire nav tree
 ├── requirements.txt       # docs toolchain (mkdocs-material, extensions)
 ├── docs/                   # all written content (Markdown)

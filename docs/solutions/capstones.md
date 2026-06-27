@@ -1,4 +1,4 @@
-# 解答 — 第五部 · 實戰專案
+# 解答 — 實戰專案
 
 <div class="page-meta">
   <span class="chip"><strong>涵蓋：</strong> 建立小型 MoE LM、擴展到更大規模</span>
@@ -6,7 +6,7 @@
 </div>
 
 實戰專案練習是針對玩具模型的**構建和測量**任務
-[`code/`](https://github.com/youyun8/ml-perf-handbook/tree/main/code)。沒有
+[`code/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code)。沒有
 單一數字答案；以下是預期結果、正確方法，以及
 每個人要避免的陷阱。
 

@@ -322,7 +322,7 @@
   background: var(--ml-accent-cool);
 }
 
-/* Top-level part labels ("第一部 · …") read as quiet, confident group headers. */
+/* Top-level section labels read as quiet, confident group headers. */
 .md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link,
 .md-nav--primary
   > .md-nav__list
@@ -1418,6 +1418,10 @@ figure > figcaption {
   gap: 0.35rem;
 }
 
+.ml-settings-options--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .ml-setting-option {
   min-height: 2rem;
   border: 1px solid var(--ml-border);
@@ -1439,13 +1443,14 @@ figure > figcaption {
   margin-top: 0.85rem;
 }
 
-[data-reading-density="compact"] .md-typeset {
+[data-reading-text="small"] .md-typeset {
   font-size: 0.74rem;
-  line-height: 1.58;
+  line-height: 1.6;
 }
 
-[data-reading-density="compact"] .md-typeset h2 {
-  margin-top: 1.8em;
+[data-reading-text="large"] .md-typeset {
+  font-size: 0.92rem;
+  line-height: 1.75;
 }
 
 [data-reading-width="wide"] .md-grid {

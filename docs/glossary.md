@@ -78,7 +78,7 @@ KV 頭）。
 
 **MoE（Mixture-of-Experts）**
 ：含許多 expert FFN 與一個 router 的層，每個 token 只啟動其中幾個，把總參數和每 token FLOP 解耦。
-見[第二部](moe/index.md)。
+見[MoE 篇](moe/index.md)。
 
 **expert**
 ：MoE 層裡並列的其中一個 FFN（通常是 SwiGLU）。

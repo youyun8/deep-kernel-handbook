@@ -90,7 +90,7 @@ all-gather/reduce-scatter 流量（與計算重疊）。這是在不動模型結
 的前提下，訓練大型 dense 模型的預設做法。
 
 ```mermaid
-flowchart LR
+flowchart TB
     O[optimizer state<br/>fp32 moments + master] --> Z1[ZeRO-1<br/>shard optimizer]
     Z1 --> G[+ gradients]
     G --> Z2[ZeRO-2<br/>also shard grads]
@@ -157,7 +157,7 @@ $$
 變體：Megatron sequence parallelism（把 TP 未涵蓋區域的 LayerNorm/dropout
 也分片），以及 ring attention / context parallelism（分片 attention 本身，
 沿 ring 傳遞 K/V 區塊）。它攻克的是
-[第一部](../foundations/attention-efficiency.md) 提到的 activation 記憶體牆與
+[基礎篇](../foundations/attention-efficiency.md) 提到的 activation 記憶體牆與
 attention 計算牆。
 
 ## Expert parallelism (EP) — MoE 維度

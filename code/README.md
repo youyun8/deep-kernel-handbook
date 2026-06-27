@@ -1,7 +1,7 @@
 # Runnable reference code
 
 Tested, from-scratch implementations that back the prose in the
-[handbook](https://youyun8.github.io/ml-perf-handbook/). The reference
+[handbook](https://youyun8.github.io/deep-kernel-handbook/). The reference
 implementations are checked against PyTorch with `torch.allclose` so you can
 trust them as ground truth and as a base to optimize.
 
@@ -48,7 +48,7 @@ GPU tests `skip` automatically when no GPU or Triton is available, so
 - The numpy/PyTorch references run on **CPU**.
 - Triton kernels run on **NVIDIA (CUDA)** or **AMD (ROCm)** GPUs. On AMD, recall
   wavefront = 64 (vs 32): re-autotune for best performance — see the
-  [CUDA/HIP track](https://youyun8.github.io/ml-perf-handbook/performance/cuda-hip-track/).
+  [CUDA/HIP track](https://youyun8.github.io/deep-kernel-handbook/performance/cuda-hip-track/).
 - The `.cu` / `_hip.cpp` files are illustrative kernels for the
-  [MoE kernels page](https://youyun8.github.io/ml-perf-handbook/moe/kernels/);
+  [MoE kernels page](https://youyun8.github.io/deep-kernel-handbook/moe/kernels/);
   build with `nvcc` / `hipcc` respectively.

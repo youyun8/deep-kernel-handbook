@@ -1,11 +1,11 @@
-# 解答 — 第一部 · 基礎
+# 解答 — 基礎
 
 <div class="page-meta">
   <span class="chip"><strong>涵蓋：</strong> 作為系統的 Transformer、attention 效率、FlashAttention、數值</span>
   <span class="chip"><strong>用法：</strong> 先自己試，再對照</span>
 </div>
 
-解答[第一部](../foundations/index.md)的練習。數字
+解答[基礎篇](../foundations/index.md)的練習。數字
 使用圓形硬體規格（A100 ≈ 312 TFLOP/s bf16 / 2.0 TB/s；H100 ≈ 990 TFLOP/s
 bf16 / 3.35 TB/秒； MI300X ≈ 1.3 PFLOP/s bf16 / 5.3 TB/s)；你的確切增量將
 隨你假設的晶片而變化，但*制度*（記憶體與計算限制）是

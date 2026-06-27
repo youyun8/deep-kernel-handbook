@@ -1,7 +1,7 @@
 site_name: 深核手冊
 site_description: >-
-  深核手冊：從模型數學、乾淨參考實作到多 GPU 效能工程，系統化看穿現代
-  ML 系統如何在 GPU kernel 上跑得快。核心深度路線：Mixture-of-Experts (MoE) 與 AITER。
+  深核手冊：從模型數學、乾淨參考實作到多 GPU 效能工程，系統化拆解現代
+  ML 系統在 GPU kernel 上的效能。核心深度路線：Mixture-of-Experts (MoE) 與 AITER。
 site_author: deep-kernel-handbook contributors
 site_url: https://youyun8.github.io/deep-kernel-handbook/
 
@@ -16,6 +16,8 @@ copyright: >-
 theme:
   name: material
   language: zh-TW
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
   features:
     - navigation.instant
     - navigation.instant.progress
@@ -59,7 +61,6 @@ theme:
     text: Inter
     code: JetBrains Mono
   icon:
-    logo: material/chip
     repo: fontawesome/brands/github
     edit: material/pencil
     view: material/eye
@@ -128,14 +129,14 @@ plugins:
 nav:
   - 首頁: index.md
   - 閱讀路線: reading-path.md
-  - "第一部 · 基礎":
+  - 基礎:
       - foundations/index.md
       - 從零實作 Transformer: foundations/transformer-from-scratch.md
       - 作為系統的 Transformer: foundations/transformer-systems.md
       - Attention 效率: foundations/attention-efficiency.md
       - 從零實作 FlashAttention: foundations/flashattention.md
       - 數值與精度: foundations/numerics-precision.md
-  - "第二部 · Mixture-of-Experts":
+  - Mixture-of-Experts:
       - moe/index.md
       - 為什麼需要稀疏化: moe/why-sparsity.md
       - 從零實作 MoE layer: moe/moe-from-scratch.md
@@ -147,7 +148,7 @@ nav:
       - 推論與 serving: moe/inference-serving.md
       - 案例研究: moe/case-studies.md
       - MoE decode 剖析: moe/decode-anatomy.md
-  - "第三部 · 效能":
+  - 效能工程:
       - performance/index.md
       - GPU 程式設計模型: performance/gpu-programming.md
       - Triton 路線: performance/triton-track.md
@@ -156,18 +157,19 @@ nav:
       - 量化與壓縮: performance/quantization.md
       - Inference 優化: performance/inference-optimization.md
       - Profiling 與方法論: performance/profiling.md
-  - "第四部 · AITER":
-      - AITER decode 深入解析: aiter/index.md
-  - "第五部 · 實戰專案":
+  - AITER 深入解析:
+      - aiter/index.md
+      - AITER 原始碼 breakdown: aiter/source-breakdown.md
+  - 實戰專案:
       - capstones/index.md
       - 建立小型 MoE LM: capstones/build-moe.md
       - 擴展到更大規模: capstones/scaling.md
   - 解答:
       - solutions/index.md
-      - "第一部 · 基礎": solutions/foundations.md
-      - "第二部 · Mixture-of-Experts": solutions/moe.md
-      - "第三部 · 效能": solutions/performance.md
-      - "第五部 · 實戰專案": solutions/capstones.md
+      - 基礎: solutions/foundations.md
+      - Mixture-of-Experts: solutions/moe.md
+      - 效能工程: solutions/performance.md
+      - 實戰專案: solutions/capstones.md
   - 參考資料:
       - 詞彙表: glossary.md
       - 書目與連結: references.md

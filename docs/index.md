@@ -8,11 +8,11 @@ hide:
 
 <p class="home-kicker">深核手冊 · ML 系統效能路線</p>
 
-<h1 class="home-title">從模型，一路看穿到 <span class="home-title__hl">GPU Kernel</span></h1>
+<h1 class="home-title">從模型數學到 <span class="home-title__hl">GPU Kernel</span></h1>
 
-<p class="home-lead">現代機器學習就是系統工程。決定模型能不能被高效部署的，是 FLOPs、記憶體流量、kernel、collective 與量化格式，以及它們在 GPU 上彼此牽制的方式。</p>
+<p class="home-lead">模型的部署效率取決於 FLOPs、記憶體流量、kernel、collective 與量化格式，以及它們在 GPU 上的交互。本手冊把這些因素逐一拆解、量測並對應到實作。</p>
 
-<p class="home-sub">每個核心主題都拆成「直覺 → 數學 → 參考實作 → 效能化版本」，並把 profiling 結果一路對應回可以修改的原始碼。</p>
+<p class="home-sub">每個主題分成「直覺 → 數學 → 參考實作 → 效能化版本」，並把 profiling 結果對應回可修改的原始碼。</p>
 
 <div class="home-actions">
 <a class="md-button md-button--primary" href="reading-path/">開始閱讀路線&nbsp;→</a>
@@ -32,8 +32,8 @@ hide:
 <div class="home-panel__title">Kimi-K2.5 · MoE · AITER</div>
 <p class="home-panel__copy">從 routing、top-k、sort、MXFP4 quant 到 stage-1 / stage-2 MoE GEMM，使用真實 decode trace 串起整條執行路徑。</p>
 <div class="home-metrics">
-<div class="home-metric"><strong>5</strong><span>主題部件</span></div>
-<div class="home-metric"><strong>25</strong><span>decode stages</span></div>
+<div class="home-metric"><strong>5</strong><span>主題章節</span></div>
+<div class="home-metric"><strong>17</strong><span>decode kernels</span></div>
 <div class="home-metric"><strong>TP4</strong><span>MI355X 追蹤</span></div>
 </div>
 </aside>
@@ -69,7 +69,7 @@ hide:
 <div class="curriculum-grid" markdown>
 
 <section class="curriculum-card" markdown>
-<span class="curriculum-card__eyebrow">第一部</span>
+<span class="curriculum-card__eyebrow">入門 · 分析直覺</span>
 
 ### :material-cube-outline: 基礎
 
@@ -81,7 +81,7 @@ roofline 與資料搬移。
 </section>
 
 <section class="curriculum-card curriculum-card--feature" markdown>
-<span class="curriculum-card__eyebrow">第二部</span>
+<span class="curriculum-card__eyebrow">主線 · 稀疏模型系統</span>
 
 ### :material-expansion-card: Mixture-of-Experts
 
@@ -93,7 +93,7 @@ roofline 與資料搬移。
 </section>
 
 <section class="curriculum-card" markdown>
-<span class="curriculum-card__eyebrow">第三部</span>
+<span class="curriculum-card__eyebrow">工具 · GPU 效能工程</span>
 
 ### :material-flash: 效能工程
 
@@ -105,7 +105,7 @@ profiling 方法論。
 </section>
 
 <section class="curriculum-card curriculum-card--feature" markdown>
-<span class="curriculum-card__eyebrow">第四部 · production trace</span>
+<span class="curriculum-card__eyebrow">實戰 · production trace</span>
 
 ### :material-chart-timeline-variant: AITER 深入解析
 
@@ -130,7 +130,7 @@ moe gemm 2、routing/sort/quant、shared expert 與 all-reduce fusion。
 
 !!! tip "閱讀建議"
     若你剛開始，先照 [閱讀路線](reading-path.md) 建立系統語彙；若你正在處理
-    Kimi-K2.5 / SGLang / AITER profiling，直接看 [AITER decode 深入解析](aiter/index.md)，
+    Kimi-K2.5 / SGLang / AITER profiling，直接看 [AITER decode 一層的 kernel 流程](aiter/index.md)，
     再回到 MoE 與效能章節補齊背景。
 
 ---

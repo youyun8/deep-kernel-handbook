@@ -6,7 +6,7 @@
   <span class="chip"><strong>硬體：</strong> 無（讀取真實 profile）</span>
 </div>
 
-第二部前面的頁面各自建好一個元件；這一頁把它們放上時鐘來量。我們取一個
+MoE 篇前面的頁面各自建好一個元件；這一頁把它們放上時鐘來量。我們取一個
 兆參數級 MLA + MoE 模型的**真實逐 token decode profile**（DeepSeek-V3 級：MLA
 attention、1 個 dense 層 + 60 個 fine-grained MoE 層、384 routed + 1 shared expert、
 top-8、sigmoid gate、FP4 expert 權重、tensor parallel = 4），讓 GPU 一個 kernel 接
@@ -72,7 +72,7 @@ flowchart TD
 | router / gate GEMM                 |         60 | ~4–6%       | 384-way 邏輯                       |
 | 其他（norm、RoPE、quant、absorb、residual） |    — | 餘額        | 許多便宜的高頻 kernel              |
 
-兩件事浮現出來，且都是純粹的第二部系統觀念：
+兩件事浮現出來，且都是純粹的MoE 篇系統觀念：
 
 **MoE block 就是 decode 的主體。** routing + 兩個 grouped expert GEMM + shared expert
 合計約佔一步的一半。這是 [memory-bound decode](../foundations/attention-efficiency.md)
@@ -113,7 +113,7 @@ Stack A 的 self-time *超過*它的 wall-clock——它同時在跑多個 kerne
 Stack B 則循序跑同一批 kernel。所以這 33% 的差距可分解成**兩條正交、可相加的軌道**：
 
 ```mermaid
-flowchart LR
+flowchart TB
     GAP["decode latency gap<br/>(Stack B − Stack A)"] --> TA["Track A — kernel efficiency<br/>make each kernel as fast<br/>≈ 12% of wall"]
     GAP --> TB["Track B — concurrency<br/>overlap kernels across streams<br/>≈ 14% of wall"]
     TA --> FIX1["fuse + tune individual kernels"]
@@ -155,7 +155,7 @@ normalize → token sort；另一個把它拆成三次 launch（select、sort、
 融合起來」建議的一個直接、可量測的論據。
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph FUSED["Fused routing — 1 kernel"]
       direction TB
       F0["logits"] --> F1["sigmoid + bias → top-8 → normalize → sort<br/>(one CTA, no HBM round-trip)"]

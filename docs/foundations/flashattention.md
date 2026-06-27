@@ -79,7 +79,7 @@ for each query block Qi:                      # outer (rows of output)
 ```
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph NAIVE["Naive — materialize full N×N in HBM"]
       direction TB
       n1["S = QKᵀ  [N×N]"] -->|"write"| h1["HBM"]
@@ -110,7 +110,7 @@ kernel 變成 compute-bound。整個勝利就在這裡。
 ## 參考實作（可運行）
 
 一份忠於原意、易讀的 numpy 實作放在
-[`code/attention/flash_attention_numpy.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/attention/flash_attention_numpy.py)。
+[`code/attention/flash_attention_numpy.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/attention/flash_attention_numpy.py)。
 核心迴圈如下：
 
 ```python
@@ -145,7 +145,7 @@ def flash_attention(Q, K, V, block=64, causal=True):
     return O
 ```
 
-測試 [`code/attention/test_attention.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/attention/test_attention.py)
+測試 [`code/attention/test_attention.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/attention/test_attention.py)
 會在隨機輸入（含與不含因果遮罩）下，用 `torch.allclose`（atol 1e-5）對照密集的 PyTorch
 參考實作驗證。執行：
 
@@ -154,7 +154,7 @@ pip install -r code/requirements.txt
 pytest code/attention -q
 ```
 
-獨立的 [`online_softmax.py`](https://github.com/youyun8/ml-perf-handbook/blob/main/code/attention/online_softmax.py)
+獨立的 [`online_softmax.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/attention/online_softmax.py)
 把 running-max 組合器單獨拎出來示範，並證明它等於一次到位的 softmax——如果你覺得那個重新
 縮放像在變魔術，先看這份。
 
