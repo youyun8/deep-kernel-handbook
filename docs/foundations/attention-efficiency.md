@@ -95,9 +95,7 @@ flowchart TD
 由此推出的結論驅動了整個 LLM serving：
 
 - **每 token latency 由讀進的 bytes 決定，而非 FLOP。** 把權重 bytes 減半（例如 int8/FP8 權重），在 batch 1 時大約把 decode latency 也減半。
-- **throughput 來自批次。** 把 $B$ 個請求一起跑，讀權重的成本攤到 $B$ 個 token 上，強度 往脊點方向提升 —— 這就是 [continuous batching](../performance/inference-optimization.md) 的基礎。
-- **prefill ≠ decode。** prefill 一次處理整段 prompt（很多 token、compute-bound）；decode 一次一個 token（memory-bound）。好的 serving 系統會分別排程它們，甚至把兩者 [拆到不同硬體](../performance/inference-optimization.md)上跑。
-
+- **Throughput 來自批次。** 把 $B$ 個請求一起跑，讀權重的成本攤到 $B$ 個 token 上，強度 往脊點方向提升 —— 這就是 [continuous batching](../performance/inference-optimization.md) 的基礎。- **Prefill ≠ decode。** prefill 一次處理整段 prompt（很多 token、compute-bound）；decode 一次一個 token（memory-bound）。好的 serving 系統會分別排程它們，甚至把兩者 [拆到不同硬體](../performance/inference-optimization.md)上跑。
 ## 分頁 attention：停止浪費緩存
 
 早期的 server 會替每個請求預先配置一塊連續的 KV 緩衝區，大小取*最大*序列長度。這有兩個 問題：**內部碎片**（一個請求只停在 200 個 token，卻仍佔著 4096-token 的緩衝區），以及 無法在有共同前綴的請求之間共享記憶體。
@@ -128,8 +126,7 @@ flowchart TB
 
 - **KV cache** 把 $O(N^2)$ 的重算換成 $O(N)$ 的計算加上一筆持續變大的記憶體讀取。它的大小 $2 L n_{kv} d_h \cdot 2 N B$ bytes 常常主導 inference 的記憶體用量。
 - GQA/MQA/MLA 是針對 KV cache 大小的**架構層級**攻擊。
-- **decode 受記憶體頻寬限制**：latency 追著搬移的 bytes 走，throughput 來自批次；prefill 則 是 compute-bound。
-- **PagedAttention** 消除 KV 碎片並啟用共享，做法正如虛擬記憶體裡的分頁。
+- **Decode 受記憶體頻寬限制**：latency 追著搬移的 bytes 走，throughput 來自批次；prefill 則 是 compute-bound。- **PagedAttention** 消除 KV 碎片並啟用共享，做法正如虛擬記憶體裡的分頁。
 
 ## 練習
 

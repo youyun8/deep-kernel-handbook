@@ -78,10 +78,10 @@ extra_css:
   - stylesheets/extra.css
 
 extra_javascript:
-  - javascripts/katex.js
-  - javascripts/site-settings.js
   - https://unpkg.com/katex@0/dist/katex.min.js
   - https://unpkg.com/katex@0/dist/contrib/auto-render.min.js
+  - javascripts/katex.js
+  - javascripts/site-settings.js
 
 markdown_extensions:
   - abbr

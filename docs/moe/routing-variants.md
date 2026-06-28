@@ -78,18 +78,14 @@ DeepSeekMoE 證明，在同等計算下，細粒度 + 共享 expert 大幅勝過
 
 現代配方（DeepSeek-V3 風格）把這幾項合在一起：
 
-- **token-choice** routing（對自回歸友善），
-- **sigmoid gate** + **aux-loss-free 偏差**做平衡，
-- **1 個共享 expert** 負責常識，
+- **Token-choice** routing（對自回歸友善），- **Sigmoid gate** + **aux-loss-free 偏差**做平衡，- **1 個共享 expert** 負責常識，
 - **許多個細粒度路由 expert**（$E$ 大、$k$ 中等），
-- **node-limited routing**：限制一個 token 的 expert 能跨多少個*裝置*（例如 ≤4 個節點）， 以壓低 all-to-all 成本 —— 一個感知系統的 routing 約束。
-
+- **Node-limited routing**：限制一個 token 的 expert 能跨多少個*裝置*（例如 ≤4 個節點）， 以壓低 all-to-all 成本 —— 一個感知系統的 routing 約束。
 最後一點是 routing 與系統協同設計的好例子：routing 演算法被它所運行的網路拓樸塑形。
 
 ## 要點
 
-- **token-choice** 保證覆蓋、不保證平衡（需要 [負載平衡](load-balancing.md)那套工具）； **expert-choice** 保證平衡、不保證覆蓋，對 decode 很尷尬。
-- **共享 expert** 扛常識，讓路由 expert 得以專業化、training 更穩。
+- **Token-choice** 保證覆蓋、不保證平衡（需要 [負載平衡](load-balancing.md)那套工具）； **expert-choice** 保證平衡、不保證覆蓋，對 decode 很尷尬。- **共享 expert** 扛常識，讓路由 expert 得以專業化、training 更穩。
 - **細粒度 expert** 在固定活躍計算下放大 expert 組合空間、提升品質 —— 代價是 routing/comm 開銷 與更小的 GEMM。
 - 真實模型會把 routing 和硬體一起設計（例如 node-limited routing）。
 

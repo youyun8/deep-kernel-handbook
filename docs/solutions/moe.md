@@ -12,8 +12,7 @@
 ??? Success "1 — 總參數與活動參數、FLOP 比率 ($E{=}128, k{=}2, d{=}4096$)"
     1 FFN ≈ $8d^2$ 參數（向上 $4d^2$ + 向下 $4d^2$，帶有 $d_{ff}=4d$）。
 
-    - **experts 總計：**$128 \times 8d^2 = 1024d^2 \approx 1.72\times10^{10}$。
-    - **根據 token 有效：**$2 \times 8d^2 = 16d^2 \approx 2.68\times10^{8}$。
+    - **Experts 總計：**$128 \times 8d^2 = 1024d^2 \approx 1.72\times10^{10}$。    - **根據 token 有效：**$2 \times 8d^2 = 16d^2 \approx 2.68\times10^{8}$。
 
     FLOPs 透過 *active* 參數進行縮放，因此 FLOPs-per-token 比率與密集 （$E{=}1$，即 $8d^2$ 有效）是 $16d^2/8d^2 = \mathbf{2\times}$ — 你付費 $k=2$ experts。但你**儲存**$128\times$ FFN 參數：巨大的容量， 常數計算。這種差距就是稀疏性的全部價值主張。
 

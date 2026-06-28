@@ -208,16 +208,13 @@ flowchart TD
     class D2 accTeal;
 ```
 
-- **prefill / training** 一次處理很多 token：矩陣乘法很大、能讓硬體的數學單元持續忙碌 → **compute-bound（計算受限）**。
-- **decode** 一個一個 token 地生成：每步幾乎沒什麼數學量，卻必須重新讀進模型權重和不斷變大的 KV cache → **memory-bound（記憶體受限）**。
-
+- **Prefill / training** 一次處理很多 token：矩陣乘法很大、能讓硬體的數學單元持續忙碌 → **compute-bound（計算受限）**。- **Decode** 一個一個 token 地生成：每步幾乎沒什麼數學量，卻必須重新讀進模型權重和不斷變大的 KV cache → **memory-bound（記憶體受限）**。
 這一道分界 —— 以及把它形式化的 [roofline](transformer-systems.md) —— 就是看待後面一切的鏡頭。現在 你已經能看見整個物件了；基礎篇接下來要學的，是怎麼「量測」它。
 
 ## 要點
 
 - Transformer 把一個 $[N,d]$ 的 token 向量矩陣反覆映射成 $[N,d]$ 共 $L$ 次，最後投影到 詞彙 logits 來預測下一個 token。
-- **attention** 是軟性查表：query 對 key → softmax 權重 → value 的加權和。$QK^\top$ 分數 構成一個 $[N,N]$ 矩陣 —— 也就是大家都在優化的那個二次成本。
-- **多頭**並行跑許多個小 attention；**FFN** 獨立處理每個 token、握有大部分參數； **殘差 + norm** 讓深層堆疊得以訓練。
+- **Attention** 是軟性查表：query 對 key → softmax 權重 → value 的加權和。$QK^\top$ 分數 構成一個 $[N,N]$ 矩陣 —— 也就是大家都在優化的那個二次成本。- **多頭**並行跑許多個小 attention；**FFN** 獨立處理每個 token、握有大部分參數； **殘差 + norm** 讓深層堆疊得以訓練。
 - 模型在 prefill/training 時 **compute-bound**、在 decode 時 **memory-bound** —— 本手冊 其餘內容都圍繞這道區別展開。
 
 ## 練習
