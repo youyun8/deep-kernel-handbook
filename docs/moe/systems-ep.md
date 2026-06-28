@@ -126,8 +126,7 @@ Dispatch 之後，每個 expert 拿到「可變」數量的 tokens —— 一個
 
 - **GEMM 迴圈**（每個 expert 一個 matmul）：簡單，但 kernel 啟動開銷大， 對小型 experts 的利用率較差。（[naive reference](moe-from-scratch.md)。）
 - **帶 padding 的 batched GEMM**：把每個 expert padding 到 capacity $C$，執行一個 batched matmul。規整，但在 padding 上浪費 FLOP（capacity/padding 權衡）。
-- **grouped GEMM**：單一 kernel 背靠背執行許多*不同*大小的 matmul， 共享啟動與調度 —— 沒有 padding 浪費，利用率完整。這是主力； [kernels](kernels.md) 頁面用 Triton 實作了一個，並勾勒了 CUDA/HIP 版本。
-
+- **Grouped GEMM**：單一 kernel 背靠背執行許多*不同*大小的 matmul， 共享啟動與調度 —— 沒有 padding 浪費，利用率完整。這是主力； [kernels](kernels.md) 頁面用 Triton 實作了一個，並勾勒了 CUDA/HIP 版本。
 ### MegaBlocks 區塊稀疏視圖
 
 MegaBlocks 把整個 MoE FFN 重新表述為 **一個大的區塊稀疏 matmul**。它堆疊 所有 experts 的權重，並把 token→expert 分配視為區塊稀疏的 運算元：每個 token 區塊只與其 expert 的權重區塊相乘。這 **消除了 token 丟棄**（不需要固定 capacity —— 稀疏運算能處理 可變大小），並映射到高效的區塊稀疏 GEMM kernels。它把 「參差不齊的 grouped GEMM」轉換成「結構化稀疏性」，而 GPU 很擅長後者。
@@ -184,8 +183,7 @@ dist.all_to_all_single(recv_buf, send_buf,
 
 ## 要點
 
-- **expert parallelism** 跨 GPU 分片 experts；每個 MoE 層需要 **兩個 all-to-all**（dispatch + combine），因為 routing 依賴資料，合計約 $2\,T\,k\,H\,c$ bytes/device。
-- 資料流是 **permute → all-to-all → grouped GEMM → all-to-all → unpermute。**
+- **Expert parallelism** 跨 GPU 分片 experts；每個 MoE 層需要 **兩個 all-to-all**（dispatch + combine），因為 routing 依賴資料，合計約 $2\,T\,k\,H\,c$ bytes/device。- 資料流是 **permute → all-to-all → grouped GEMM → all-to-all → unpermute。**
 - All-to-all 會主宰執行時間；**把它與計算重疊**（分塊管線、 DualPipe/DeepEP）、**用 node-limited routing 約束它**，並 **以映射到網路拓撲的 TP/PP/DP 來組成 EP**。
 - 可變的 tokens-per-expert 由 **grouped GEMM** 或 **MegaBlocks 區塊稀疏** 配方（dropless）處理。**capacity factor** 聯合權衡 品質、throughput 與記憶體；**load imbalance** 讓一層慢到最忙 expert 的速度。
 

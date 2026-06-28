@@ -10,9 +10,7 @@ Inference 是一個 throughput 與 latency 的最佳化問題，其根基是 [me
 
 ## 再談兩個階段
 
-- **prefill**：一次處理整個 prompt — 大量 tokens → compute-bound → 逼近峰值 FLOPs，決定第一個 token 的 latency（TTFT）。
-- **decode**：一次產生一個 token → memory-bound → 每個 token 的 latency 由所讀取的位元組數（權重 + KV cache）決定。
-
+- **Prefill**：一次處理整個 prompt — 大量 tokens → compute-bound → 逼近峰值 FLOPs，決定第一個 token 的 latency（TTFT）。- **Decode**：一次產生一個 token → memory-bound → 每個 token 的 latency 由所讀取的位元組數（權重 + KV cache）決定。
 下面每項技術都針對其中一個或兩個階段。北極星指標：**TTFT**（time to first token、prefill）、**TPOT/ITL**（每個輸出 token 的時間、decode），以及 **throughput**（所有並發請求合計的 tokens/秒）。
 
 ### KV cache 的大小
@@ -128,12 +126,9 @@ $$
 
 KV cache 是 serving 的動態記憶體消耗者（參見 [attention efficiency](../foundations/attention-efficiency.md)，並回顧上方 $\text{bytes} = 2\,L\,H_{kv}\,d_h\,s\,c$）。可用的槓桿：
 
-- **paged attention**：以區塊為單位配置 → 無碎片，支援共享 （prefix caching、平行取樣）。它是 continuous batching 的基底。
-- **prefix/prompt caching**：對共享系統 prompt 的請求重複使用其 KV （copy-on-write 區塊）— 對具有固定前導的聊天場景效益巨大。
-- **架構收縮**：GQA/MQA/MLA 從源頭（降低 $H_{kv}$ 或改存 latent）縮小 cache。
+- **Paged attention**：以區塊為單位配置 → 無碎片，支援共享 （prefix caching、平行取樣）。它是 continuous batching 的基底。- **Prefix/prompt caching**：對共享系統 prompt 的請求重複使用其 KV （copy-on-write 區塊）— 對具有固定前導的聊天場景效益巨大。- **架構收縮**：GQA/MQA/MLA 從源頭（降低 $H_{kv}$ 或改存 latent）縮小 cache。
 - **KV 量化**：以 int8/FP8 儲存 K/V（降低 $c$）以容納更多序列； 在長上下文中要留意品質。
-- **offloading/eviction**：將冷 KV 溢出到 CPU，或驅逐/壓縮舊 tokens （streaming/window attention），適用於極長的上下文。
-
+- **Offloading/eviction**：將冷 KV 溢出到 CPU，或驅逐/壓縮舊 tokens （streaming/window attention），適用於極長的上下文。
 ## 其他槓桿
 
 - **算子融合**（fused attention、fused MLP+activation、fused RMSNorm+residual）減少記憶體往返 — 屬於 [kernel](triton-track.md) 工作。
@@ -160,9 +155,7 @@ flowchart TD
 ## 要點
 
 - Decode **受記憶體限制**；serving 的核心是攤銷權重讀取而非 浪費工作（$I \approx 2b/c$，下界 $t_{\text{step}} \gtrsim P c/\beta$）。
-- **continuous batching**（paged KV cache 上的迭代級調度）是 throughput 最大的勝利。
-- **speculative decoding** 以備用計算換取更少的 target forward pass， 且**無損** — 正因 decode 受記憶體限制才有效。
-- **KV cache 管理**（paging、prefix caching、量化、架構 收縮）控制動態記憶體上限；**融合、graphs、量化與 prefill/decode 分解**讓堆疊更完整。
+- **Continuous batching**（paged KV cache 上的迭代級調度）是 throughput 最大的勝利。- **Speculative decoding** 以備用計算換取更少的 target forward pass， 且**無損** — 正因 decode 受記憶體限制才有效。- **KV cache 管理**（paging、prefix caching、量化、架構 收縮）控制動態記憶體上限；**融合、graphs、量化與 prefill/decode 分解**讓堆疊更完整。
 
 ## 練習
 

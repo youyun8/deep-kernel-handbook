@@ -1830,6 +1830,7 @@ figure > figcaption {
 .md-typeset details > :not(summary):not(style) {
   margin-left: 1rem;
   line-height: 1.6;
+  color: var(--md-default-fg-color);
 }
 
 .md-typeset .admonition > :not(.admonition-title):first-of-type,
@@ -2121,6 +2122,25 @@ body.ml-settings-open {
 [data-code-wrap="true"] .md-typeset pre > code {
   white-space: pre-wrap;
 }
+
+/* Floating-point bit-layout diagram */
+.fmt-sign  { fill: #fca5a5; stroke: #dc2626; stroke-width: 1; }
+.fmt-exp   { fill: #bbf7d0; stroke: #16a34a; stroke-width: 1; }
+.fmt-mant  { fill: #e9d5ff; stroke: #9333ea; stroke-width: 1; }
+.fmt-grid  { stroke: rgba(0,0,0,0.18); stroke-width: 0.5; }
+.fmt-label { fill: var(--ml-diagram-text); font-family: var(--md-code-font); }
+.fmt-label-s { fill: #dc2626; }
+.fmt-label-e { fill: #16a34a; }
+.fmt-label-m { fill: #9333ea; }
+.fmt-idx   { fill: var(--ml-diagram-muted-text); }
+
+[data-md-color-scheme="slate"] .fmt-sign  { fill: #7f1d1d; stroke: #fca5a5; }
+[data-md-color-scheme="slate"] .fmt-exp   { fill: #14532d; stroke: #86efac; }
+[data-md-color-scheme="slate"] .fmt-mant  { fill: #4c1d95; stroke: #d8b4fe; }
+[data-md-color-scheme="slate"] .fmt-grid  { stroke: rgba(255,255,255,0.15); }
+[data-md-color-scheme="slate"] .fmt-label-s { fill: #fca5a5; }
+[data-md-color-scheme="slate"] .fmt-label-e { fill: #86efac; }
+[data-md-color-scheme="slate"] .fmt-label-m { fill: #d8b4fe; }
 
 /* ---------- 9. Responsive ------------------------------------------------ */
 @media screen and (max-width: 76.1875em) {

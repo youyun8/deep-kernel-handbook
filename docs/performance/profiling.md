@@ -117,8 +117,7 @@ def benchmark(fn, iters=100, warmup=20):
 Wall-clock 告訴你*有多慢*；profiler 告訴你*為什麼*。兩種視角：
 
 - **時間軸／系統視圖**（Nsight Systems；rocprof + Perfetto）：顯示 kernels、 memcpy 以及時間線上的空隙。尋找**空隙**（CPU 受限的啟動開銷、 Python、同步點）、**序列化的通訊**（all-reduce/all-to-all 未與計算 重疊 —— [MoE](../moe/systems-ep.md) 的典型失效模式），以及主導時間的 kernels。
-- **kernel 視圖**（Nsight Compute；Omniperf）：每個 kernel 的計數器 —— 已達成 occupancy、記憶體 throughput 對峰值、計算 throughput 對峰值、 warp（AMD 上的 wavefront）的 stall 原因。這告訴你所處的**régime**：若記憶體 throughput 接近峰值而計算偏低，你是 memory-bound（fuse／提高算術強度）； 反之則是 compute-bound（降精度／減少 FLOP）。
-
+- **Kernel 視圖**（Nsight Compute；Omniperf）：每個 kernel 的計數器 —— 已達成 occupancy、記憶體 throughput 對峰值、計算 throughput 對峰值、 warp（AMD 上的 wavefront）的 stall 原因。這告訴你所處的**régime**：若記憶體 throughput 接近峰值而計算偏低，你是 memory-bound（fuse／提高算術強度）； 反之則是 compute-bound（降精度／減少 FLOP）。
 ### Amdahl 定律：為何優化非主導階段幫助甚微
 
 設某階段佔總時間的比例為 $p$，且該階段被加速 $s$ 倍，其餘 $(1-p)$ 維持不變，則整體加速比為

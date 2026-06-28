@@ -34,6 +34,119 @@ $$ x = (-1)^s\, f\, 2^{\,1-b} $$
 
 <small>\*TF32 以 32 位儲存，但乘法時僅取 10 位 mantissa。此處 mantissa 欄位皆指顯式儲存位元（不含隱含前導 1），故有效 $p = m + 1$。</small>
 
+<figure markdown="span">
+<svg viewBox="0 0 760 270" role="img" aria-labelledby="fp-layout-title" xmlns="http://www.w3.org/2000/svg">
+  <title id="fp-layout-title">FP32、BF16、FP16 位元佈局</title>
+  <rect class="roofline-panel" x="10" y="10" width="740" height="250" rx="10"/>
+
+  <!-- FP32 row: 32 bits × 20 px = 640 px, x=100..740 -->
+  <text class="fmt-label" x="92" y="68" text-anchor="end" font-size="12" font-weight="700">FP32</text>
+  <text class="fmt-label-s" x="110" y="46" text-anchor="middle" font-size="10">s</text>
+  <text class="fmt-label-e" x="200" y="46" text-anchor="middle" font-size="10">exponent (8 bit)</text>
+  <text class="fmt-label-m" x="510" y="46" text-anchor="middle" font-size="10">fraction (23 bit)</text>
+  <rect class="fmt-sign" x="100" y="50" width="20"  height="28"/>
+  <rect class="fmt-exp"  x="120" y="50" width="160" height="28"/>
+  <line class="fmt-grid" x1="140" y1="50" x2="140" y2="78"/>
+  <line class="fmt-grid" x1="160" y1="50" x2="160" y2="78"/>
+  <line class="fmt-grid" x1="180" y1="50" x2="180" y2="78"/>
+  <line class="fmt-grid" x1="200" y1="50" x2="200" y2="78"/>
+  <line class="fmt-grid" x1="220" y1="50" x2="220" y2="78"/>
+  <line class="fmt-grid" x1="240" y1="50" x2="240" y2="78"/>
+  <line class="fmt-grid" x1="260" y1="50" x2="260" y2="78"/>
+  <rect class="fmt-mant" x="280" y="50" width="460" height="28"/>
+  <line class="fmt-grid" x1="300" y1="50" x2="300" y2="78"/>
+  <line class="fmt-grid" x1="320" y1="50" x2="320" y2="78"/>
+  <line class="fmt-grid" x1="340" y1="50" x2="340" y2="78"/>
+  <line class="fmt-grid" x1="360" y1="50" x2="360" y2="78"/>
+  <line class="fmt-grid" x1="380" y1="50" x2="380" y2="78"/>
+  <line class="fmt-grid" x1="400" y1="50" x2="400" y2="78"/>
+  <line class="fmt-grid" x1="420" y1="50" x2="420" y2="78"/>
+  <line class="fmt-grid" x1="440" y1="50" x2="440" y2="78"/>
+  <line class="fmt-grid" x1="460" y1="50" x2="460" y2="78"/>
+  <line class="fmt-grid" x1="480" y1="50" x2="480" y2="78"/>
+  <line class="fmt-grid" x1="500" y1="50" x2="500" y2="78"/>
+  <line class="fmt-grid" x1="520" y1="50" x2="520" y2="78"/>
+  <line class="fmt-grid" x1="540" y1="50" x2="540" y2="78"/>
+  <line class="fmt-grid" x1="560" y1="50" x2="560" y2="78"/>
+  <line class="fmt-grid" x1="580" y1="50" x2="580" y2="78"/>
+  <line class="fmt-grid" x1="600" y1="50" x2="600" y2="78"/>
+  <line class="fmt-grid" x1="620" y1="50" x2="620" y2="78"/>
+  <line class="fmt-grid" x1="640" y1="50" x2="640" y2="78"/>
+  <line class="fmt-grid" x1="660" y1="50" x2="660" y2="78"/>
+  <line class="fmt-grid" x1="680" y1="50" x2="680" y2="78"/>
+  <line class="fmt-grid" x1="700" y1="50" x2="700" y2="78"/>
+  <line class="fmt-grid" x1="720" y1="50" x2="720" y2="78"/>
+  <text class="fmt-idx" x="110" y="92" text-anchor="middle" font-size="9">31</text>
+  <text class="fmt-idx" x="130" y="92" text-anchor="middle" font-size="9">30</text>
+  <text class="fmt-idx" x="270" y="92" text-anchor="middle" font-size="9">23</text>
+  <text class="fmt-idx" x="290" y="92" text-anchor="middle" font-size="9">22</text>
+  <text class="fmt-idx" x="730" y="92" text-anchor="middle" font-size="9">0</text>
+
+  <!-- BF16 row: 16 bits × 40 px = 640 px, x=100..740 -->
+  <text class="fmt-label" x="92" y="138" text-anchor="end" font-size="12" font-weight="700">BF16</text>
+  <text class="fmt-label-s" x="120" y="116" text-anchor="middle" font-size="10">s</text>
+  <text class="fmt-label-e" x="300" y="116" text-anchor="middle" font-size="10">exponent (8 bit)</text>
+  <text class="fmt-label-m" x="600" y="116" text-anchor="middle" font-size="10">fraction (7 bit)</text>
+  <rect class="fmt-sign" x="100" y="120" width="40"  height="28"/>
+  <rect class="fmt-exp"  x="140" y="120" width="320" height="28"/>
+  <line class="fmt-grid" x1="180" y1="120" x2="180" y2="148"/>
+  <line class="fmt-grid" x1="220" y1="120" x2="220" y2="148"/>
+  <line class="fmt-grid" x1="260" y1="120" x2="260" y2="148"/>
+  <line class="fmt-grid" x1="300" y1="120" x2="300" y2="148"/>
+  <line class="fmt-grid" x1="340" y1="120" x2="340" y2="148"/>
+  <line class="fmt-grid" x1="380" y1="120" x2="380" y2="148"/>
+  <line class="fmt-grid" x1="420" y1="120" x2="420" y2="148"/>
+  <rect class="fmt-mant" x="460" y="120" width="280" height="28"/>
+  <line class="fmt-grid" x1="500" y1="120" x2="500" y2="148"/>
+  <line class="fmt-grid" x1="540" y1="120" x2="540" y2="148"/>
+  <line class="fmt-grid" x1="580" y1="120" x2="580" y2="148"/>
+  <line class="fmt-grid" x1="620" y1="120" x2="620" y2="148"/>
+  <line class="fmt-grid" x1="660" y1="120" x2="660" y2="148"/>
+  <line class="fmt-grid" x1="700" y1="120" x2="700" y2="148"/>
+  <text class="fmt-idx" x="120" y="162" text-anchor="middle" font-size="9">15</text>
+  <text class="fmt-idx" x="160" y="162" text-anchor="middle" font-size="9">14</text>
+  <text class="fmt-idx" x="440" y="162" text-anchor="middle" font-size="9">7</text>
+  <text class="fmt-idx" x="480" y="162" text-anchor="middle" font-size="9">6</text>
+  <text class="fmt-idx" x="720" y="162" text-anchor="middle" font-size="9">0</text>
+
+  <!-- FP16 row: 16 bits × 40 px = 640 px, x=100..740 -->
+  <text class="fmt-label" x="92" y="210" text-anchor="end" font-size="12" font-weight="700">FP16</text>
+  <text class="fmt-label-s" x="120" y="188" text-anchor="middle" font-size="10">s</text>
+  <text class="fmt-label-e" x="240" y="188" text-anchor="middle" font-size="10">exponent (5 bit)</text>
+  <text class="fmt-label-m" x="540" y="188" text-anchor="middle" font-size="10">fraction (10 bit)</text>
+  <rect class="fmt-sign" x="100" y="192" width="40"  height="28"/>
+  <rect class="fmt-exp"  x="140" y="192" width="200" height="28"/>
+  <line class="fmt-grid" x1="180" y1="192" x2="180" y2="220"/>
+  <line class="fmt-grid" x1="220" y1="192" x2="220" y2="220"/>
+  <line class="fmt-grid" x1="260" y1="192" x2="260" y2="220"/>
+  <line class="fmt-grid" x1="300" y1="192" x2="300" y2="220"/>
+  <rect class="fmt-mant" x="340" y="192" width="400" height="28"/>
+  <line class="fmt-grid" x1="380" y1="192" x2="380" y2="220"/>
+  <line class="fmt-grid" x1="420" y1="192" x2="420" y2="220"/>
+  <line class="fmt-grid" x1="460" y1="192" x2="460" y2="220"/>
+  <line class="fmt-grid" x1="500" y1="192" x2="500" y2="220"/>
+  <line class="fmt-grid" x1="540" y1="192" x2="540" y2="220"/>
+  <line class="fmt-grid" x1="580" y1="192" x2="580" y2="220"/>
+  <line class="fmt-grid" x1="620" y1="192" x2="620" y2="220"/>
+  <line class="fmt-grid" x1="660" y1="192" x2="660" y2="220"/>
+  <line class="fmt-grid" x1="700" y1="192" x2="700" y2="220"/>
+  <text class="fmt-idx" x="120" y="234" text-anchor="middle" font-size="9">15</text>
+  <text class="fmt-idx" x="160" y="234" text-anchor="middle" font-size="9">14</text>
+  <text class="fmt-idx" x="320" y="234" text-anchor="middle" font-size="9">10</text>
+  <text class="fmt-idx" x="360" y="234" text-anchor="middle" font-size="9">9</text>
+  <text class="fmt-idx" x="720" y="234" text-anchor="middle" font-size="9">0</text>
+
+  <!-- Legend -->
+  <rect class="fmt-sign" x="30"  y="250" width="12" height="12"/>
+  <text class="fmt-idx"  x="46"  y="261" font-size="10">符號 sign</text>
+  <rect class="fmt-exp"  x="160" y="250" width="12" height="12"/>
+  <text class="fmt-idx"  x="176" y="261" font-size="10">指數 exponent</text>
+  <rect class="fmt-mant" x="320" y="250" width="12" height="12"/>
+  <text class="fmt-idx"  x="336" y="261" font-size="10">小數 fraction / mantissa</text>
+</svg>
+<figcaption>FP32（32 位元）、BF16（16 位元）與 FP16（16 位元）位元佈局。BF16 與 FP32 共用 8 個指數位（相同動態範圍），僅以 7 個小數位換取；FP16 保留 10 個小數位但指數僅 5 位，範圍大幅縮窄。</figcaption>
+</figure>
+
 關鍵的取捨：**BF16 保留 FP32 的 8 個指數位**（相同範圍，~3e38），但 mantissa 只剩 7 位 —— 它以 FP16 的 mantissa 換取了 FP32 的指數範圍。FP16 保留 10 個 mantissa bits，但只有 5 個指數位 → 在 **65504** 溢位，並在 6e-5 附近下溢。
 
 ### Unit roundoff 與 machine epsilon

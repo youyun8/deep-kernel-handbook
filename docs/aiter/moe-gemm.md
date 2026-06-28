@@ -125,5 +125,4 @@ Trace 中的 `mfma_moe1/2` 是執行期實際選到的 kernel；選擇邏輯由 
 這張表可以直接讀出幾個行為：
 
 - **小 M（1–2）的 stage-2 走 CK**（`moe_ck2stages_gemm2_*`），M ≥ 4 才換成 FlyDSL `flydsl_moe2_*_atomic`。這跟 [Shared-expert fusion 開 / 關](fusion.md) trace 看到的 `mfma_moe2`（FlyDSL，conc4 對應 padded M=8）一致。
-- **stage-2 大多是 `atomic` combine**（直接 atomic accumulate 到 `[M, 7168]`）；只有 更大的 prefill tier（M ≥ 2048）才改用 `reduce`。decode 全程在 atomic 範圍。
-- Runtime log（`kimi_k25_rocm_path.md` 第 267–292 行）顯示 conc 較高時 padded M=8 命中 `flydsl_moe1_..._t64x128x256_w4_fp4` + `flydsl_moe2_..._t64x128x256_atomic`，M=1 命中 `t32x128x256_w3_kb14_fp4` + CK stage2，與上表 token=8 / token=1 列吻合，表示 runtime 確實命中 tuned config，而不是 fallback。
+- **Stage-2 大多是 `atomic` combine**（直接 atomic accumulate 到 `[M, 7168]`）；只有 更大的 prefill tier（M ≥ 2048）才改用 `reduce`。decode 全程在 atomic 範圍。- Runtime log（`kimi_k25_rocm_path.md` 第 267–292 行）顯示 conc 較高時 padded M=8 命中 `flydsl_moe1_..._t64x128x256_w4_fp4` + `flydsl_moe2_..._t64x128x256_atomic`，M=1 命中 `t32x128x256_w3_kb14_fp4` + CK stage2，與上表 token=8 / token=1 列吻合，表示 runtime 確實命中 tuned config，而不是 fallback。

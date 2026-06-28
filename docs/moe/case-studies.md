@@ -48,8 +48,7 @@
 **系統**（這裡最相關的部分）
 
 - **FP8 training**：GEMM 走 FP8、累積走高精度，敏感部件留 BF16/FP32 —— 前沿等級的 [數值](../foundations/numerics-precision.md)配方。
-- **node-limited routing**：一個 token 的 expert 最多跨 ≤4 個節點，壓低跨節點的 [all-to-all](systems-ep.md) 流量。
-- **DualPipe + DeepEP**：管線排程加通訊函式庫，把 **all-to-all 與計算幾乎完全重疊** —— 量產化的 最大單一 EP 優化。
+- **Node-limited routing**：一個 token 的 expert 最多跨 ≤4 個節點，壓低跨節點的 [all-to-all](systems-ep.md) 流量。- **DualPipe + DeepEP**：管線排程加通訊函式庫，把 **all-to-all 與計算幾乎完全重疊** —— 量產化的 最大單一 EP 優化。
 
 總共 671B／**37B 活躍**：你付的是約 37B 模型的 inference 計算，換到的卻是更大模型的品質 —— *因為*系統工作把 EP 開銷壓得夠小。
 

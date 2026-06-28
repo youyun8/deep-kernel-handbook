@@ -178,10 +178,7 @@ flowchart TD
 
 ## 重點整理
 
-- **decode step 主要是它的 MoE block** —— Routing + 兩個 grouped expert GEMM + shared expert，每 token 跑一次，處於 [memory-bound](../foundations/attention-efficiency.md) 狀態，外加每層的 [all-reduce](../performance/distributed-training.md) 稅。
-- **latency 是兩條可相加的軌道**：kernel 效率（fuse + tune）與並發（跨 stream 重疊）。 兩者互斥；要分開量測、分開攻擊，否則會把工作預算編錯。
-- **fusion 是 kernel-count 槓桿。** 跨堆疊單一最大差距是*未融合的 routing*；單一最大 的最佳化是 _shared-experts fusion_（~18%）。兩者都在 [kernels](kernels.md) 頁量化。
-- **永遠以呼叫次數加權來衡量 kernel。** 重點在單次呼叫成本 × 次數；一個便宜但被 launch 60× 的 kernel（split-K reduce、residual add、quant）可能勝過一個昂貴但只跑一次的。
+- **Decode step 主要是它的 MoE block** —— Routing + 兩個 grouped expert GEMM + shared expert，每 token 跑一次，處於 [memory-bound](../foundations/attention-efficiency.md) 狀態，外加每層的 [all-reduce](../performance/distributed-training.md) 稅。- **Latency 是兩條可相加的軌道**：kernel 效率（fuse + tune）與並發（跨 stream 重疊）。 兩者互斥；要分開量測、分開攻擊，否則會把工作預算編錯。- **Fusion 是 kernel-count 槓桿。** 跨堆疊單一最大差距是*未融合的 routing*；單一最大 的最佳化是 _shared-experts fusion_（~18%）。兩者都在 [kernels](kernels.md) 頁量化。- **永遠以呼叫次數加權來衡量 kernel。** 重點在單次呼叫成本 × 次數；一個便宜但被 launch 60× 的 kernel（split-K reduce、residual add、quant）可能勝過一個昂貴但只跑一次的。
 
 ## 練習
 

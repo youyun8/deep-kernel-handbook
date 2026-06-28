@@ -47,8 +47,7 @@ $$ \mathcal{L} = \mathcal{L}_{\text{LM}} + \alpha\,\mathcal{L}_{\text{aux}} + \b
 
 這是 [數值與精度](../foundations/numerics-precision.md)和 MoE 正面相撞的地方。routing 是一個由 logit 之間「微小差距」驅動的「離散」決策，所以捨入雜訊會翻轉分配、破壞回饋迴路的穩定。
 
-- **router logits、softmax/sigmoid 與 aux/z-loss 一律用 FP32 計算**，即使是 BF16 模型。router 矩陣很小，FP32 成本可忽略，但穩定性收益很大。
-- **偏差控制器的計數必須以 FP32 reduce 並跨 data-parallel rank 同步**，否則不同 rank 會朝不同 目標平衡。
+- **Router logits、softmax/sigmoid 與 aux/z-loss 一律用 FP32 計算**，即使是 BF16 模型。router 矩陣很小，FP32 成本可忽略，但穩定性收益很大。- **偏差控制器的計數必須以 FP32 reduce 並跨 data-parallel rank 同步**，否則不同 rank 會朝不同 目標平衡。
 - 在任何 softmax 之前都先減掉 max（用 `logsumexp`／`log_softmax` 即免費取得）。
 
 !!! Warning "經典的無聲 bug"
@@ -60,17 +59,14 @@ Routing 在**早期**最脆弱，也就是 expert 還沒分化的時候。良好
 
 - **小的 router 初始化。** 用小尺度初始化 router 權重（例如 $\text{std}\sim 0.01$–$d^{-1/2}$ 再額外縮小），讓初始 logit 接近零 → routing 接近均勻 → 每個 expert 都拿到梯度、在迴圈崩塌前 先分化開來。（Switch 用截斷常態並刻意縮小初始化尺度，正是為此。）
 - **標準的 expert 初始化。** expert 就是普通 FFN，照密集 FFN 的方式初始化即可。
-- **router/容量 warmup。** 早期用較大的容量係數（routing 還隨機時少丟一點）加上 LR warmup，可 降低早期不穩定。
-- **用共享 expert 當穩定器。** 一個 [共享 expert](routing-variants.md) 從第 0 步就保證有一條密集 梯度路徑，能平滑冷啟動。
+- **Router/容量 warmup。** 早期用較大的容量係數（routing 還隨機時少丟一點）加上 LR warmup，可 降低早期不穩定。- **用共享 expert 當穩定器。** 一個 [共享 expert](routing-variants.md) 從第 0 步就保證有一條密集 梯度路徑，能平滑冷啟動。
 
 ## 其他實用護欄
 
 - **梯度裁剪（global norm）** —— MoE 的損失尖峰很常見；裁剪能防止單一尖峰毀掉整個訓練。
-- **per-microbatch／per-sequence 的 auxiliary loss**，而不只是全域，以避免全域統計掩蓋掉 batch 內部的熱點。
-- **監控死 expert**（連續多步零負載）與 routing 熵；熵突然下降是崩塌的早期警訊。
+- **Per-microbatch／per-sequence 的 auxiliary loss**，而不只是全域，以避免全域統計掩蓋掉 batch 內部的熱點。- **監控死 expert**（連續多步零負載）與 routing 熵；熵突然下降是崩塌的早期警訊。
 - **在 logit 上加 jitter/雜訊**（較舊的手法，例如 Switch 的乘法式輸入 jitter）增加探索，避免 routing 鎖死 —— 有了 z-loss + 良好初始化後較少用，但仍是一項工具。
-- **optimizer 狀態保持 FP32**（Adam 的動量） —— 標準做法，在損失面崎嶇時格外重要。
-
+- **Optimizer 狀態保持 FP32**（Adam 的動量） —— 標準做法，在損失面崎嶇時格外重要。
 ## 診斷有問題的 MoE 運行
 
 | 症狀 | 可能原因 | 解法 |
@@ -84,8 +80,7 @@ Routing 在**早期**最脆弱，也就是 expert 還沒分化的時候。良好
 ## 要點
 
 - MoE 的不穩定源自**離散、自我強化的 routing**與**無界的 router logits**。
-- **router z-loss** $\beta(\log\sum e^{x})^2$ 讓 logit 維持小 → softmax 穩定、不溢位、routing 可塑。即使在 aux-loss-free 配方裡也要保留它。
-- **所有 router 數學都用 FP32** —— 基於微小 logit 差距的離散決策對精度敏感，BF16 的打平會造成 跨副本不一致。
+- **Router z-loss** $\beta(\log\sum e^{x})^2$ 讓 logit 維持小 → softmax 穩定、不溢位、routing 可塑。即使在 aux-loss-free 配方裡也要保留它。- **所有 router 數學都用 FP32** —— 基於微小 logit 差距的離散決策對精度敏感，BF16 的打平會造成 跨副本不一致。
 - **小 router 初始化 +（可選）共享 expert + warmup** 讓脆弱的冷啟動得以存活；裁剪梯度，並監控 熵與死 expert。
 
 ## 練習

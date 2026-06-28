@@ -83,8 +83,7 @@ MFU 的成敗就在這裡（[系統與 EP](../moe/systems-ep.md)）：
 
 - **偏差控制器的計數必須在 DP rank／副本之間同步**，否則各自朝不同目標平衡。
 - **損失/梯度範數應該對得上**單 GPU 跑幾步、固定種子的結果（用梯度累積當作 sanity check）。
-- **router 數學一律用 FP32**，避免 BF16 打平造成跨 rank 的 routing 分歧。
-
+- **Router 數學一律用 FP32**，避免 BF16 打平造成跨 rank 的 routing 分歧。
 ## 要點
 
 - 依**哪一項先溢位記憶體**來選並行策略；對 MoE，**EP** 是主軸，外面包 DP/ZeRO/TP/PP。
