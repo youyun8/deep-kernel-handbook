@@ -1,7 +1,7 @@
 (function () {
   const storageKey = "deep-kernel-handbook-settings";
-  const defaultSidebarWidth = 360;
-  const sidebarLayoutVersion = 3;
+  const defaultSidebarWidth = 256;
+  const sidebarLayoutVersion = 4;
   const defaults = {
     textSize: "standard", // small | standard | large
     width: "standard", // standard | wide
@@ -20,7 +20,7 @@
   function sidebarWidthBounds() {
     const viewport = Math.max(document.documentElement.clientWidth, 0);
     return {
-      min: 300,
+      min: 220,
       max: Math.min(560, Math.max(defaultSidebarWidth, viewport * 0.38)),
     };
   }

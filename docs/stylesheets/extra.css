@@ -23,7 +23,7 @@
     "Inter", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
     system-ui, -apple-system, "Segoe UI", sans-serif;
   --ml-sidebar-font: var(--md-text-font-family, "Inter", system-ui, sans-serif);
-  --ml-sidebar-width: 360px;
+  --ml-sidebar-width: 256px;
   --ml-sidebar-rail-width: 2.45rem;
   --ml-toc-accent: #15803d;
   --ml-toc-accent-soft: rgba(22, 163, 74, 0.12);
@@ -510,7 +510,7 @@
     position: fixed !important;
     flex: 0 0 var(--ml-sidebar-width) !important;
     width: var(--ml-sidebar-width) !important;
-    min-width: 300px;
+    min-width: 220px;
     max-width: min(560px, 38vw);
     top: 0 !important;
     left: 0;
