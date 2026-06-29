@@ -31,7 +31,7 @@ flowchart TD
 
 符號約定：$t$ 是目前 decode token，$u$ 是可被 attend 的歷史 token，$\ell$ 是 layer， $h_{\ell,t} \in \mathbb{R}^{H}$，$H=7168$。MLA 的 KV latent 記為 $c_{\ell,u} \in \mathbb{R}^{d_c}$，RoPE key 分量記為 $k^R_{\ell,u}$。MoE 的每個 expert partition intermediate size 是 $I=256$，所以 gate/up 輸出寬度是 $2I=512$。
 
-## 序章：embedding lookup + KV metadata
+## Embedding lookup + KV metadata
 
 Decode 的新 token 先做 embedding lookup；位置、sequence 與 cache slot 則進入後續 paged-KV metadata。
 
@@ -236,7 +236,7 @@ $$
 
 這條 fusion 開 / 關的差異，在 [Shared-expert fusion 開 / 關](fusion.md) 會用實際 trace 的 kernel 順序具體對照。
 
-## 尾聲：final norm + LM head
+## Final norm + LM head
 
 最後一層 hidden state 做 final RMSNorm，再投到 vocabulary logits：
 
