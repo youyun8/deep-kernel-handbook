@@ -370,12 +370,14 @@
 
 .md-header__title {
   font-family: var(--ml-display);
-  font-weight: 750;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
+/* cp-handbook's header title is ~15px / semibold, not a heavy display size. */
 .md-header__topic .md-ellipsis {
-  font-size: 0.92rem;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .ml-settings-button {
@@ -1055,7 +1057,7 @@
 .md-typeset .grid.cards > :is(ul, ol) > li:hover {
   border-color: color-mix(in srgb, var(--ml-accent-cool) 45%, var(--ml-border));
   box-shadow: var(--ml-shadow);
-  transform: translateY(-3px);
+  transform: translateY(-2px);
 }
 
 .md-typeset .grid.cards > :is(ul, ol) > li > :first-child {
@@ -1411,7 +1413,7 @@ figure > figcaption {
 }
 
 .curriculum-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--ml-accent-cool) 40%, var(--ml-border));
   box-shadow: var(--ml-shadow);
 }
