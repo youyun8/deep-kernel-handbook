@@ -166,6 +166,10 @@
   --md-default-fg-color--light: hsl(215 16% 42%);
   --md-default-fg-color--lighter: hsl(215 16% 55%);
   --md-default-fg-color--lightest: hsl(214 24% 80%);
+
+  /* Card surface sits one step above the page, like cp-handbook: pure white
+     over the slate-tinted background in light mode. */
+  --ml-card: hsl(0 0% 100%);
 }
 [data-md-color-scheme="slate"] {
   --md-primary-fg-color: #2563eb;
@@ -176,6 +180,10 @@
   --md-default-fg-color--light: hsl(216 18% 68%);
   --md-default-fg-color--lighter: hsl(216 16% 56%);
   --md-default-fg-color--lightest: hsl(216 16% 38%);
+
+  /* In dark mode the card is a lighter navy than the page, so it reads as
+     raised (cp-handbook card ≈ hsl(222 40% 11%) over a 7% background). */
+  --ml-card: hsl(222 39% 12%);
 }
 
 /* Dark-theme Mermaid colors compatible with a black page background. */
@@ -829,14 +837,15 @@
   color: var(--md-default-fg-color);
 }
 
-/* Active page: a restrained tinted row with a leading accent rail. */
+/* Active page: cp-handbook style — a blue left bar, blue-tinted row, and blue
+   label. */
 .md-nav__link--active,
 .md-nav__link[aria-current="page"] {
   position: relative;
-  border-color: color-mix(in srgb, var(--ml-accent-cool) 18%, transparent);
-  background: color-mix(in srgb, var(--ml-accent-cool) 10%, transparent);
-  color: var(--md-default-fg-color) !important;
-  font-weight: 500;
+  border-color: color-mix(in srgb, var(--ml-accent-cool) 22%, transparent);
+  background: color-mix(in srgb, var(--ml-accent-cool) 15%, transparent);
+  color: var(--ml-accent-cool) !important;
+  font-weight: 600;
 }
 
 .md-nav--primary .md-nav__item .md-nav__link--active,
@@ -894,14 +903,14 @@
   > .md-nav__list
   > .md-nav__item--active
   > .md-nav__container.md-nav__link {
-  margin: 0.42rem 0.34rem;
-  min-height: 2.45rem;
-  border: 1px solid color-mix(in srgb, var(--ml-accent-cool) 18%, transparent);
-  border-left-color: var(--ml-accent-cool);
-  border-left-width: 2px;
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--ml-accent-cool) 10%, transparent);
-  color: var(--md-default-fg-color);
+  margin: 0;
+  min-height: 2.75rem;
+  border: 0;
+  border-bottom: 1px solid var(--ml-border);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ml-accent-cool) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--ml-accent-cool);
+  color: var(--ml-accent-cool);
 }
 
 .md-sidebar--primary
@@ -1035,7 +1044,7 @@
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-radius);
   padding: 1rem 1.1rem;
-  background: var(--md-default-bg-color);
+  background: var(--ml-card);
   box-shadow: var(--ml-shadow-sm);
   transition:
     transform 180ms ease,
@@ -1393,7 +1402,7 @@ figure > figcaption {
   padding: 1.15rem;
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-radius);
-  background: var(--md-default-bg-color);
+  background: var(--ml-card);
   box-shadow: var(--ml-shadow-sm);
   transition:
     transform 180ms ease,
@@ -1411,8 +1420,8 @@ figure > figcaption {
   border-color: color-mix(in srgb, var(--ml-accent-cool) 40%, var(--ml-border));
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--ml-accent-cool) 9%, var(--md-default-bg-color)),
-    var(--md-default-bg-color)
+    color-mix(in srgb, var(--ml-accent-cool) 9%, var(--ml-card)),
+    var(--ml-card)
   );
 }
 
