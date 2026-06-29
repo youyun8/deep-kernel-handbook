@@ -108,7 +108,7 @@ $$ \boxed{\;W_{\text{train}} \approx 6\, P \cdot (\text{tokens})\;} $$
     在 MI300X 上若有效達到峰值 $1.3$ PFLOP/s 的 60%，可用算力約 $780$ TFLOP/s，因此理想時間約
     $57/780 \approx 0.073$ s。這不是端到端 latency，只是幫你判斷「純模型前向」的量級。
 
-### $N^2$ attention 術語
+### N² attention 術語
 
 分數矩陣 $QK^\top$ 是 $(N\times d)\cdot(d\times N)$，而 $\text{softmax}\cdot V$ 步驟是 $(N\times N)\cdot(N\times d)$，各約 $2N^2 d$ FLOP（合計所有頭），因此 attention 分數項 總共消耗 $\approx 4 L N^2 d \cdot B$。和線性項 $24 L d^2 BN$ 相比：
 

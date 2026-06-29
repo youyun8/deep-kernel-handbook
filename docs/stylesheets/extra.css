@@ -16,11 +16,14 @@
 :root {
   --md-code-font: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
-  /* Serif display family for the site title and page headings. */
-  --ml-serif:
-    "Noto Serif TC", "Songti TC", "Songti SC", "SimSun", "STSong", serif;
+  /* Sans display family for the site title and page headings. Matches the
+     cp-handbook look — everything is Inter (with a CJK sans fallback) rather
+     than a serif display face. */
+  --ml-display:
+    "Inter", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
+    system-ui, -apple-system, "Segoe UI", sans-serif;
   --ml-sidebar-font: var(--md-text-font-family, "Inter", system-ui, sans-serif);
-  --ml-sidebar-width: 360px;
+  --ml-sidebar-width: 256px;
   --ml-sidebar-rail-width: 2.45rem;
   --ml-toc-accent: #15803d;
   --ml-toc-accent-soft: rgba(22, 163, 74, 0.12);
@@ -57,9 +60,11 @@
   --ml-shadow-strong:
     0 2px 6px rgba(15, 23, 42, 0.06), 0 20px 48px rgba(15, 23, 42, 0.14);
 
-  --ml-radius: 12px;
-  --ml-radius-sm: 8px;
-  --ml-radius-lg: 18px;
+  /* Rounding matched to cp-handbook: cards ~rounded-2xl, hero ~rounded-3xl,
+     small chrome ~rounded-xl. */
+  --ml-radius: 16px;
+  --ml-radius-sm: 12px;
+  --ml-radius-lg: 24px;
 
   --ml-gradient: linear-gradient(
     120deg,
@@ -146,17 +151,39 @@
   --ml-toc-accent-soft: rgba(74, 222, 128, 0.14);
 }
 
-/* Brand-tinted primary so the header/links match the new accent. */
+/* Brand-tinted primary + surfaces. The background/ink tokens mirror
+   cp-handbook's palette: a cool slate-tinted surface with navy ink in light
+   mode, and a deep navy-slate in dark mode. */
 :root,
 [data-md-color-scheme="default"] {
   --md-primary-fg-color: #1e3a8a;
   --md-primary-fg-color--light: #2563eb;
   --md-primary-fg-color--dark: #172554;
   --md-accent-fg-color: #0d9488;
+
+  --md-default-bg-color: hsl(210 40% 98%);
+  --md-default-fg-color: hsl(222 47% 11%);
+  --md-default-fg-color--light: hsl(215 16% 42%);
+  --md-default-fg-color--lighter: hsl(215 16% 55%);
+  --md-default-fg-color--lightest: hsl(214 24% 80%);
+
+  /* Card surface sits one step above the page, like cp-handbook: pure white
+     over the slate-tinted background in light mode. */
+  --ml-card: hsl(0 0% 100%);
 }
 [data-md-color-scheme="slate"] {
   --md-primary-fg-color: #2563eb;
   --md-accent-fg-color: #2dd4bf;
+
+  --md-default-bg-color: hsl(222 47% 7%);
+  --md-default-fg-color: hsl(210 40% 96%);
+  --md-default-fg-color--light: hsl(216 18% 68%);
+  --md-default-fg-color--lighter: hsl(216 16% 56%);
+  --md-default-fg-color--lightest: hsl(216 16% 38%);
+
+  /* In dark mode the card is a lighter navy than the page, so it reads as
+     raised (cp-handbook card ≈ hsl(222 40% 11%) over a 7% background). */
+  --ml-card: hsl(222 39% 12%);
 }
 
 /* Dark-theme Mermaid colors compatible with a black page background. */
@@ -178,18 +205,44 @@
 }
 
 /* ---------- 3. Base layout & typography ---------------------------------- */
+/* Match cp-handbook's content width (Tailwind max-w-7xl = 1280px) so line
+   length and overall proportions line up instead of sprawling on wide
+   screens. Set in px on purpose: Material's root font is 20px, so a rem-based
+   width would not equal cp-handbook's 16px-root pixels. */
 .md-grid {
-  max-width: 92rem;
+  max-width: 1280px;
 }
 
 .md-main {
   background:
     radial-gradient(
-      60rem 40rem at 100% -10%,
-      color-mix(in srgb, var(--ml-accent-cool) 7%, transparent),
-      transparent 60%
+      60rem 32rem at 110% -8%,
+      rgba(56, 189, 248, 0.1),
+      transparent 70%
     ),
-    color-mix(in srgb, var(--md-default-bg-color) 97%, var(--ml-accent-soft) 3%);
+    radial-gradient(
+      52rem 30rem at -10% 0%,
+      rgba(37, 99, 235, 0.12),
+      transparent 70%
+    ),
+    var(--md-default-bg-color);
+  background-attachment: fixed;
+}
+
+[data-md-color-scheme="slate"] .md-main {
+  background:
+    radial-gradient(
+      60rem 32rem at 110% -8%,
+      rgba(56, 189, 248, 0.08),
+      transparent 70%
+    ),
+    radial-gradient(
+      52rem 30rem at -10% 0%,
+      rgba(37, 99, 235, 0.12),
+      transparent 70%
+    ),
+    var(--md-default-bg-color);
+  background-attachment: fixed;
 }
 
 .md-main__inner {
@@ -213,7 +266,7 @@
   max-width: 42ch;
   margin-bottom: 0.5rem;
   color: var(--md-default-fg-color);
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-weight: 800;
   letter-spacing: -0.01em;
 }
@@ -227,14 +280,14 @@
   margin-top: 2.6em;
   padding-top: 0.8rem;
   border-top: 1px solid var(--ml-border);
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-weight: 750;
   letter-spacing: -0.005em;
 }
 
 .md-typeset h3 {
   color: var(--md-default-fg-color);
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-weight: 700;
 }
 
@@ -316,13 +369,15 @@
 }
 
 .md-header__title {
-  font-family: var(--ml-serif);
-  font-weight: 750;
-  letter-spacing: -0.01em;
+  font-family: var(--ml-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
+/* cp-handbook's header title is ~15px / semibold, not a heavy display size. */
 .md-header__topic .md-ellipsis {
-  font-size: 0.92rem;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .ml-settings-button {
@@ -457,7 +512,7 @@
     position: fixed !important;
     flex: 0 0 var(--ml-sidebar-width) !important;
     width: var(--ml-sidebar-width) !important;
-    min-width: 300px;
+    min-width: 220px;
     max-width: min(560px, 38vw);
     top: 0 !important;
     left: 0;
@@ -784,14 +839,15 @@
   color: var(--md-default-fg-color);
 }
 
-/* Active page: a restrained tinted row with a leading accent rail. */
+/* Active page: cp-handbook style — a blue left bar, blue-tinted row, and blue
+   label. */
 .md-nav__link--active,
 .md-nav__link[aria-current="page"] {
   position: relative;
-  border-color: color-mix(in srgb, var(--ml-accent-cool) 18%, transparent);
-  background: color-mix(in srgb, var(--ml-accent-cool) 10%, transparent);
-  color: var(--md-default-fg-color) !important;
-  font-weight: 500;
+  border-color: color-mix(in srgb, var(--ml-accent-cool) 22%, transparent);
+  background: color-mix(in srgb, var(--ml-accent-cool) 15%, transparent);
+  color: var(--ml-accent-cool) !important;
+  font-weight: 600;
 }
 
 .md-nav--primary .md-nav__item .md-nav__link--active,
@@ -849,14 +905,14 @@
   > .md-nav__list
   > .md-nav__item--active
   > .md-nav__container.md-nav__link {
-  margin: 0.42rem 0.34rem;
-  min-height: 2.45rem;
-  border: 1px solid color-mix(in srgb, var(--ml-accent-cool) 18%, transparent);
-  border-left-color: var(--ml-accent-cool);
-  border-left-width: 2px;
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--ml-accent-cool) 10%, transparent);
-  color: var(--md-default-fg-color);
+  margin: 0;
+  min-height: 2.75rem;
+  border: 0;
+  border-bottom: 1px solid var(--ml-border);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--ml-accent-cool) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--ml-accent-cool);
+  color: var(--ml-accent-cool);
 }
 
 .md-sidebar--primary
@@ -990,7 +1046,7 @@
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-radius);
   padding: 1rem 1.1rem;
-  background: var(--md-default-bg-color);
+  background: var(--ml-card);
   box-shadow: var(--ml-shadow-sm);
   transition:
     transform 180ms ease,
@@ -1001,7 +1057,7 @@
 .md-typeset .grid.cards > :is(ul, ol) > li:hover {
   border-color: color-mix(in srgb, var(--ml-accent-cool) 45%, var(--ml-border));
   box-shadow: var(--ml-shadow);
-  transform: translateY(-3px);
+  transform: translateY(-2px);
 }
 
 .md-typeset .grid.cards > :is(ul, ol) > li > :first-child {
@@ -1024,8 +1080,8 @@
 }
 
 .md-typeset .md-button {
-  border-radius: 999rem;
-  padding: 0.42rem 1.1rem;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1.2rem;
   font-weight: 650;
   box-shadow: none;
   border-width: 1px;
@@ -1038,19 +1094,21 @@
 }
 
 .md-typeset .md-button:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--ml-shadow-sm);
+  transform: translateY(-2px);
+  box-shadow: var(--ml-shadow);
 }
 
+/* Solid blue lead button with cp-handbook's soft glow (not a gradient pill). */
 .md-typeset .md-button--primary {
-  background: var(--ml-gradient);
+  background: var(--md-primary-fg-color--light);
   border-color: transparent;
   color: #fff;
+  box-shadow: 0 18px 40px -24px rgba(37, 99, 235, 0.45);
 }
 .md-typeset .md-button--primary:hover {
   color: #fff;
-  box-shadow: 0 6px 18px
-    color-mix(in srgb, var(--ml-accent-cool) 40%, transparent);
+  background: color-mix(in srgb, var(--md-primary-fg-color--light) 90%, #000);
+  box-shadow: 0 22px 44px -20px rgba(37, 99, 235, 0.55);
 }
 
 .md-typeset__table {
@@ -1152,7 +1210,7 @@ figure > figcaption {
 .home-title {
   max-width: 18ch;
   margin: 0 0 0.9rem;
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-size: clamp(1.85rem, 1rem + 2.6vw, 3rem);
   font-weight: 850;
   line-height: 1.08;
@@ -1285,7 +1343,7 @@ figure > figcaption {
 
 .home-panel__title {
   margin: 0.35rem 0 0;
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-size: 1.3rem;
   font-weight: 800;
   line-height: 1.15;
@@ -1346,7 +1404,7 @@ figure > figcaption {
   padding: 1.15rem;
   border: 1px solid var(--ml-border);
   border-radius: var(--ml-radius);
-  background: var(--md-default-bg-color);
+  background: var(--ml-card);
   box-shadow: var(--ml-shadow-sm);
   transition:
     transform 180ms ease,
@@ -1355,7 +1413,7 @@ figure > figcaption {
 }
 
 .curriculum-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--ml-accent-cool) 40%, var(--ml-border));
   box-shadow: var(--ml-shadow);
 }
@@ -1364,8 +1422,8 @@ figure > figcaption {
   border-color: color-mix(in srgb, var(--ml-accent-cool) 40%, var(--ml-border));
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--ml-accent-cool) 9%, var(--md-default-bg-color)),
-    var(--md-default-bg-color)
+    color-mix(in srgb, var(--ml-accent-cool) 9%, var(--ml-card)),
+    var(--ml-card)
   );
 }
 
@@ -2116,7 +2174,7 @@ body.ml-settings-open {
 }
 
 [data-reading-width="wide"] .md-grid {
-  max-width: 90rem;
+  max-width: 1536px;
 }
 
 [data-code-wrap="true"] .md-typeset pre > code {

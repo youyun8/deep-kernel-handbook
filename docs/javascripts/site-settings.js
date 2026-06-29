@@ -1,7 +1,7 @@
 (function () {
   const storageKey = "deep-kernel-handbook-settings";
-  const defaultSidebarWidth = 360;
-  const sidebarLayoutVersion = 3;
+  const defaultSidebarWidth = 256;
+  const sidebarLayoutVersion = 4;
   const defaults = {
     textSize: "standard", // small | standard | large
     width: "standard", // standard | wide
@@ -20,7 +20,7 @@
   function sidebarWidthBounds() {
     const viewport = Math.max(document.documentElement.clientWidth, 0);
     return {
-      min: 300,
+      min: 220,
       max: Math.min(560, Math.max(defaultSidebarWidth, viewport * 0.38)),
     };
   }
@@ -74,8 +74,11 @@
     }
 
     // Drive the Material color scheme directly so the panel is the single
-    // source of truth and "auto" can track prefers-color-scheme live.
+    // source of truth and "auto" can track prefers-color-scheme live. The
+    // scheme lives on <html> (set pre-paint by overrides/main.html and never
+    // replaced by instant navigation) with <body> kept in sync for parity.
     const scheme = resolveScheme(settings.theme);
+    root.setAttribute("data-md-color-scheme", scheme);
     const body = document.body;
     if (body) {
       body.setAttribute("data-md-color-scheme", scheme);

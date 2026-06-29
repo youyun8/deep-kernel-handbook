@@ -76,7 +76,7 @@ $$ \text{Attn}(Q,K,V) = \underbrace{\text{softmax}\!\left(\frac{QK^\top}{\sqrt{d
 
 兩個 matmul 中間夾一個 softmax。我們把這兩段拆開來看。
 
-### 2a — 分數矩陣 $QK^\top$
+### 2a — 分數矩陣 QKᵀ
 
 $Q$ 是 $[N, d_h]$，$K^\top$ 是 $[d_h, N]$，所以 $QK^\top$ 是一個 $[N, N]$ 矩陣：第 $(i,j)$ 項 表示 token $i$ 對 token $j$ 的關注程度。**這個 $N\times N$ 矩陣正是 attention 二次成本的來源** —— 它隨序列長度的*平方*增長，也是 [FlashAttention](flashattention.md) 與整個長上下文研究背後的 那一個關鍵事實。
 
