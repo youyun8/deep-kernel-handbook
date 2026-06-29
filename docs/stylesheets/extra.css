@@ -197,8 +197,12 @@
 }
 
 /* ---------- 3. Base layout & typography ---------------------------------- */
+/* Match cp-handbook's content width (Tailwind max-w-7xl = 1280px) so line
+   length and overall proportions line up instead of sprawling on wide
+   screens. Set in px on purpose: Material's root font is 20px, so a rem-based
+   width would not equal cp-handbook's 16px-root pixels. */
 .md-grid {
-  max-width: 92rem;
+  max-width: 1280px;
 }
 
 .md-main {
@@ -2159,7 +2163,7 @@ body.ml-settings-open {
 }
 
 [data-reading-width="wide"] .md-grid {
-  max-width: 90rem;
+  max-width: 1536px;
 }
 
 [data-code-wrap="true"] .md-typeset pre > code {

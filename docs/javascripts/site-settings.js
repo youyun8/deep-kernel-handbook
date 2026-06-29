@@ -74,8 +74,11 @@
     }
 
     // Drive the Material color scheme directly so the panel is the single
-    // source of truth and "auto" can track prefers-color-scheme live.
+    // source of truth and "auto" can track prefers-color-scheme live. The
+    // scheme lives on <html> (set pre-paint by overrides/main.html and never
+    // replaced by instant navigation) with <body> kept in sync for parity.
     const scheme = resolveScheme(settings.theme);
+    root.setAttribute("data-md-color-scheme", scheme);
     const body = document.body;
     if (body) {
       body.setAttribute("data-md-color-scheme", scheme);

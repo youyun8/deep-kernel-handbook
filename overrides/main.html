@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{#
+  Apply the saved colour scheme synchronously in <head>, before the body is
+  painted. Without this the page renders in the build-time default first and
+  then site-settings.js flips it on DOMContentLoaded — a visible theme flash on
+  every page load. The attribute is set on <html> (which is never replaced by
+  instant navigation), so the scheme also survives page-to-page navigation.
+#}
+{% block extrahead %}
+  {{ super() }}
+  <script>
+    (function () {
+      try {
+        var raw = localStorage.getItem("deep-kernel-handbook-settings");
+        var theme = raw ? (JSON.parse(raw) || {}).theme : "auto";
+        var dark =
+          window.matchMedia &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var scheme =
+          theme === "light"
+            ? "default"
+            : theme === "dark"
+              ? "slate"
+              : dark
+                ? "slate"
+                : "default";
+        document.documentElement.setAttribute("data-md-color-scheme", scheme);
+      } catch (e) {
+        /* ignore — fall back to the default scheme */
+      }
+    })();
+  </script>
+{% endblock %}
