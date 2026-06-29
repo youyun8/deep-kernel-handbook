@@ -16,9 +16,12 @@
 :root {
   --md-code-font: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
-  /* Serif display family for the site title and page headings. */
-  --ml-serif:
-    "Noto Serif TC", "Songti TC", "Songti SC", "SimSun", "STSong", serif;
+  /* Sans display family for the site title and page headings. Matches the
+     cp-handbook look — everything is Inter (with a CJK sans fallback) rather
+     than a serif display face. */
+  --ml-display:
+    "Inter", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
+    system-ui, -apple-system, "Segoe UI", sans-serif;
   --ml-sidebar-font: var(--md-text-font-family, "Inter", system-ui, sans-serif);
   --ml-sidebar-width: 360px;
   --ml-sidebar-rail-width: 2.45rem;
@@ -57,9 +60,11 @@
   --ml-shadow-strong:
     0 2px 6px rgba(15, 23, 42, 0.06), 0 20px 48px rgba(15, 23, 42, 0.14);
 
-  --ml-radius: 12px;
-  --ml-radius-sm: 8px;
-  --ml-radius-lg: 18px;
+  /* Rounding matched to cp-handbook: cards ~rounded-2xl, hero ~rounded-3xl,
+     small chrome ~rounded-xl. */
+  --ml-radius: 16px;
+  --ml-radius-sm: 12px;
+  --ml-radius-lg: 24px;
 
   --ml-gradient: linear-gradient(
     120deg,
@@ -146,17 +151,31 @@
   --ml-toc-accent-soft: rgba(74, 222, 128, 0.14);
 }
 
-/* Brand-tinted primary so the header/links match the new accent. */
+/* Brand-tinted primary + surfaces. The background/ink tokens mirror
+   cp-handbook's palette: a cool slate-tinted surface with navy ink in light
+   mode, and a deep navy-slate in dark mode. */
 :root,
 [data-md-color-scheme="default"] {
   --md-primary-fg-color: #1e3a8a;
   --md-primary-fg-color--light: #2563eb;
   --md-primary-fg-color--dark: #172554;
   --md-accent-fg-color: #0d9488;
+
+  --md-default-bg-color: hsl(210 40% 98%);
+  --md-default-fg-color: hsl(222 47% 11%);
+  --md-default-fg-color--light: hsl(215 16% 42%);
+  --md-default-fg-color--lighter: hsl(215 16% 55%);
+  --md-default-fg-color--lightest: hsl(214 24% 80%);
 }
 [data-md-color-scheme="slate"] {
   --md-primary-fg-color: #2563eb;
   --md-accent-fg-color: #2dd4bf;
+
+  --md-default-bg-color: hsl(222 47% 7%);
+  --md-default-fg-color: hsl(210 40% 96%);
+  --md-default-fg-color--light: hsl(216 18% 68%);
+  --md-default-fg-color--lighter: hsl(216 16% 56%);
+  --md-default-fg-color--lightest: hsl(216 16% 38%);
 }
 
 /* Dark-theme Mermaid colors compatible with a black page background. */
@@ -185,11 +204,33 @@
 .md-main {
   background:
     radial-gradient(
-      60rem 40rem at 100% -10%,
-      color-mix(in srgb, var(--ml-accent-cool) 7%, transparent),
-      transparent 60%
+      60rem 32rem at 110% -8%,
+      rgba(56, 189, 248, 0.1),
+      transparent 70%
     ),
-    color-mix(in srgb, var(--md-default-bg-color) 97%, var(--ml-accent-soft) 3%);
+    radial-gradient(
+      52rem 30rem at -10% 0%,
+      rgba(37, 99, 235, 0.12),
+      transparent 70%
+    ),
+    var(--md-default-bg-color);
+  background-attachment: fixed;
+}
+
+[data-md-color-scheme="slate"] .md-main {
+  background:
+    radial-gradient(
+      60rem 32rem at 110% -8%,
+      rgba(56, 189, 248, 0.08),
+      transparent 70%
+    ),
+    radial-gradient(
+      52rem 30rem at -10% 0%,
+      rgba(37, 99, 235, 0.12),
+      transparent 70%
+    ),
+    var(--md-default-bg-color);
+  background-attachment: fixed;
 }
 
 .md-main__inner {
@@ -213,7 +254,7 @@
   max-width: 42ch;
   margin-bottom: 0.5rem;
   color: var(--md-default-fg-color);
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-weight: 800;
   letter-spacing: -0.01em;
 }
@@ -227,14 +268,14 @@
   margin-top: 2.6em;
   padding-top: 0.8rem;
   border-top: 1px solid var(--ml-border);
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-weight: 750;
   letter-spacing: -0.005em;
 }
 
 .md-typeset h3 {
   color: var(--md-default-fg-color);
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-weight: 700;
 }
 
@@ -316,7 +357,7 @@
 }
 
 .md-header__title {
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-weight: 750;
   letter-spacing: -0.01em;
 }
@@ -1024,8 +1065,8 @@
 }
 
 .md-typeset .md-button {
-  border-radius: 999rem;
-  padding: 0.42rem 1.1rem;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1.2rem;
   font-weight: 650;
   box-shadow: none;
   border-width: 1px;
@@ -1038,19 +1079,21 @@
 }
 
 .md-typeset .md-button:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--ml-shadow-sm);
+  transform: translateY(-2px);
+  box-shadow: var(--ml-shadow);
 }
 
+/* Solid blue lead button with cp-handbook's soft glow (not a gradient pill). */
 .md-typeset .md-button--primary {
-  background: var(--ml-gradient);
+  background: var(--md-primary-fg-color--light);
   border-color: transparent;
   color: #fff;
+  box-shadow: 0 18px 40px -24px rgba(37, 99, 235, 0.45);
 }
 .md-typeset .md-button--primary:hover {
   color: #fff;
-  box-shadow: 0 6px 18px
-    color-mix(in srgb, var(--ml-accent-cool) 40%, transparent);
+  background: color-mix(in srgb, var(--md-primary-fg-color--light) 90%, #000);
+  box-shadow: 0 22px 44px -20px rgba(37, 99, 235, 0.55);
 }
 
 .md-typeset__table {
@@ -1152,7 +1195,7 @@ figure > figcaption {
 .home-title {
   max-width: 18ch;
   margin: 0 0 0.9rem;
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-size: clamp(1.85rem, 1rem + 2.6vw, 3rem);
   font-weight: 850;
   line-height: 1.08;
@@ -1285,7 +1328,7 @@ figure > figcaption {
 
 .home-panel__title {
   margin: 0.35rem 0 0;
-  font-family: var(--ml-serif);
+  font-family: var(--ml-display);
   font-size: 1.3rem;
   font-weight: 800;
   line-height: 1.15;

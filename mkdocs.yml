@@ -73,7 +73,6 @@ extra:
   generator: false
 
 extra_css:
-  - https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;700;900&display=swap
   - https://unpkg.com/katex@0/dist/katex.min.css
   - stylesheets/extra.css
 
