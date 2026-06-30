@@ -26,9 +26,9 @@ flowchart TB
 
 這個回饋迴圈 —— 把預測出的 token 接到尾端、再跑一次 —— 就是 **autoregressive 生成（自回歸 生成）**。這也解釋了為什麼會「寫作」的模型其實只是一次預測一個 token，以及為什麼 [decode 是記憶體受限的階段](attention-efficiency.md)，那是後面我們花最多力氣的地方。
 
-## 步驟 1 — tokens 和嵌入
+## 步驟 1 — tokens 和 embedding
 
-文字先被 tokenizer 切成 **tokens（子詞片段）**；每個 token 是一個整數 id，取自固定大小為 $V$ （通常 32k–256k）的**詞彙表**。模型沒辦法直接對整數做運算，所以每個 id 會去索引**嵌入矩陣** $E \in \mathbb{R}^{V \times d}$ 的某一列，把它轉成一個維度為 $d$ 的向量（$d$ 是**模型寬度**， 例如 4096）。
+文字先被 tokenizer 切成 **tokens（子詞片段）**；每個 token 是一個整數 id，取自固定大小為 $V$ （通常 32k–256k）的**詞彙表**。模型沒辦法直接對整數做運算，所以每個 id 會去索引**embedding 矩陣** $E \in \mathbb{R}^{V \times d}$ 的某一列，把它轉成一個維度為 $d$ 的向量（$d$ 是**隱藏維度（hidden size）**， 例如 4096）。
 
 ```mermaid
 flowchart TB
@@ -40,13 +40,13 @@ flowchart TB
 一段 $N$ 個 token 的序列就變成矩陣 $X \in \mathbb{R}^{N \times d}$ —— 每個 token 一列。**這個 $[N, d]$ 矩陣就是流經整個網路的東西**：每一層讀進一個 $[N,d]$，再寫出一個形狀完全相同的 $[N,d]$。
 
 !!! Note "位置資訊必須另外加進去"
-    不管「cat」出現在句子哪裡，它的嵌入都一樣，但詞序是有意義的（「貓坐」≠「坐貓」）。所以 模型要額外注入**位置資訊** —— 傳統做法是在 $X$ 上加位置嵌入，現代模型則多半用**旋轉位置 嵌入（RoPE）**，在 attention 內部施加。無論哪種，目的都是告訴網路每個 token 在*哪裡*， 而不只是它*是什麼*。
+    不管「cat」出現在句子哪裡，它的 embedding 都一樣，但詞序是有意義的（「貓坐」≠「坐貓」）。所以 模型要額外注入**位置資訊** —— 傳統做法是在 $X$ 上加 positional embedding，現代模型則多半用 **Rotary Position Embedding（RoPE）**，在 attention 內部施加。無論哪種，目的都是告訴網路每個 token 在*哪裡*， 而不只是它*是什麼*。
 
 ## 步驟 2 — 核心思想：把 attention 看成軟性查表
 
 這是 Transformer 的核心。要理解一個詞，你需要**上下文**：「it」指的是前面提過的某樣東西； 「bank」在「river」旁邊和在「money」旁邊意思不同。attention 讓每個 token **從其他 token 蒐集 資訊**，並依彼此的相關程度加權。
 
-機制是一種**軟性字典查表**。每個 token 把自己的嵌入 $x$ 乘上三個可學習矩陣，產生三個向量：
+機制是一種**軟性字典查表**。每個 token 把自己的 embedding $x$ 乘上三個可學習矩陣，產生三個向量：
 
 | 向量 | 矩陣 | 直覺 |
 | --- | --- | --- |
@@ -143,12 +143,12 @@ flowchart TB
 !!! Tip "這正是 MoE 要稀疏化的對象"
     FFN 是每個 token 上最貴的零件。一個 [Mixture-of-Experts](../moe/index.md) 層把這個單一 FFN 換成*許多個* FFN（「experts」），並把每個 token 只路由到其中幾個 —— 藉此把總參數量和每個 token 的計算量解耦。MoE 篇講的一切，都是這個方塊的變形。
 
-## 步驟 5 — 組裝 Transformer 塊
+## 步驟 5 — 組裝 Transformer block
 
 一個 block 用兩個「黏合」機制把 attention 和 FFN 接起來，讓深層網路得以訓練：
 
 - **殘差連接（residual connection）**：把每個子層的輸入加回它的輸出（$x + \text{sublayer}(x)$）， 給梯度一條直達路徑，讓每一層做的是「改良」而非「取代」。
-- **層正規化（layer norm）**：在每個子層前把激活重新縮放成穩定的分佈（現代模型用 **RMSNorm**， 一種更便宜的變體）。
+- **layer norm**：在每個子層前把 activation 重新縮放成穩定的分佈（現代模型用 **RMSNorm**， 一種更便宜的變體）。
 
 ```mermaid
 flowchart TD
@@ -169,7 +169,7 @@ flowchart TD
 
 ## 步驟 6 — 完整模型
 
-完整模型就是：嵌入 → $L$ 個相同 block 的堆疊 → 最終 norm → 投影到詞彙 logits → softmax。最後的 **LM head**（$W_{\text{LM}}\in\mathbb{R}^{V\times d}$）把最後一個 token 的向量轉成詞彙表裡每個 字的分數。
+完整模型就是：embedding → $L$ 個相同 block 的堆疊 → 最終 norm → 投影到詞彙 logits → softmax。最後的 **LM head**（$W_{\text{LM}}\in\mathbb{R}^{V\times d}$）把最後一個 token 的向量轉成詞彙表裡每個 字的分數。
 
 ```mermaid
 flowchart TD
@@ -222,7 +222,7 @@ flowchart TD
 !!! Tip "解決方案"
     參考解答位於 [解答頁](../solutions/foundations.md) 上。請先嘗試每個練習，再展開解答。
 
-1. 追蹤形狀：從 token id $[N]$ 開始，列出張量在這些步驟後的形狀 —— 嵌入後、$QK^\top$ 後、 softmax 後、$\times V$ 後、乘 $W_O$ 後、LM head 後。其中哪一個對 $N$ 是二次的？
+1. 追蹤形狀：從 token id $[N]$ 開始，列出張量在這些步驟後的形狀 —— embedding 後、$QK^\top$ 後、 softmax 後、$\times V$ 後、乘 $W_O$ 後、LM head 後。其中哪一個對 $N$ 是二次的？
 2. 一個模型有 $d=4096$、$h=32$ 個頭。$d_h$ 是多少？若改用 8 個 KV 頭（GQA），每個 token 的 KV cache 比完整多頭小多少？
 3. 用一句話說明為什麼訓練深層網路需要**殘差連接**和**層 norm**。少了其中任一個，分別會 壞在哪裡？
 4. 為什麼 decode 可以重用快取的 key/value，卻*不能*快取 query？把答案扣回因果遮罩的 三角形結構。

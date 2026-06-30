@@ -5,32 +5,32 @@
   <span class="chip"><strong>用法：</strong> 先自己試，再對照</span>
 </div>
 
-實戰專案練習是針對玩具模型的**構建和測量**任務 [`code/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code)。沒有 單一數字答案；以下是預期結果、正確方法，以及 每個人要避免的陷阱。
+實戰專案的練習是針對 [`code/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code) 裡玩具模型的**動手建構與量測**任務。沒有單一數字答案；以下是預期結果、正確的做法，以及每個人都要避免的陷阱。
 
 ## 建立一個小型 MoE LM
 
-??? Success "1 — 刪除平衡並量化崩潰"
-    訓練參考，然後停用輔助損耗/偏壓控制器。預計 **崩潰簽名**：routing**熵崩潰**（一些 experts 獲勝）， **負載 CV 急遽上升**（從〜0.1–0.2 到 ≫1），幾個 experts 去 **死**（零負載），並且**最終的 val 損失更糟**。記錄所有三個 每一步（熵、CV、損失），因此與平衡運行的差異為 可見 —— 這是平衡是承重的具體體現， 不是化妝品。
+??? Success "1 — 移除負載平衡，量化 routing collapse"
+    先訓練參照版本，再關掉 auxiliary loss/bias controller。預期出現**collapse 的徵兆**：routing **熵崩潰**（少數幾個 expert 贏家全拿）、**負載 CV 急速上升**（從 ~0.1–0.2 飆到 ≫1）、幾個 expert 變成**dead**（負載歸零），而且**最終 val loss 變差**。把這三項（熵、CV、loss）每一步都記下來，這樣跟有做負載平衡的那次跑就能明顯比較出差異——這正具體證明了負載平衡是真正承重的機制，不是裝飾用的。
 
-??? Success "2 — 調度表 + 分組 GEMM，前/後表"
-    實現排列 → 分組 GEMM→ 取消排列路徑並與樸素的路徑進行比較 屏蔽循環。**使表格值得信賴的方法：**相同 權重/種子、預熱迭代、`synchronize()` 圍繞定時循環、報告 多次運行的中位數，並**驗證輸出匹配**（最大 abs 差異~1e-3 BF16） 在相信速度之前。預計調度形式會在 GPU 上獲勝（連續 分組 GEMM 與許多微小的掩模矩陣相乘），$E$ 中的差距越來越大。
+??? Success "2 — permute + grouped GEMM：有無對照表"
+    實作 permute → grouped GEMM → unpermute 的路徑，跟 naive 的 masked loop 路徑比較。**讓對照表可信的做法：**用相同的權重/種子，先 warmup，計時迴圈外面包 `synchronize()`，報告多次跑的中位數，並在相信速度數字之前**先驗證輸出一致**（BF16 下最大絕對誤差 ~1e-3）。預期 permute 形式在 GPU 上會贏（連續的 grouped GEMM 對上許多微小的、被 mask 蓋住大半的 matmul），而且差距會隨著 $E$ 變大而擴大。
 
-??? Success "3 — KV 快取與重新計算一切"
-    在生成循環中新增 KV 快取：每層儲存 K,V，附加一個 token K,V 每一步而不是重新計算整個前綴。測量 decode latency 與重新計算基線。預期：一代中重新計算為 $O(N^2)$ （每個新的 token 都會重新關注所有先前的 tokens**並重新計算它們的 K,V**）， 而快取的 decode 是 $O(N)$ — 因此加速**隨著序列長度的成長而成長**， 從短長度的適度到長長度的大（10×+）。
+??? Success "3 — KV cache 與每步重算所有東西"
+    在生成迴圈裡加上 KV cache：每層存 K、V，每一步只附加新 token 的 K、V，而不是重算整段前綴。把 decode latency 跟「每步重算全部」的 baseline 比較。預期：不快取的話整個生成過程是 $O(N^2)$（每個新 token 都要重新關注所有先前 token、**還要重新算它們的 K、V**），而有快取的 decode 是 $O(N)$——所以加速比**會隨序列長度增加而變大**，短序列時只是小幅提升，長序列時可以到 10 倍以上。
 
-??? Success "4 — int8 experts：質量與速度"
-    將 expert 權重化為 int8，將 router + attention 保留在 BF16 中。報告**值 損失**（質量）和**decode latency /重量位元組**（速度）。預期： 值 損失幾乎不變（experts 具有量化容忍 — 請參閱 [quantization ex. 4](performance.md#quantization-compression))、重量記憶 體積縮小約 2 倍，decode 在記憶體限制範圍內速度更快。這再現了，在 微型，真正的 MoE serving 配方。
+??? Success "4 — int8 expert：品質與速度"
+    把 expert 權重量化成 int8，router + attention 維持 BF16。報告**val loss**（品質）與**decode latency / 權重位元組數**（速度）。預期：val loss 幾乎不變（expert 對量化容忍度高——見 [量化練習 4](performance.md#quantization-compression)），權重的記憶體佔用縮小約 2 倍，decode 在 memory-bound 的範圍內變快。這在玩具規模上重現了真正的 MoE serving 配方。
 
-## 擴大規模
+## 擴展到更大規模
 
-??? Success "1 — 每 GPU 記憶體以及 8 和 64 個 GPU 的平行配置"
-    計算每個 GPU 狀態（BF16+Adam 為 16 B/param；請參閱 [distributed ex. 2](performance.md#distributed-training)）加上啟動和 KV。**8 個 GPU（單一節點）：** 如果某個層不適合，則透過 NVLink TP=8，否則 ZeRO-3/FSDP 用於純 DP 記憶體切割； EP 跨 8 為 MoE 層。 **64 個 GPU（多節點）：**組成 — TP=8**節點內**，然後是 PP 和/或 EP **跨節點**，DP/ZeRO 在外部。證明每個： TP 頻寬所在 最高，PP/EP 較低，DP 最外層（最能容忍慢速連結）。
+??? Success "1 — 每 GPU 記憶體，以及 8 與 64 GPU 的並行配置"
+    算出每 GPU 的狀態量（BF16+Adam 是 16 B/param；見 [分散式 training 練習 2](performance.md#distributed-training)），再加上 activation 和 KV。**8 GPU（單一節點）：**如果單層裝不下，就用 NVLink 上的 TP=8；否則用 ZeRO-3/FSDP 做純 DP 的記憶體切分；MoE 層則用跨 8 張卡的 EP。**64 GPU（多節點）：**組合方式是——TP=8 留在**節點內**，PP 和/或 EP 跨**節點**，DP/ZeRO 放在最外層。理由：TP 對頻寬要求最高，放在最快的連結上；PP/EP 次之；DP 放最外層（最能忍受慢速連結）。
 
-??? Success "2 — 實作 EP 並驗證損失是否與單 GPU 相符"
-    連接 expert 並行性（手捲 all-to-all 調度/組合，或 DeepSpeed-MoE/威震天）。**正確性檢查：**使用相同的種子/數據， EP 運行的損失必須追蹤單 GPU 運行約 50 步以內 浮點噪音。如果它發生漂移，通常的罪魁禍首是**router 數學不是 在 FP32**（跨等級 routing 分歧）或**未同步的平衡計數** — 正是 [training stability](../moe/training-stability.md) 中的錯誤。
+??? Success "2 — 實作 EP，驗證 loss 與單 GPU 對得上"
+    接上 expert parallelism（自己刻 all-to-all 的 dispatch/combine，或用 DeepSpeed-MoE/Megatron-LM）。**正確性檢查：**用相同的種子/資料，EP 跑出來的 loss 在約 50 步內應該要跟單 GPU 跑的結果吻合到浮點誤差範圍內。如果開始漂移，常見元兇是**router 的數學沒有用 FP32**（導致不同 rank 的 routing 結果不一致）或**負載平衡計數沒有同步**——正好對應 [訓練穩定性](../moe/training-stability.md) 裡提到的錯誤。
 
-??? Success "3 — 量化 all-to-all 重疊；MFU 之前/之後"
-    分析分塊管線**關閉**，然後**開啟**。關閉：all-to-all 在時間軸上顯示為暴露的間隙（通訊期間 GPU 空閒）→ 較低的 MFU。 開啟：通訊與獨立計算重疊（共用 expert / 下一個區塊 attention）→ 差距縮小，**MFU 上升**。報告 MFU = $6P\cdot\text{tok/s}/\text{peak}$ 兩者皆適用； delta 為重疊值， 最重要的 EP 優化。
+??? Success "3 — 量化 all-to-all 的重疊效果；前後 MFU"
+    先 profile 關掉分塊 pipeline 的版本，再 profile 打開的版本。**關閉時：**all-to-all 在時間軸上是一段暴露的空檔（通訊期間 GPU 閒著）→ MFU 較低。**打開時：**通訊跟可獨立計算的工作（shared expert / 下一個 chunk 的 attention）重疊 → 空檔縮小，**MFU 上升**。兩種情況都報告 MFU = $6P\cdot\text{tok/s}/\text{peak}$；兩者的差值就是重疊帶來的收益，也是 EP 裡最重要的一項優化。
 
-??? Success "4 — 強縮放表和線性偏差"
-    固定問題大小，增加 GPU，繪製加速與 GPU 數量的關係。它將 **低於線性理想**，因為： (a)**通訊成長** 規模 (all-reduce/all-to-all)，(b)**管道氣泡**$\frac{P-1}{m+P-1}$ 消耗運算能力，(c)**每 GPU 工作量縮減**，直到 kernels 發布-/latency- 界（低佔用率），以及（d）負載不平衡。將差距歸咎於這些 術語 - 命名「為什麼」縮放偏差是真正的可交付成果，而不是表格。
+??? Success "4 — strong scaling 表與偏離線性的原因"
+    固定問題規模、增加 GPU 數量，畫出加速比對 GPU 數的關係。結果會**低於理想線性**，原因有：(a) **通訊量隨規模成長**（all-reduce/all-to-all）；(b) **pipeline bubble** $\frac{P-1}{m+P-1}$ 吃掉算力；(c) **每 GPU 的工作量變小**到 kernel 變成 launch-/latency-bound（occupancy 低）；以及 (d) 負載不平衡。把偏離的部分拆給這幾項——說清楚「為什麼」會偏離線性才是真正的交付成果，不是表格本身。

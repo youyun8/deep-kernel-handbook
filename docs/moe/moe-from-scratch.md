@@ -10,7 +10,7 @@
 
 ## MoE 層的剖析
 
-MoE FFN 把單一前饋 block 換成：
+MoE FFN 把單一 FFN 換成：
 
 1. **$E$ 個 expert** —— 各自獨立的 FFN（通常是 SwiGLU）：$\text{expert}_e(h) = W^{down}_e\,\big(\text{SiLU}(W^{gate}_e h)\odot (W^{up}_e h)\big)$。
 2. **router/gate** —— 一個線性映射 $h \mapsto W_r h \in \mathbb{R}^{E}$，為每個 expert 產生一個 logit。
