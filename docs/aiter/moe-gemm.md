@@ -58,7 +58,7 @@ $$
 = 4m\ \ \text{FLOP/byte}.
 $$
 
-$m=1$ 時只有 **4 FLOP/byte**，$m=8$ 也只有 32。MI355X 的 FP4 compute / HBM bandwidth ridge point 遠高於此，因此 decode MoE GEMM 落在 roofline 的 bandwidth slope 上，離 compute roof 很遠。這也是 `mfma_moe1` / `mfma_moe2` 成為單層最重 kernel、且 stage-1 （gate/up）是 tuning 首要槓桿的原因。
+$m=1$ 時只有 **4 FLOP/byte**，$m=8$ 也只有 32。MI355X 的 FP4 compute / HBM bandwidth ridge point 遠高於此，因此 decode MoE GEMM 落在 roofline 的 bandwidth slope 上，離 compute roof 很遠。這也是 `mfma_moe1` / `mfma_moe2` 成為單層最重 kernel、且 stage-1（gate/up）是 tuning 首要槓桿的原因。
 
 ## 吸收式（absorption）BMM
 

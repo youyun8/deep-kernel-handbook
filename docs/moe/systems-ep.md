@@ -36,7 +36,7 @@ flowchart TB
 
 1. **依*目標 GPU*（擁有所選 expert 的那個 GPU）對本地 token-expert 分配進行排序/分桶。**這會為每個目的地產生一段連續的緩衝區。
 2. **all-to-all #1**：先交換計數（每個 GPU 互相要送多少個 tokens）， 再交換 token payload。此後，每個 GPU 保存所有路由到 _其_ experts 的 tokens，依來源分組。
-3. **本地 grouped GEMM**：每個常駐 expert 在其接收到的 tokens 上運行 （連續的區塊 → 一個 grouped/batched matmul，見下文）。
+3. **本地 grouped GEMM**：每個常駐 expert 在其接收到的 tokens 上運行（連續的區塊 → 一個 grouped/batched matmul，見下文）。
 4. **all-to-all #2（combine）**：沿著反向排列把 expert 輸出送回去。
 5. **unpermute + 加權和**到每個 token 在其主 GPU 上的殘差。
 
@@ -55,7 +55,7 @@ flowchart TD
 
 ## All-to-all 的通訊量
 
-設定符號：$T$ 為每個 device 的本地 token 數，$k$ 為 top-$k$ routing 中 每個 token 選取的 expert 數，$H$ 為 hidden dimension，$c$ 為每個元素的位元組數 （BF16 為 $c=2$）。
+設定符號：$T$ 為每個 device 的本地 token 數，$k$ 為 top-$k$ routing 中 每個 token 選取的 expert 數，$H$ 為 hidden dimension，$c$ 為每個元素的位元組數（BF16 為 $c=2$）。
 
 Dispatch all-to-all 將每個 token 複製到它的 $k$ 個 experts，因此每個 device 送出約
 
@@ -116,7 +116,7 @@ TP 與 EP 切分模型的方式不同，付出的通訊代價也不同。 設 $b
 
   在小型 decode 訊息上是 latency-bound（受訊息延遲而非頻寬限制）。
 
-- **EP**：透過 all-to-all 交換路由後的 tokens，每個 device 約 $T\,k\,H\,c$ bytes （見上節）。
+- **EP**：透過 all-to-all 交換路由後的 tokens，每個 device 約 $T\,k\,H\,c$ bytes（見上節）。
 
 EP 讓每個 expert 的權重 _不被切分_（GEMM 效率較佳），但要付 all-to-all 的 代價，且對 load imbalance 敏感；TP 則切分權重、每層都要 all-reduce。 選擇取決於在你的 batch size 下，哪種訊息大小、哪個 bottleneck 主導。
 
@@ -194,7 +194,7 @@ dist.all_to_all_single(recv_buf, send_buf,
 
 1. 對於 $T{=}4096$ tokens/GPU、$H{=}4096$、BF16，估計每層兩個 all-to-all 搬移的位元組數。在 60 層上，將其與 H100 上的 expert GEMM FLOP-time 比較。 該層是受 communication-bound 還是 compute-bound？
 2. 證明 node-limited routing（≤$M$ 節點）如何限制最壞情況的跨節點 流量。routing 彈性的代價是什麼？
-3. 比較 padding 浪費（capacity factor 為 2.0 的 batched GEMM）與 grouped GEMM （無 padding），在 CV = 0.5 的負載分佈下。
+3. 比較 padding 浪費（capacity factor 為 2.0 的 batched GEMM）與 grouped GEMM（無 padding），在 CV = 0.5 的負載分佈下。
 4. 畫出將 dispatch all-to-all 與 shared-expert 計算重疊的分塊管線調度表。 什麼限制了可達成的重疊？
 
 ## 參考文獻

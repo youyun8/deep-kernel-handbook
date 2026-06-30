@@ -21,7 +21,7 @@ $$
 \text{bytes} = 2\,L\,H_{kv}\,d_h\,s\,c
 $$
 
-其中因子 $2$ 對應 K 與 V 兩份；$L$ 為層數；$H_{kv}$ 為 KV head 數 （GQA/MQA 下小於 query head 數）；$d_h$ 為每個 head 的維度；$s$ 為序列 長度；$c$ 為每個元素的位元組數（FP16 為 $2$、FP8 為 $1$）。此式對每個 序列、每個 token 線性成長，是 serving 的動態記憶體瓶頸來源。
+其中因子 $2$ 對應 K 與 V 兩份；$L$ 為層數；$H_{kv}$ 為 KV head 數（GQA/MQA 下小於 query head 數）；$d_h$ 為每個 head 的維度；$s$ 為序列 長度；$c$ 為每個元素的位元組數（FP16 為 $2$、FP8 為 $1$）。此式對每個 序列、每個 token 線性成長，是 serving 的動態記憶體瓶頸來源。
 
 Paged attention 與 KV 量化都直接作用於此式：FP8 KV 把 $c$ 減半。 MLA（multi-head latent attention）則改為每個 token 只儲存單一個低秩 latent，而非完整的 $H_{kv}$ 份 K/V，因而把上式縮小一個很大的因子。
 
@@ -80,7 +80,7 @@ $$
 \text{throughput} = \frac{b}{t_{\text{step}}},
 $$
 
-其中 $b$ 為同時在飛行中的 token（請求）數，$t_{\text{step}}$ 為單一 decode 步驟的時間。增大 $b$ 會提高 throughput，但也會推高每個請求的 latency （TPOT）。Little's law 將兩者綁定：
+其中 $b$ 為同時在飛行中的 token（請求）數，$t_{\text{step}}$ 為單一 decode 步驟的時間。增大 $b$ 會提高 throughput，但也會推高每個請求的 latency（TPOT）。Little's law 將兩者綁定：
 
 $$
 B = \text{throughput} \times \text{latency}.
@@ -96,7 +96,7 @@ $$
 Decode 受記憶體限制，因此 GPU 在等待記憶體時有閒置的計算能力。 Speculative decoding 花費這份計算，在每次昂貴的驗證步驟中一次 產生多個 tokens：
 
 1. 一個便宜的 **draft**（一個小模型、模型自身的早期層，或 [n-gram/Medusa/EAGLE heads](#)）提出 $k$ 個候選 tokens。
-2. 大的 **target** 模型在**單一次** forward pass 中平行驗證全部 $k$ 個候選 （成本與一個 decode 步驟相當，因為它本來就是 memory-bound）。
+2. 大的 **target** 模型在**單一次** forward pass 中平行驗證全部 $k$ 個候選（成本與一個 decode 步驟相當，因為它本來就是 memory-bound）。
 3. 接受與 target 分佈相符的最長前綴（一個保留 target 精確輸出 分佈的 rejection sampling 規則 — 預期上是無損的），然後繼續。
 
 設 draft 的 acceptance rate（接受率）為 $\alpha$、draft 長度為 $k$，則每個 target 步驟期望接受的 token 數為
@@ -126,14 +126,14 @@ $$
 
 KV cache 是 serving 的動態記憶體消耗者（參見 [attention efficiency](../foundations/attention-efficiency.md)，並回顧上方 $\text{bytes} = 2\,L\,H_{kv}\,d_h\,s\,c$）。可用的槓桿：
 
-- **Paged attention**：以區塊為單位配置 → 無碎片，支援共享 （prefix caching、平行取樣）。它是 continuous batching 的基底。- **Prefix/prompt caching**：對共享系統 prompt 的請求重複使用其 KV （copy-on-write 區塊）— 對具有固定前導的聊天場景效益巨大。- **架構收縮**：GQA/MQA/MLA 從源頭（降低 $H_{kv}$ 或改存 latent）縮小 cache。
+- **Paged attention**：以區塊為單位配置 → 無碎片，支援共享（prefix caching、平行取樣）。它是 continuous batching 的基底。- **Prefix/prompt caching**：對共享系統 prompt 的請求重複使用其 KV（copy-on-write 區塊）— 對具有固定前導的聊天場景效益巨大。- **架構收縮**：GQA/MQA/MLA 從源頭（降低 $H_{kv}$ 或改存 latent）縮小 cache。
 - **KV 量化**：以 int8/FP8 儲存 K/V（降低 $c$）以容納更多序列； 在長上下文中要留意品質。
-- **Offloading/eviction**：將冷 KV 溢出到 CPU，或驅逐/壓縮舊 tokens （streaming/window attention），適用於極長的上下文。
+- **Offloading/eviction**：將冷 KV 溢出到 CPU，或驅逐/壓縮舊 tokens（streaming/window attention），適用於極長的上下文。
 ## 其他槓桿
 
 - **算子融合**（fused attention、fused MLP+activation、fused RMSNorm+residual）減少記憶體往返 — 屬於 [kernel](triton-track.md) 工作。
 - **CUDA/HIP graphs** 擷取 decode 步驟以消除每次迭代的啟動 開銷（小 batch 時影響顯著）。
-- **分解 prefill/decode**：在兩個分別調校以適配不同 roofline 的 GPU 池上各跑一個階段，並在其間傳輸 KV cache （disaggregated serving / split）。可改善負載下的 TTFT 與 TPOT。
+- **分解 prefill/decode**：在兩個分別調校以適配不同 roofline 的 GPU 池上各跑一個階段，並在其間傳輸 KV cache（disaggregated serving / split）。可改善負載下的 TTFT 與 TPOT。
 - **權重量化**（W4/W8，來自[quantization](quantization.md)）直接削減 decode latency（降低式中的 $P\,c$）。
 
 ## 將其放在一起：serving 堆疊

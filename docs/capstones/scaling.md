@@ -13,7 +13,7 @@
 
 ## 步驟 1 — 決定分片內容以及原因
 
-把記憶體預算走一遍。對每張 GPU，估計（BF16 + Adam）：參數（2 bytes）、梯度（2）、optimizer 狀態 （FP32 動量 + master ≈ 12）與峰值 activation。然後依「哪一項先溢位」來決定切分方式：
+把記憶體預算走一遍。對每張 GPU，估計（BF16 + Adam）：參數（2 bytes）、梯度（2）、optimizer 狀態（FP32 動量 + master ≈ 12）與峰值 activation。然後依「哪一項先溢位」來決定切分方式：
 
 ```text
 fits on 1 GPU?                      → just DP/DDP for throughput
@@ -29,7 +29,7 @@ context too long?                   → SP/CP (shard the sequence)
 
 ## 第 2 步 — 對映到拓樸
 
-把最「多話」的 collective 放到最快的連結上 （[分散式訓練](../performance/distributed-training.md)）：
+把最「多話」的 collective 放到最快的連結上（[分散式訓練](../performance/distributed-training.md)）：
 
 - **TP** 放節點內（每層 all-reduce 需要 NVLink/Infinity Fabric）。
 - **EP** 跨節點是可接受的，*只要*你把 all-to-all 重疊掉、並用 [node-limited routing](../moe/routing-variants.md) 約束它；在 expert 數允許的範圍內，盡量讓 EP 群組保持在本地。

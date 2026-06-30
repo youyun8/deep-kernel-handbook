@@ -228,7 +228,7 @@ flowchart TB
     OPT --> W32
 ```
 
-在 PyTorch 中，這是 `torch.autocast`（選擇每個操作精度）+ `GradScaler` （損失縮放，僅 FP16 需要）：
+在 PyTorch 中，這是 `torch.autocast`（選擇每個操作精度）+ `GradScaler`（損失縮放，僅 FP16 需要）：
 
 ```python
 scaler = torch.cuda.amp.GradScaler(enabled=use_fp16)  # no-op for bf16

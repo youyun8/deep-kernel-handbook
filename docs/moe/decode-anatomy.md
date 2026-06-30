@@ -106,7 +106,7 @@ flowchart TB
 這個恆等式精確成立：$\text{wall gap} = \text{Track A (net)} + \text{Track B} + \text{idle}$。 實務結論是避開一個規劃陷阱 —— **差距裡大約一半根本不是「某個 kernel 慢」的問題，而是 排程（scheduling）問題**。最佳化 kernel（Track A）與啟用重疊（Track B）是*不同的工作*， 而且它們的節省可以*相加*，因為在結構上互斥。只追其中一條，就把另一條留在桌上。
 
 !!! Tip "為什麼 Amdahl 定律讓 call count 成為正確的視角"
-    一個 stage 佔的 wall-clock 比例，是「只最佳化該 stage」能得到的加速比**上限** （Amdahl：$S = 1/((1-p) + p/s)$，$p$ 為該 stage 佔比、$s$ 為其加速倍率）。因為各 stage 的單次呼叫成本相近，*呼叫次數最多*的 stage（每層的 MoE 與 attention kernel， ×60–61）累積最多總時間 —— Track A 的力氣花在那裡才有回報，而不是每步只跑一次的 decode 序章/尾聲。
+    一個 stage 佔的 wall-clock 比例，是「只最佳化該 stage」能得到的加速比**上限**（Amdahl：$S = 1/((1-p) + p/s)$，$p$ 為該 stage 佔比、$s$ 為其加速倍率）。因為各 stage 的單次呼叫成本相近，*呼叫次數最多*的 stage（每層的 MoE 與 attention kernel， ×60–61）累積最多總時間 —— Track A 的力氣花在那裡才有回報，而不是每步只跑一次的 decode 序章/尾聲。
 
 ## 第 2 課 — fusion 決定 kernel 數量
 
@@ -168,7 +168,7 @@ flowchart TD
 | 其獨立的 activation-quant kernel            | ~4.5%                       |
 | 其 residual add                             | ~2.3%                       |
 | 其 SiLU activation                          | ~2.2%                       |
-| （略增的 routing 成本：更大的 sort + GEMM） | −0.7%（淨）                 |
+|（略增的 routing 成本：更大的 sort + GEMM） | −0.7%（淨）                 |
 | **decode 總加速**                           | **~18%**                    |
 
 這一課對整個模型一般化：一條永遠在線的 dense 路徑，旁邊接著一條 grouped sparse 路徑， 就是一張 fusion 的邀請函。獨立 pipeline 的 GEMM、activation、quant 與 residual，一旦 共享後都成了多餘的 launch —— Shared token 只是附加到 routed batch 上。decode latency 中 幾乎五分之一是結構性開銷，而不是數學本身。
@@ -189,7 +189,7 @@ flowchart TD
 2. Routed GEMM1 約佔一步 15% 且跑 60×；LM head 約 1% 且只跑一次。你能把任一者的單次呼叫 成本減半。哪個贏？這對「以單次呼叫成本 vs 總成本來最佳化」說明了什麼？
 3. Shared-experts fusion 移除了獨立的 GEMM、activation、quant 與 residual add（各 ×61）， 換得約 18% 的勝利，代價是略大的 routing sort + GEMM。用「省下的 kernel vs 多做的工作」 寫出這個 fusion 有利可圖的不等式。
 4. 一個堆疊的 self-time 是其 wall-clock 的 111%，另一個是 96%。解釋 self-time 為何能超過 wall-clock，以及*低於* 100% 的值對 idle 空檔代表什麼。
-5. Split-K 把一個 GEMM 變成一個 compute kernel + 一個 reduce kernel。已知一個堆疊每層 （×60）做一次 reduce、另一個每次 decode 只做一次，估計呼叫次數的代價，並論證對每層的 GEMM 而言，用 in-kernel K-accumulation 避開 split-K 是否值得。
+5. Split-K 把一個 GEMM 變成一個 compute kernel + 一個 reduce kernel。已知一個堆疊每層（×60）做一次 reduce、另一個每次 decode 只做一次，估計呼叫次數的代價，並論證對每層的 GEMM 而言，用 in-kernel K-accumulation 避開 split-K 是否值得。
 
 ## 參考文獻
 

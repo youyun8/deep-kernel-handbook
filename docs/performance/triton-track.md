@@ -6,7 +6,7 @@
   <span class="chip"><strong>程式碼：</strong> <code>code/kernels/</code>（需 GPU）</span>
 </div>
 
-Triton 讓你用 Python 寫 GPU kernel，編譯成接近峰值的機器碼，同時替你處理那些痛苦的細節 （coalescing、SMEM 分段、向量化、大部分排程）。你以 **tile（張量塊）** 的角度思考，而不是 單個 thread。本路線從最簡單的 kernel 一路堆到融合 softmax 與 matmul，再指向手冊其他地方的 attention / MoE kernel。
+Triton 讓你用 Python 寫 GPU kernel，編譯成接近峰值的機器碼，同時替你處理那些痛苦的細節（coalescing、SMEM 分段、向量化、大部分排程）。你以 **tile（張量塊）** 的角度思考，而不是 單個 thread。本路線從最簡單的 kernel 一路堆到融合 softmax 與 matmul，再指向手冊其他地方的 attention / MoE kernel。
 
 !!! Info "為什麼先學 Triton"
     對大多數 kernel，Triton 能以一小部分的工作量達到手調 CUDA 80–95% 的效能，而且*同一份原始碼 也能在 AMD 上跑*（Triton 有 ROCm 後端，對映到 wavefront-64 與 MFMA）。只有當你需要 Triton 沒暴露出來的控制權時，才往下掉到 [CUDA/HIP](cuda-hip-track.md)。

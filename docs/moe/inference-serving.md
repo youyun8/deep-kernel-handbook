@@ -52,7 +52,7 @@ MoE server 要同時照顧**兩個**會動態變化的大記憶體消耗者：
 
 兩者爭奪同一塊 HBM。好的 serving 堆疊（vLLM、SGLang、TensorRT-LLM、DeepSeek 自家的）把兩者都 當成分頁池、依合併後的預算來排程。一些手法：
 
-- **Expert 快取**：offload 時用 LRU／熱門度策略 —— 把熱 expert 留在 HBM、串流冷的，並在計算當前 層時預取下一層可能用到的 expert（重疊，如 [EP](systems-ep.md) 中所述）。- **Prefill/decode 拆分**：把 compute-bound 的 prefill 與 memory-bound 的 decode 跑在各自的 GPU 池上、各自依其 roofline 配置，再把 KV cache 在兩者間搬運。- **依熱門度調整 expert-parallel 放置**：把熱門 expert 散到各 device，免得某張 GPU 變成落後者 （這是 inference 版的 [負載平衡](load-balancing.md)）。
+- **Expert 快取**：offload 時用 LRU／熱門度策略 —— 把熱 expert 留在 HBM、串流冷的，並在計算當前 層時預取下一層可能用到的 expert（重疊，如 [EP](systems-ep.md) 中所述）。- **Prefill/decode 拆分**：把 compute-bound 的 prefill 與 memory-bound 的 decode 跑在各自的 GPU 池上、各自依其 roofline 配置，再把 KV cache 在兩者間搬運。- **依熱門度調整 expert-parallel 放置**：把熱門 expert 散到各 device，免得某張 GPU 變成落後者（這是 inference 版的 [負載平衡](load-balancing.md)）。
 
 ```mermaid
 flowchart TD

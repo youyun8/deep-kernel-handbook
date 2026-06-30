@@ -22,7 +22,7 @@
 
 <small>\*Qwen 變體隨版本不同；請查對應的模型卡。</small>
 
-趨勢非常清楚：從少數幾個大 expert（Mixtral），走向**許多細粒度 expert + 共享 expert + sigmoid gating + aux-loss-free 平衡**（DeepSeek、Kimi），並用 attention 壓縮 （[MLA](../foundations/attention-efficiency.md)）對抗 KV cache 成本。
+趨勢非常清楚：從少數幾個大 expert（Mixtral），走向**許多細粒度 expert + 共享 expert + sigmoid gating + aux-loss-free 平衡**（DeepSeek、Kimi），並用 attention 壓縮（[MLA](../foundations/attention-efficiency.md)）對抗 KV cache 成本。
 
 ## Mixtral 8×7B — 乾淨的經典
 
@@ -61,7 +61,7 @@ Qwen MoE 系列（Qwen1.5-MoE-A2.7B → Qwen2-57B-A14B → Qwen3-235B-A22B）展
 - 標準的 **auxiliary loss** 平衡 —— 穩健、好推理，把可靠性看得比榨出最後一點平衡更重。
 - 強大的**生態系支援**（量化變體、serving 整合），這本身就是一個系統決策：架構再好，也只能 和跑它的 kernel 與 server 一樣好用。
 
-重點：存在一條光譜，一端是「奇特的研究前沿」（DeepSeek/Kimi），另一端是「久經考驗、可移植」 （Qwen）；該選哪一端，取決於你是否掌控整個堆疊。
+重點：存在一條光譜，一端是「奇特的研究前沿」（DeepSeek/Kimi），另一端是「久經考驗、可移植」（Qwen）；該選哪一端，取決於你是否掌控整個堆疊。
 
 ## Kimi K2 / K2.5 — 兆級的極度稀疏
 

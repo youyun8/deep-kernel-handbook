@@ -125,7 +125,7 @@ fused_moe()                 # 第 242 行，公開 API
 
 AITER 在 MoE 上做的主要優化：
 
-1. **2-stage fused grouped GEMM**：把「gate/up GEMM + SwiGLU」融成 stage-1 （`mfma_moe1` / `flydsl_moe1`），「down GEMM + combine」融成 stage-2 （`mfma_moe2` / `flydsl_moe2`），省掉中間 activation 的來回。實作： `aiter/ops/flydsl/kernels/moe_gemm_2stage.py`（`compile_moe_gemm1` 第 93 行內含 `silu` 融合）、CK 版 `csrc/ck_gemm_moe_2stages_codegen/`。
+1. **2-stage fused grouped GEMM**：把「gate/up GEMM + SwiGLU」融成 stage-1（`mfma_moe1` / `flydsl_moe1`），「down GEMM + combine」融成 stage-2（`mfma_moe2` / `flydsl_moe2`），省掉中間 activation 的來回。實作： `aiter/ops/flydsl/kernels/moe_gemm_2stage.py`（`compile_moe_gemm1` 第 93 行內含 `silu` 融合）、CK 版 `csrc/ck_gemm_moe_2stages_codegen/`。
 
 2. **MXFP4 量化 grouped GEMM**：權重 FP4（0.5 byte/元素），activation 動態量化成 `per_1x32` MXFP4。decode 是 weight-bandwidth-bound，FP4 直接把權重讀取量砍半。 入口 `aiter/ops/quant.py`、`aiter/utility/fp4_utils.py`。
 
