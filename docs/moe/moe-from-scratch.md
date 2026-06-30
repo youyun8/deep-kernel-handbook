@@ -121,7 +121,7 @@ def moe_dispatch(x, topi, topv, experts, n_experts):
 `argsort`／`bincount`／`index_add_` 這三件套，在 GPU 上對應的就是融合的 **permute** kernel； 而每個 expert 的連續區塊則餵進單一的 **grouped GEMM** 呼叫。我們已經把「參差不齊的遮罩迴圈」 變成了「排序 + 密集區塊」。
 
 !!! Tip "兩種實作經測試一致"
-    [`code/moe/test_moe.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/moe/test_moe.py) 斷言 `MoELayerNaive` 與 dispatch 形式在隨機輸入、兩種 gate、數種 $k$ 下產生相同輸出 （`torch.allclose`），並且單一 expert 在 $E{=}1$ 時退化成普通 FFN。執行 `pytest code/moe`。
+    [`code/moe/test_moe.py`](https://github.com/youyun8/deep-kernel-handbook/blob/main/code/moe/test_moe.py) 斷言 `MoELayerNaive` 與 dispatch 形式在隨機輸入、兩種 gate、數種 $k$ 下產生相同輸出（`torch.allclose`），並且單一 expert 在 $E{=}1$ 時退化成普通 FFN。執行 `pytest code/moe`。
 
 ## 將其放入 Transformer 塊中
 

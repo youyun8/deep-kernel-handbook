@@ -27,7 +27,7 @@ O = P @ V                  # [N, d]
 
 ## 線上 softmax：running-max 技巧
 
-我們要算 $\text{softmax}(x)_i = e^{x_i - m} / \sum_j e^{x_j - m}$，其中 $m=\max_j x_j$ （減掉最大值可維持數值穩定 —— 見 [數值與精度](numerics-precision.md)）。假設我們把 $x$ 分成 兩塊 $x^{(1)}, x^{(2)}$ 看到，想把部分結果合併起來。
+我們要算 $\text{softmax}(x)_i = e^{x_i - m} / \sum_j e^{x_j - m}$，其中 $m=\max_j x_j$（減掉最大值可維持數值穩定 —— 見 [數值與精度](numerics-precision.md)）。假設我們把 $x$ 分成 兩塊 $x^{(1)}, x^{(2)}$ 看到，想把部分結果合併起來。
 
 維護一個 running max $m$ 與 running 分母 $\ell$。處理完區塊 1 之後：
 

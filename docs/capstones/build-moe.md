@@ -60,7 +60,7 @@ for step, (xb, yb) in enumerate(loader):
         log_metrics(lm, load_cv(model), drop_rate(model), entropy(model))
 ```
 
-盯著 [健康指標](../moe/load-balancing.md)：損失下降、**負載 CV** 趨近 0、**drop rate** 維持低、 **routing 熵**穩定（不崩塌）。若看到尖峰/NaN，回去看 [訓練穩定性](../moe/training-stability.md) （z-loss、FP32 router、初始化、梯度裁剪）。
+盯著 [健康指標](../moe/load-balancing.md)：損失下降、**負載 CV** 趨近 0、**drop rate** 維持低、 **routing 熵**穩定（不崩塌）。若看到尖峰/NaN，回去看 [訓練穩定性](../moe/training-stability.md)（z-loss、FP32 router、初始化、梯度裁剪）。
 
 ??? Success "你應該看到什麼"
     在玩具任務上，訓練損失應平穩下降，負載 CV 應在幾百步內從初始值降到約 0.1–0.2（偏差控制器 在發揮作用），drop rate 維持低。把平衡關掉「看它崩塌」 —— 少數 expert 吃掉一切、熵崩潰 —— 平衡機制的價值就具體了。

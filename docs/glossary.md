@@ -281,7 +281,7 @@
 | H200 | ~990 TFLOP/s | ~4.8 TB/s | 141 GB | ~206 FLOP/byte |
 | MI300X | ~1.3 PFLOP/s | ~5.3 TB/s | 192 GB | ~245 FLOP/byte |
 
-互連（用於 [分散式訓練](performance/distributed-training.md)）：節點內 **NVLink** ~0.9 TB/s/GPU （NVLink 4）或 MI300 上的 **Infinity Fabric**；跨節點 **InfiniBand/RoCE** ~25–50 GB/s/GPU；主機 **PCIe Gen5** ~64 GB/s。從 HBM → NVLink → IB → PCIe 每一級掉 1–2 個數量級 —— 這正是為什麼要把並行 小心對映，好讓最多話的 collective 走最快的連結。
+互連（用於 [分散式訓練](performance/distributed-training.md)）：節點內 **NVLink** ~0.9 TB/s/GPU（NVLink 4）或 MI300 上的 **Infinity Fabric**；跨節點 **InfiniBand/RoCE** ~25–50 GB/s/GPU；主機 **PCIe Gen5** ~64 GB/s。從 HBM → NVLink → IB → PCIe 每一級掉 1–2 個數量級 —— 這正是為什麼要把並行 小心對映，好讓最多話的 collective 走最快的連結。
 
 !!! Note "怎麼用這些數字"
     數字會隨 SKU、時脈與稀疏性宣稱而變（廠商常引用 2× 結構稀疏 —— 對密集要減半）。你的估計裡該 穩健的是**機制**與**數量級**，而不是第三位有效數字。

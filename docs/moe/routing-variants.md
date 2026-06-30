@@ -72,7 +72,7 @@ DeepSeek-V3 用 1 個共享 + 256 個路由（其中 8 個活躍）。共享 FFN
 - **更多 routing 開銷** —— 更大的 router 矩陣（$d\times E$）、更多 top-$k$ 工作、更多 all-to-all 訊息（payload 更小 → 網路效率更差，見 [系統與 EP](systems-ep.md)）。
 - **每個 expert 的 GEMM 變小** —— 算術強度更低，更難餵飽 GPU。grouped GEMM [kernels](kernels.md) 的存在正是為了把這個問題救回來。
 
-DeepSeekMoE 證明，在同等計算下，細粒度 + 共享 expert 大幅勝過經典的「少數大 expert」 （GShard 風格）設計。現代大型 MoE（DeepSeek-V3：256 個 expert；Qwen3-MoE：128 個）都牢牢站在 細粒度這一邊。
+DeepSeekMoE 證明，在同等計算下，細粒度 + 共享 expert 大幅勝過經典的「少數大 expert」（GShard 風格）設計。現代大型 MoE（DeepSeek-V3：256 個 expert；Qwen3-MoE：128 個）都牢牢站在 細粒度這一邊。
 
 ## 將槓桿放在一起
 

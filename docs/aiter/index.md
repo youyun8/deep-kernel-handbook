@@ -41,8 +41,8 @@ record_function("Decode") window
 !!! Note "`moe_tp_size=8`"
 
     1. **runtime log 直接印出 `moe_tp_size=8`**： `FusedMoE.__init__: ... Num_experts=385, num_fused_shared_experts=1, moe_ep_size=1, moe_tp_size=8`
-    2. **與 server_args 一致**：profiling 用 `--tensor-parallel-size 4`，server_args 為 `tp_size=4, moe_ep_size=1, moe_dp_size=1` （`shared_expert_fusion_on/.../server.log` 第 8 行）。
-    3. **與 SGLang 推導式一致**： `moe_tp_size = tp_size // moe_ep_size // moe_dp_size` （`/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py:1118`）。
+    2. **與 server_args 一致**：profiling 用 `--tensor-parallel-size 4`，server_args 為 `tp_size=4, moe_ep_size=1, moe_dp_size=1`（`shared_expert_fusion_on/.../server.log` 第 8 行）。
+    3. **與 SGLang 推導式一致**： `moe_tp_size = tp_size // moe_ep_size // moe_dp_size`（`/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py:1118`）。
 
     關鍵是 Kimi K2.5 對 MoE 採用 **attention DP + MoE TP** 的切法：attention 走 TP4， MoE 權重則沿 intermediate 維度切成 8 份（`2048 / 8 = 256`）。因此 `moe_tp_size=8` 與 `tp_size=4` 並不矛盾；它們描述的是不同並行軸。本章所有 `inter_dim=256` 的 kernel shape 都直接來自這個 MoE TP 切分。
 

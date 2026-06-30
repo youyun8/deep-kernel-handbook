@@ -109,7 +109,7 @@ $$
 
 ### Sort/padding 開銷
 
-Grouped GEMM 會把每個 expert 的行數向上 pad 到 tile $\text{block}_m$ 的整數倍 （matmul tile 沿 $M$ 維的高度）。若 expert 實際有 $m_e$ 行，實際算的是 $\lceil m_e / \text{block}_m\rceil \cdot \text{block}_m$ 行，padding 比例為
+Grouped GEMM 會把每個 expert 的行數向上 pad 到 tile $\text{block}_m$ 的整數倍（matmul tile 沿 $M$ 維的高度）。若 expert 實際有 $m_e$ 行，實際算的是 $\lceil m_e / \text{block}_m\rceil \cdot \text{block}_m$ 行，padding 比例為
 
 $$
 \frac{\lceil m_e/\text{block}_m\rceil \cdot \text{block}_m - m_e}{m_e}.

@@ -10,7 +10,7 @@
 
 ## 你必須知道的 collective
 
-所有並行性都是由少數幾個 collective 通訊原語建構的 （NVIDIA 上的 NCCL，AMD 上的 RCCL — 相同的 API）：
+所有並行性都是由少數幾個 collective 通訊原語建構的（NVIDIA 上的 NCCL，AMD 上的 RCCL — 相同的 API）：
 
 | collective | 它做什麼 | 使用者 |
 | --- | --- | --- |
@@ -48,7 +48,7 @@ $$
 2\,\frac{N-1}{N}\,P\,c \quad\text{位元組／裝置},
 $$
 
-其中 $N$ = DP 裝置數，$P$ = 參數數量，$c$ = 每個參數的位元組數 （例如 FP16/BF16 時 $c=2$）。這一項與上面 ring all-reduce 的頻寬項 （取 $M = Pc$）一致。實務上把這個 all-reduce 與反向傳播**重疊** （逐層 bucket）即可大致隱藏其成本。
+其中 $N$ = DP 裝置數，$P$ = 參數數量，$c$ = 每個參數的位元組數（例如 FP16/BF16 時 $c=2$）。這一項與上面 ring all-reduce 的頻寬項（取 $M = Pc$）一致。實務上把這個 all-reduce 與反向傳播**重疊**（逐層 bucket）即可大致隱藏其成本。
 
 **ZeRO**(DeepSpeed) /**FSDP**(PyTorch) 把 DP 群組內的冗餘狀態分片， 分為三個階段：
 
@@ -110,7 +110,7 @@ $$
 \text{bubble} = \frac{p-1}{m + p - 1},
 $$
 
-其中 $p$ = 管線階段數、$m$ = microbatch 數。提高 $m$ 即可壓低 bubble （$m \to \infty$ 時 bubble $\to 0$）。
+其中 $p$ = 管線階段數、$m$ = microbatch 數。提高 $m$ 即可壓低 bubble（$m \to \infty$ 時 bubble $\to 0$）。
 
 !!! Example "數值例子：要多少 microbatch 才有 10% bubble"
     若 pipeline 有 $p=8$ 個 stage，要讓 $\frac{p-1}{m+p-1}\le0.1$，需

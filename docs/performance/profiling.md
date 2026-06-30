@@ -107,7 +107,7 @@ def benchmark(fn, iters=100, warmup=20):
 - **問題規模太小** → 由啟動開銷主導，不代表真實工作量。對真實 shape 做基準。
 - **時鐘漂移／熱節流** → 跑得夠久或鎖定時鐘；一個「2% 回歸」通常只是變異數變大。
 - **拿蘋果比橘子** → 基線與優化之間的精度、batch 或序列長度不同。 一次只改一件事。
-- **只挑一個 shape** → 報告掃描結果；一個 kernel 在某個尺寸快，在另一個可能慢 （這就是我們做 [autotune](triton-track.md) 的原因）。
+- **只挑一個 shape** → 報告掃描結果；一個 kernel 在某個尺寸快，在另一個可能慢（這就是我們做 [autotune](triton-track.md) 的原因）。
 
 !!! Warning "基本規則：首先驗證正確性"
     傳回錯誤數字的快速 kernel 的工作速度無限慢。每個 `code/` kernel 這裡檢查 `torch.allclose` 與任何*之前*的參考 時機。僅對經過驗證的程式碼進行基準測試。
@@ -146,7 +146,7 @@ $$ \text{in-flight requests} = \text{throughput} \times \text{latency}, $$
 
 ### 測量統計：判斷加速是真是噪聲
 
-Kernel 計時通常右偏（偶發的長尾），因此報告**中位數與 IQR** （四分位距）比平均值更穩健。量化離散度用變異係數
+Kernel 計時通常右偏（偶發的長尾），因此報告**中位數與 IQR**（四分位距）比平均值更穩健。量化離散度用變異係數
 
 $$ \mathrm{CV} = \frac{\sigma}{\mu}, $$
 
@@ -178,7 +178,7 @@ print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=15))
 
 1. **先做 roofline** —— 計算目標時間與預期 régime。
 2. **時間軸視圖** —— 時間花在 kernels、空隙還是通訊？先修空隙／通訊， 再去微優化 kernels（通常是更大的勝利）。
-3. **kernel 視圖看最重的 kernel** —— 確認 régime，找出限制器 （記憶體 throughput？occupancy？stall？）。
+3. **kernel 視圖看最重的 kernel** —— 確認 régime，找出限制器（記憶體 throughput？occupancy？stall？）。
 4. **優化限制器**，而非舒適的東西 —— Memory-bound 就提高算術強度， compute-bound 就削減 FLOP／降精度，通訊受限就做重疊。
 5. **正確地重新量測**（warmup、events、sync、掃描）並與目標比較。
 6. **重複**，直到你逼近 roofline 或耗盡可用空間（headroom）。

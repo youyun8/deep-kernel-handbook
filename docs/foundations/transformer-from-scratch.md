@@ -28,7 +28,7 @@ flowchart TB
 
 ## 步驟 1 — tokens 和 embedding
 
-文字先被 tokenizer 切成 **tokens（子詞片段）**；每個 token 是一個整數 id，取自固定大小為 $V$ （通常 32k–256k）的**詞彙表**。模型沒辦法直接對整數做運算，所以每個 id 會去索引**embedding 矩陣** $E \in \mathbb{R}^{V \times d}$ 的某一列，把它轉成一個維度為 $d$ 的向量（$d$ 是**隱藏維度（hidden size）**， 例如 4096）。
+文字先被 tokenizer 切成 **tokens（子詞片段）**；每個 token 是一個整數 id，取自固定大小為 $V$（通常 32k–256k）的**詞彙表**。模型沒辦法直接對整數做運算，所以每個 id 會去索引**embedding 矩陣** $E \in \mathbb{R}^{V \times d}$ 的某一列，把它轉成一個維度為 $d$ 的向量（$d$ 是**隱藏維度（hidden size）**， 例如 4096）。
 
 ```mermaid
 flowchart TB

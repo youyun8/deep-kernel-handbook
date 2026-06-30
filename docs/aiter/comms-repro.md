@@ -11,7 +11,7 @@ $$
 = \begin{cases} 448\,\text{KB} & (\text{bs}=32) \\ 896\,\text{KB} & (\text{bs}=64) \end{cases}
 $$
 
-訊息小代表 collective 主要受 latency 限制，不容易被 batch 攤平，因此它是 MoE GEMM 後面 固定存在的尾巴。concurrency 很高時，fused all-reduce 會從 1-stage 切到 2-stage reduce-scatter + load-RMSNorm （`reduce_scatter_cross_device_store` / `local_device_load_rmsnorm`，見 [Shared-expert fusion 開 / 關](fusion.md) 同 trace 的 其他 rank）。tuning 入口：`aiter/ops/custom_all_reduce.py`、`aiter/dist/communication_op.py`。
+訊息小代表 collective 主要受 latency 限制，不容易被 batch 攤平，因此它是 MoE GEMM 後面 固定存在的尾巴。concurrency 很高時，fused all-reduce 會從 1-stage 切到 2-stage reduce-scatter + load-RMSNorm（`reduce_scatter_cross_device_store` / `local_device_load_rmsnorm`，見 [Shared-expert fusion 開 / 關](fusion.md) 同 trace 的 其他 rank）。tuning 入口：`aiter/ops/custom_all_reduce.py`、`aiter/dist/communication_op.py`。
 
 ## 從 trace 回到原始碼的查表
 
@@ -34,7 +34,7 @@ $$
 
 ## 重現
 
-兩組 trace 由 `run_multistream_profile_comparison.sh` 產生。A/B 列表分別設成 baseline （fusion 開）與 `--disable-shared-experts-fusion`（fusion 關）：
+兩組 trace 由 `run_multistream_profile_comparison.sh` 產生。A/B 列表分別設成 baseline（fusion 開）與 `--disable-shared-experts-fusion`（fusion 關）：
 
 ```bash
 # 在 run_multistream_profile_comparison.sh 的 RUN_LIST 內保留：

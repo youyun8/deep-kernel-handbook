@@ -22,7 +22,7 @@ $$ P = \min(\pi,\ \beta I) $$
 
 $$ I^\ast = \frac{\pi}{\beta} $$
 
-當 $I < I^\ast$ 時 kernel 為 **memory-bound（受記憶體限制）**，效能由 $\beta I$ 決定； 當 $I > I^\ast$ 時為 **compute-bound（受算力限制）**，效能逼近 $\pi$。本頁所有手法 （合併存取、重用 SMEM、提升佔用率）的最終目的，都是把 kernel 推離 memory-bound 區域。
+當 $I < I^\ast$ 時 kernel 為 **memory-bound（受記憶體限制）**，效能由 $\beta I$ 決定； 當 $I > I^\ast$ 時為 **compute-bound（受算力限制）**，效能逼近 $\pi$。本頁所有手法（合併存取、重用 SMEM、提升佔用率）的最終目的，都是把 kernel 推離 memory-bound 區域。
 
 ## 執行層次
 
@@ -72,13 +72,13 @@ flowchart TD
 
   $$ \beta_{\text{eff}} \approx \frac{\beta}{\min(k,\ \text{lanes})} $$
 
-  其中 lanes 為 warp/wavefront 寬度（32 或 64）。MoE 的 gather 正是這類風險所在 （[kernels](../moe/kernels.md)） —— 它直接侵蝕 roofline 中的 $\beta$。
+  其中 lanes 為 warp/wavefront 寬度（32 或 64）。MoE 的 gather 正是這類風險所在（[kernels](../moe/kernels.md)） —— 它直接侵蝕 roofline 中的 $\beta$。
 
 - **SMEM/LDS 的 bank conflict**：共享記憶體被切成 $B = 32$ 個 bank，相鄰的 4-byte 字輪流落在不同 bank（bank index $= (\text{address}/4) \bmod 32$）。若一個 warp 內有 $c$ 條 lane 同時存取*同一個 bank 內的不同位址*，該存取會被序列化為 $c$ 路（$c\times$ latency）：
 
   $$ T_{\text{access}} \approx c \cdot T_{\text{bank}} $$
 
-  無 conflict（$c = 1$）的前提是所有 lane 映射到相異的 bank；對 tile 做寬度 padding （例如把列寬從 32 補到 33）是消除 conflict 的常用手法。
+  無 conflict（$c = 1$）的前提是所有 lane 映射到相異的 bank；對 tile 做寬度 padding（例如把列寬從 32 補到 33）是消除 conflict 的常用手法。
 
 ## 佔用率（occupancy）
 
@@ -141,7 +141,7 @@ Kernel 本體完全相同；HIP 是疊在 CUDA 概念之上的一層薄可移植
     參考解答位於 [解答頁](../solutions/performance.md) 上。請先嘗試每個練習，再展開解答。
 
 1. 為什麼一個為 32 條 lane 寫死的 warp/wavefront reduction 在 CDNA 上會給出 錯誤結果？把它改寫成使用 `warpSize`。
-2. 對一個每 thread 使用 64 個 registers、每 block 使用 48 KB SMEM 的 kernel， 在一個擁有 64K registers 與 100 KB SMEM 的 SM 上，用佔用率公式估算限制因子 （register 上限與 SMEM 上限各自允許幾個 warp？）。
+2. 對一個每 thread 使用 64 個 registers、每 block 使用 48 KB SMEM 的 kernel， 在一個擁有 64K registers 與 100 KB SMEM 的 SM 上，用佔用率公式估算限制因子（register 上限與 SMEM 上限各自允許幾個 warp？）。
 3. 寫出一個對 row-major 張量為合併、但對其轉置卻不合併的記憶體存取模式； 把它連結到 MoE 的 gather。
 4. 解釋在什麼情況下*降低*佔用率反而能提升 throughput（提示：register 用量很重的 matmul tile）。
 
