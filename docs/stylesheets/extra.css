@@ -23,12 +23,12 @@
     "Inter", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
     system-ui, -apple-system, "Segoe UI", sans-serif;
   --ml-sidebar-font: var(--md-text-font-family, "Inter", system-ui, sans-serif);
-  --ml-sidebar-width: 256px;
+  --ml-sidebar-width: 300px;
   --ml-sidebar-rail-width: 2.45rem;
-  /* Total width of the centred app (sidebar + content), like cp-handbook's
-     max-w-7xl. On wider viewports the surplus becomes symmetric gutters so the
-     sidebar+content block stays centred instead of leaving a gap on the right. */
-  --ml-app-width: 1280px;
+  /* Comfortable reading width for the content column. The sidebar stays
+     docked to the left edge; on wide screens the content is centred in the
+     viewport at this width so it neither sprawls nor strands a gap. */
+  --ml-content-max: 1024px;
   --ml-toc-accent: #15803d;
   --ml-toc-accent-soft: rgba(22, 163, 74, 0.12);
 
@@ -209,10 +209,9 @@
 }
 
 /* ---------- 3. Base layout & typography ---------------------------------- */
-/* Match cp-handbook's content width (Tailwind max-w-7xl = 1280px) so line
-   length and overall proportions line up instead of sprawling on wide
-   screens. Set in px on purpose: Material's root font is 20px, so a rem-based
-   width would not equal cp-handbook's 16px-root pixels. */
+/* Fallback cap for the tablet breakpoint (below the fixed-sidebar layout). On
+   desktop the content width is driven by --ml-content-max via centred margins
+   in the layout media query below. */
 .md-grid {
   max-width: 1280px;
 }
@@ -494,32 +493,37 @@
 }
 
 @media screen and (min-width: 76.25em) {
+  /* Sidebar stays docked at the left edge; the content column is centred
+     within the space to its right (at --ml-content-max), so the gap before the
+     content and the gap after it stay symmetric instead of stranding the slack
+     on one side. */
   :root {
-    --ml-app-gutter: max(0px, calc((100vw - var(--ml-app-width)) / 2));
+    --ml-content-gutter: max(
+      1.4rem,
+      calc((100vw - var(--ml-sidebar-width) - var(--ml-content-max)) / 2)
+    );
   }
 
   .md-main__inner {
-    margin-left: calc(
-      var(--ml-app-gutter) + var(--ml-sidebar-width) + 1.4rem
-    );
-    margin-right: var(--ml-app-gutter);
+    margin-left: calc(var(--ml-sidebar-width) + var(--ml-content-gutter));
+    margin-right: var(--ml-content-gutter);
     transition: margin 160ms ease;
   }
 
   [data-sidebar-collapsed="true"] .md-main__inner {
-    margin-left: calc(var(--ml-app-gutter) + 3rem);
+    margin-left: max(3rem, calc((100vw - var(--ml-content-max)) / 2));
+    margin-right: max(3rem, calc((100vw - var(--ml-content-max)) / 2));
   }
 
   .md-footer {
-    margin-left: calc(
-      var(--ml-app-gutter) + var(--ml-sidebar-width) + 0.75rem
-    );
-    margin-right: var(--ml-app-gutter);
+    margin-left: calc(var(--ml-sidebar-width) + var(--ml-content-gutter));
+    margin-right: var(--ml-content-gutter);
     transition: margin 160ms ease;
   }
 
   [data-sidebar-collapsed="true"] .md-footer {
-    margin-left: var(--ml-app-gutter);
+    margin-left: max(0px, calc((100vw - var(--ml-content-max)) / 2));
+    margin-right: max(0px, calc((100vw - var(--ml-content-max)) / 2));
   }
 
   .md-sidebar--primary {
@@ -529,7 +533,7 @@
     min-width: 220px;
     max-width: min(560px, 38vw);
     top: 0 !important;
-    left: var(--ml-app-gutter, 0px);
+    left: 0;
     bottom: 0;
     z-index: 8;
     margin: 0;
@@ -2188,7 +2192,7 @@ body.ml-settings-open {
 }
 
 [data-reading-width="wide"] {
-  --ml-app-width: 1536px;
+  --ml-content-max: 1320px;
 }
 [data-reading-width="wide"] .md-grid {
   max-width: 1536px;
