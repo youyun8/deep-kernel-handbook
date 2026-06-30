@@ -9,7 +9,7 @@
 MoE FFN 的執行時間主要由兩個不規則操作主導（[systems page](systems-ep.md) 有介紹）：**permute**（scatter/gather，把 tokens 依其目的 expert 分組） 與 **grouped GEMM**（一次處理許多大小不一的 matmul）。本頁展示如何 在 **Triton**、**CUDA** 與 **ROCm/HIP** 上有效地撰寫它們 — 將 AMD 視為 一流目標，並標記出 warp/wavefront 寬度、occupancy 與 API 的差異。
 
 !!! Info "「融合 routing」是什麼意思"
-    最樸素的 MoE 做法是：gather (kernel) → grouped GEMM (kernel) → scatter (kernel)，每一步都是一次完整的 HBM 往返。勝利來自 **fusion**：把 gather 併進 GEMM 的 prologue（透過 permutation 索引直接讀入 tokens，省去單獨的 gather pass），並把 scatter 併進 epilogue。本頁的目標即在此。
+    最樸素的 MoE 做法是：gather (kernel) → grouped GEMM (kernel) → scatter (kernel)，每一步都是一次完整的 HBM 往返。勝利來自 **fusion**：把 gather fuse 進 GEMM 的 prologue（透過 permutation 索引直接讀入 tokens，省去單獨的 gather pass），並把 scatter fuse 進 epilogue。本頁的目標即在此。
 
 ## Permute（scatter/gather）
 
@@ -90,7 +90,7 @@ $$
 
 ### Decode 是 weight-bandwidth-bound
 
-考慮 stage-1 在每個 expert 處理 $m$ 行、權重只讀一次時的 arithmetic intensity $I_{\text{AI}}$（FLOP/byte）：
+考慮 stage-1 在每個 expert 處理 $m$ 行、權重只讀一次時的算術強度 $I_{\text{AI}}$（FLOP/byte）：
 
 $$
 I_{\text{AI}} = \frac{2\,m\,H\,(2I)}{2I\cdot H \cdot 0.5} = 4m\ \text{FLOP/byte}.
@@ -102,10 +102,10 @@ $$
 M \approx \frac{\text{batch}\cdot k}{E}.
 $$
 
-例如 $\text{batch}=32$、$k=8$、$E=384$ 時 $m \approx 32\cdot 8/384 = 0.67$， 即 decode 時 $m \lesssim 1$，於是 $I_{\text{AI}} \approx 4$ FLOP/byte，遠低於現代 GPU 的 roofline ridge point（數百 FLOP/byte）⇒ **memory-bound**。這解釋了為何 decode 的 MoE GEMM 形同為 ~1 個 token 付出一次完整的權重讀取；而提高 batch 會 線性拉高 $I_{\text{AI}}$，因此提升效率，直到計算飽和（撞到 ridge point）為止。
+例如 $\text{batch}=32$、$k=8$、$E=384$ 時 $m \approx 32\cdot 8/384 = 0.67$， 即 decode 時 $m \lesssim 1$，於是 $I_{\text{AI}} \approx 4$ FLOP/byte，遠低於現代 GPU 的 roofline 脊點（數百 FLOP/byte）⇒ **memory-bound**。這解釋了為何 decode 的 MoE GEMM 形同為 ~1 個 token 付出一次完整的權重讀取；而提高 batch 會 線性拉高 $I_{\text{AI}}$，因此提升效率，直到計算飽和（撞到脊點）為止。
 
-!!! Example "數值例子：batch 要多大才接近 ridge"
-    對 FP4 stage-1，$I_{\text{AI}}=4m$。若目標 GPU 的 ridge point 約 $250$ FLOP/byte，需要 $m\approx62.5$ rows/expert。以 $E=384,k=8$ 反推 batch：$m=\text{batch}\cdot k/E$，所以 batch 約 $62.5\cdot384/8\approx3000$。這遠高於一般低 latency decode 的並發量，因此單 token decode 的 routed GEMM 幾乎必然是 weight-bandwidth-bound。
+!!! Example "數值例子：batch 要多大才接近脊點"
+    對 FP4 stage-1，$I_{\text{AI}}=4m$。若目標 GPU 的脊點約 $250$ FLOP/byte，需要 $m\approx62.5$ rows/expert。以 $E=384,k=8$ 反推 batch：$m=\text{batch}\cdot k/E$，所以 batch 約 $62.5\cdot384/8\approx3000$。這遠高於一般低 latency decode 的並發量，因此單 token decode 的 routed GEMM 幾乎必然是 weight-bandwidth-bound。
 
 ### Sort/padding 開銷
 
@@ -213,14 +213,14 @@ def grouped_gemm_kernel(
 方法學（warmup、CUDA events、固定時鐘）見 [profiling](../performance/profiling.md) 頁 — 沒有它的加速數字別輕信。
 
 !!! Tip "真實 decode 中的 fusion"
-    [Anatomy of an MoE decode](decode-anatomy.md) 在生產級兆參數模型上對照這些 選擇：_unfused routing_（top-$k$ + sort 拆成 3 個 kernels）是單一最大的 跨堆疊缺口，而把 _fused shared expert_ 併進 routed grouped GEMM 可削去約 18% 的 decode latency。
+    [Anatomy of an MoE decode](decode-anatomy.md) 在生產級兆參數模型上對照這些 選擇：_unfused routing_（top-$k$ + sort 拆成 3 個 kernels）是單一最大的 跨堆疊缺口，而把 shared expert fuse 進 routed grouped GEMM（即 _fused shared expert_）可削去約 18% 的 decode latency。
 
 ## 要點
 
 - MoE 的熱點操作是 **permute**（bandwidth-bound 的 scatter/gather）與 **grouped GEMM**（一次 launch 下的許多可變大小 matmul）。
 - Grouped GEMM 把每個輸出 _tile_ 導向其 expert 的權重板，並透過 per-expert 行偏移 把可變大小的區塊封裝在一起 — 無 padding。
 - **把 gather/scatter fuse 進 GEMM 的 prologue/epilogue** 可消除整次 HBM 往返 — 最大的實際勝利。
-- Decode 的 MoE GEMM 是 **weight-bandwidth-bound**：arithmetic intensity $I_{\text{AI}}=4m$，而 decode 時 $m\approx\text{batch}\cdot k/E \lesssim 1$， 遠低於 ridge point；提高 batch 可線性拉高效率直到計算飽和。
+- Decode 的 MoE GEMM 是 **weight-bandwidth-bound**：算術強度 $I_{\text{AI}}=4m$，而 decode 時 $m\approx\text{batch}\cdot k/E \lesssim 1$， 遠低於脊點；提高 batch 可線性拉高效率直到計算飽和。
 - CUDA 與 HIP 原始碼幾乎相同，但要 **針對 wavefront = 64、LDS 與 AMD 上的 `mfma` 做 tuning**；以 `warpSize` 參數化，並讓 Triton/函式庫對應到正確的 Matrix Core。
 
 ## 練習

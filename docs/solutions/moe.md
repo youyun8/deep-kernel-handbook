@@ -5,169 +5,166 @@
   <span class="chip"><strong>用法：</strong> 先自己試，再對照</span>
 </div>
 
-解答[MoE 篇](../moe/index.md)的練習。部分參考 到[`code/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code)中的玩具模型； 如果推導具有乾淨的封閉形式，我們給出它，否則我們給出 方法和預期的定性結果。
+解答[MoE 篇](../moe/index.md)的練習。部分題目會參照 [`code/`](https://github.com/youyun8/deep-kernel-handbook/tree/main/code) 裡的玩具模型；如果推導有乾淨的封閉解，我們直接給出；否則給出方法與預期的定性結果。
 
-## 為什麼稀疏
+## 為什麼需要稀疏化
 
-??? Success "1 — 總參數與活動參數、FLOP 比率 ($E{=}128, k{=}2, d{=}4096$)"
-    1 FFN ≈ $8d^2$ 參數（向上 $4d^2$ + 向下 $4d^2$，帶有 $d_{ff}=4d$）。
+??? Success "1 — 總參數與 active 參數、FLOP 比率（$E{=}128, k{=}2, d{=}4096$）"
+    1 個 FFN ≈ $8d^2$ 參數（up $4d^2$ + down $4d^2$，$d_{ff}=4d$）。
 
-    - **Experts 總計：**$128 \times 8d^2 = 1024d^2 \approx 1.72\times10^{10}$。    - **根據 token 有效：**$2 \times 8d^2 = 16d^2 \approx 2.68\times10^{8}$。
+    - **expert 總計：**$128 \times 8d^2 = 1024d^2 \approx 1.72\times10^{10}$。
+    - **每個 token 的 active 參數：**$2 \times 8d^2 = 16d^2 \approx 2.68\times10^{8}$。
 
-    FLOPs 透過 *active* 參數進行縮放，因此 FLOPs-per-token 比率與密集 （$E{=}1$，即 $8d^2$ 有效）是 $16d^2/8d^2 = \mathbf{2\times}$ — 你付費 $k=2$ experts。但你**儲存**$128\times$ FFN 參數：巨大的容量， 常數計算。這種差距就是稀疏性的全部價值主張。
+    FLOP 只隨 *active* 參數量縮放，所以每 token FLOP 相對密集模型（$E{=}1$，即 $8d^2$ active）的比率是 $16d^2/8d^2 = \mathbf{2\times}$——你只為 $k=2$ 個 expert 付出計算代價。但你要**儲存** $128\times$ 的 FFN 參數：巨大的容量、固定的計算量。這個落差正是稀疏化的全部價值所在。
 
-??? Success "2 — DeepSeek-V3 稀疏性與 Mixtral"
-    DeepSeek-V3：$37/671 \approx 5.5\%$ 活躍（≈**18× 稀疏性**）。混合 8×7B：8 個 experts、$\approx 13/47 \approx 28\%$ 的前 2 個有效（≈ 3.6×）。 V3 是 更稀疏 —— 許多細粒度的 experts 具有低激活 —— 這是 現代趨勢：更多、更小的 experts 提供更多組合（下一個練習） 在相同的主動成本下。
+??? Success "2 — DeepSeek-V3 稀疏度與 Mixtral"
+    DeepSeek-V3：$37/671 \approx 5.5\%$ active（≈**18× 稀疏**）。Mixtral 8×7B：8 個 expert，top-2 約 $13/47 \approx 28\%$ active（≈3.6×）。V3 明顯更稀疏——許多細粒度 expert、每個 active 比例都很低——這正是近期的趨勢：更多、更小的 expert，在相同 active 成本下換來更大的組合空間（見下一題）。
 
-??? Success "3 — 何時更喜歡密集 37B 而不是 671B/37B-主動稀疏"
-    相同的活動 FLOP，但稀疏模型需要**~18× 記憶體**來保存所有 experts 居民。在以下情況下首選**密集**：(a) 記憶體張力（單一 GPU / 邊緣）； (b)**batch-1 latency**很重要，你不能攤銷 expert 裝載 — 稀疏的 decode 可能會為少數 tokens 觸及許多 experts，從而損害局部性； (c) 在小資料集上進行**微調**，其中大多數 experts 得到的資訊很少 梯度和風險陳舊性。對於高 throughput serving 和 pretraining 每 FLOP 品質。
+??? Success "3 — 何時偏好密集 37B 而非 671B 總/37B active 的稀疏模型"
+    active FLOP 相同，但稀疏模型需要 **~18× 的記憶體**才能把所有 expert 都放進顯存。優先選**密集**模型的情況：(a) 記憶體吃緊（單張 GPU / 邊緣裝置）；(b) **batch-1 latency** 很重要、無法把 expert 載入成本攤銷掉——稀疏模型的 decode 可能要為少數幾個 token 觸及很多 expert，傷害 locality；(c) 在小資料集上**微調**，這時大多數 expert 只拿到很少梯度，容易過時。反過來，稀疏模型在高 throughput serving 與 pretraining 的每-FLOP 品質上勝出。
 
-??? Success "4 — 卸載 experts：哪個 roofline 軸綁定？"
-    透過 PCIe 從 CPU/NVMe 串流 experts（約數十 GB/秒）與 HBM（TB/秒） — 1-2 數量級的頻寬懸崖。限制器變成**頻寬** （expert 權重的 PCIe/NVMe 傳輸），不計算。串流媒體僅隱藏 如果 tokens-per-expert 夠大以至於 GEMM 時間超過傳輸 時間 — [inference & serving](#inference-serving) 中匯出的確切條件 練習 2.
+??? Success "4 — expert offload：卡在 roofline 的哪一軸？"
+    透過 PCIe 從 CPU/NVMe 把 expert 權重串流進來（約數十 GB/s），相比 HBM（TB/s）差了 1–2 個數量級的頻寬。所以限制因素變成**頻寬**（expert 權重的 PCIe/NVMe 傳輸），不是算力。只有當 tokens-per-expert 夠大、GEMM 時間超過傳輸時間時，streaming 才能被藏起來——確切條件見[推論與 serving](#inference-serving) 的練習 2。
 
-## MoE 層從頭開始
+## 從零實作 MoE layer
 
-??? Success "1 — `MoELayerNaive` 中的 S 型門控"
-    對於頂部 $k$ 閘值，將 `softmax(logits)` 替換為 `sigmoid(logits)`； 與 Softmax 不同，Sigmoid 閘是**獨立的**（它們的總和不等於 1），所以 每個 expert 的重量是一個絕對的「應該這個火」的分數。選擇後 top-$k$，如果你想要凸組合，請重新規範化所選的閘。驗證 針對測試的輸出形狀/有限性；預計損失可比但不同 平衡動態（Sigmoid + 偏移控制器是 DeepSeek-V3 的配方）。
+??? Success "1 — `MoELayerNaive` 裡的 sigmoid gating"
+    把 top-$k$ gate 的 `softmax(logits)` 換成 `sigmoid(logits)`。和 softmax 不同，sigmoid gate 是**獨立的**（總和不等於 1），所以每個 expert 的權重是一個絕對的「這個 expert 該不該被觸發」分數。選出 top-$k$ 之後，如果想要凸組合，要把選中的 gate 重新 normalize。用測試檢查輸出形狀/數值有限性；預期 loss 量級相近，但平衡動態不同（sigmoid + bias controller 正是 DeepSeek-V3 的配方）。
 
-??? Success "2 — $k{=}1$（開關），無需重整化"
-    使用 $k=1$ 且不進行重規範，輸出為 $g\cdot \text{expert}(h)$，其中 $g=\text{softmax}(\cdot)_{\text{top1}} \in (0,1)$。所以 expert 輸出是 **按 $g<1$ 縮小**，縮小活化幅度（並耦合 剩餘尺度來決定門控置信度）。開關保持門作為乘法器打開 目的 - 它為 router 提供可微訊號 - 但你必須 考慮縮小的規模（init/LR），或重新歸一化，使保留的門為 1。
+??? Success "2 — $k{=}1$（Switch），不重新 normalize"
+    $k=1$ 且不重新 normalize 時，輸出是 $g\cdot \text{expert}(h)$，其中 $g=\text{softmax}(\cdot)_{\text{top1}} \in (0,1)$。所以 expert 輸出會**被 $g<1$ 縮小**，縮小了 activation 的幅度（也讓殘差尺度跟 gate 的置信度耦合在一起）。Switch 故意保留這個乘法的 gate——它給 router 一個可微訊號——但你得在 init/learning rate 上考慮這個縮小，或者重新 normalize 讓保留的 gate 等於 1。
 
-??? Success "3 — 樸素循環與調度形式（$T{=}8192, E{=}64$，CPU）"
-    **樸素循環**迭代 experts，每次都會屏蔽 $T$ tokens → 它接觸 所有 $T$ tokens $E$ 次（大量浪費蒙版工作，但微不足道 向量化）。**調度表**將 tokens 排列成每 expert 連續 僅在其 tokens 上分組並運行每個 expert → 浪費的計算量要少得多，但是 支付聚集/分散費用。在 CPU 上，一旦 $E$ 很大，調度形式通常會獲勝 （樸素的 $O(TE)$ 掩蔽占主導地位）。在**GPU**上差距擴大：調度 形式的連續分組 GEMM 是硬體想要的，而天真的 循環啟動許多微小的屏蔽 matmul（啟動 + 低佔用率邊界）。
+??? Success "3 — naive loop 與 permute 形式（$T{=}8192, E{=}64$，CPU）"
+    **naive loop** 對每個 expert 都掃過全部 $T$ 個 token、用 mask 蓋掉不屬於它的部分 → 等於把所有 $T$ 個 token 碰了 $E$ 次（浪費大量被 mask 掉的運算，但容易向量化）。**permute 形式**先把 token 依 expert 重新排列成連續區塊，再對每個 expert 只跑屬於它的那一段 → 浪費的計算少得多，但要付 gather/scatter 的成本。在 CPU 上，一旦 $E$ 變大，permute 形式通常會贏（naive 的 $O(TE)$ mask 成本會主導）。在**GPU**上差距更明顯：permute 形式產出的連續 grouped GEMM 正是硬體喜歡的形狀，而 naive loop 會啟動很多個極小、被 mask 蓋住大半的 matmul（啟動開銷 + 低 occupancy）。
 
-??? Success "4 — 新增共享 expert；每一步確認梯度"
-    加入$y = \text{shared}(h) + \sum_{e\in\text{TopK}} g_e\,\text{expert}_e(h)$。 因為 `shared(h)` 位於**每個**token 的路徑上，無論 routing 為何， `shared.weight.grad` 是非 `None` 並且在每個步驟上都非零（檢查後 `backward`）。路由 experts 僅在選取時才獲得漸層；共用 expert 是穩定冷啟動的始終在線密集路徑（請參閱 training 穩定性例如 4).
+??? Success "4 — 加入 shared expert；逐步確認梯度"
+    加入 $y = \text{shared}(h) + \sum_{e\in\text{TopK}} g_e\,\text{expert}_e(h)$。因為 `shared(h)` 在每個 token 的路徑上、不受 routing 影響，所以 `shared.weight.grad` 永遠不是 `None`、每一步都非零（`backward` 之後檢查即可）。路由 expert 只有在被選中時才拿到梯度；shared expert 則是一條永遠在線的密集路徑，有助於穩定冷啟動（見 [訓練穩定性](#training-stability) 的練習 4）。
 
 ## 負載平衡
 
 ??? Success "1 — 均勻分佈最小化 $\sum_e f_e P_e$"
-    根據$\sum f_e = k$、$\sum P_e = 1$最小化$\sum_e f_e P_e$。的 開關輔助損耗將路由到 $e$ ($f_e$) 的**tokens**的分數乘以 $e$ ($P_e$) 的平均**閘機率**；當負載分散時，它被最小化。 形式上，透過重排/柯西-施瓦茨，耦合和最小時 兩個向量都是平的：對於所有 $e$，$f_e = k/E$ 和 $P_e = 1/E$，給出 $\sum_e f_e P_e = E\cdot\frac{k}{E}\frac{1}{E} = k/E$。任意濃度 （一些 $f_e,P_e$ 大在一起）提高了產品 - 因此降低了這種損失 推動 routing 走向統一。 _（輔助損耗使用 $f$ = 硬計數，$P$ = 可微的機率，因此梯度流經 $P$。 ）_
+    在 $\sum f_e = k$、$\sum P_e = 1$ 的限制下最小化 $\sum_e f_e P_e$。Switch 的 auxiliary loss 把路由到 expert $e$ 的**token 比例**（$f_e$）乘上 $e$ 的平均**gate 機率**（$P_e$）；當負載平均分散時這個乘積最小。形式上，由排序不等式／Cauchy–Schwarz 可知，兩個向量都「拉平」時乘積和最小：對所有 $e$，$f_e = k/E$、$P_e = 1/E$，得到 $\sum_e f_e P_e = E\cdot\frac{k}{E}\frac{1}{E} = k/E$。任何集中現象（某些 $f_e,P_e$ 同時偏大）都會推高乘積——所以最小化這個 loss 會把 routing 推向均勻分佈。*（auxiliary loss 用 $f$ = 硬計數、$P$ = 可微機率，所以梯度只流經 $P$。）*
 
-??? Success "2 — 容量和掉落率（$T{=}4096, E{=}64, k{=}2$，參見 1.25）"
-    預期為 tokens/expert $= Tk/E = 4096\cdot2/64 = 128$。容量 $C = \lceil \text{cf}\cdot Tk/E\rceil = \lceil 1.25\times128\rceil = 160$。 如果一個 expert 獲得所有 $Tk = 8192$ 分配 $= 410$ tokens 的 5%，則它 $410-160 = 250$ 溢位；那些被**丟棄**。那個的掉率 所有分配的 expert $\approx 250/8192 \approx 3.0\%$（其他假設 能力範圍內）。將 cf 提高到 2.0 ($C=256$) 仍然會降低 $410-256=154$ — 僅顯示容量無法修復嚴重傾斜的 router；你需要平衡。
+??? Success "2 — capacity 與 drop rate（$T{=}4096, E{=}64, k{=}2$，cf=1.25）"
+    預期 tokens/expert $= Tk/E = 4096\cdot2/64 = 128$。capacity $C = \lceil \text{cf}\cdot Tk/E\rceil = \lceil 1.25\times128\rceil = 160$。若某個 expert 拿到全部 $Tk = 8192$ 次分配中的 5%，即 410 個 token，就會溢出 $410-160 = 250$ 個；這些都會被**丟棄**。佔全部分配的 drop rate ≈ $250/8192 \approx 3.0\%$（假設其餘 expert 都在 capacity 之內）。把 cf 提高到 2.0（$C=256$）還是會丟 $410-256=154$ 個——說明 capacity 沒辦法修補嚴重傾斜的 router；你需要的是更好的負載平衡。
 
-??? Success "3 — 調整偏移控制器"
-    輔助無損控制器微調每個 expert 偏差： $b_e \leftarrow b_e + \gamma\,\text{sign}(\text{target} - \text{load}_e)$. **Larger $\gamma$**→ 更快的收斂，但圍繞平衡振盪/超調；**較小 $\gamma$**→ 平滑但緩慢。**Sigmoid**門的響應比 **softmax**因為 sigmoid 分數是獨立的－改變一個偏差不會 透過共享標準化器重新調整其他參數，因此控制器的 per-expert 調整不會互相衝突。預計負載 CV 會下降到 ~0.1–0.2 在經過精心調校的 $\gamma$ 上只需幾百步。
+??? Success "3 — 調整 bias controller 的 $\gamma$"
+    aux-loss-free 的控制器逐步微調每個 expert 的 bias：$b_e \leftarrow b_e + \gamma\,\text{sign}(\text{target} - \text{load}_e)$。**$\gamma$ 較大**→收斂更快，但會在平衡點附近震盪/超調；**$\gamma$ 較小**→平滑但慢。**sigmoid** gate 的響應比 **softmax** 更快，因為 sigmoid 分數是獨立的——調整一個 expert 的 bias 不會透過共享的 normalizer 牽動其他 expert，所以控制器對各 expert 的調整不會互相干擾。調好 $\gamma$ 之後，預期負載 CV 只要幾百步就能降到 ~0.1–0.2。
 
-??? Success "4 — 玩具 MoE 上的輔助損耗與無輔助損耗"
-    雙向運行 `train_tiny_moe.py`。預期：**aux-loss-free**達到類似水平 或在相同負載 CV 下略微**降低最終 LM 損耗**，因為它平衡了 透過 routing _計數_ 上的偏差，而不添加競爭的梯度項 使用 LM 物鏡（輔助損耗稍微扭曲了損耗表面）。兩者都 負載 CV 應降低至 ~0.1–0.2；輔助無損耗運轉避免了 平衡與質量之間的拉鋸戰。並列報告最終損失和 CV 側面 —— 配對就是重點。
+??? Success "4 — 玩具 MoE 上的 auxiliary loss 與 aux-loss-free"
+    用兩種模式各跑一次 `train_tiny_moe.py`。預期：**aux-loss-free** 在相同負載 CV 下可以打平、甚至略微**降低最終 LM loss**，因為它是用 bias 去調整 routing 的*計數*，而不是加一個和 LM 目標互相競爭的梯度項（auxiliary loss 多少會扭曲 loss surface）。兩種模式的負載 CV 都應該降到 ~0.1–0.2；aux-loss-free 的優勢是省掉了平衡與品質之間的拉鋸。把兩次跑的最終 loss 和 CV 並排報告——這個對照本身就是重點。
 
 ## Routing 變體
 
-??? Success "1 — expert 組合和細粒度增益"
-    組合 $= \binom{E}{k}$：
+??? Success "1 — expert 組合數與細粒度的好處"
+    組合數 $= \binom{E}{k}$：
 
-    - $(8,2): \binom{8}{2} = 28$
-    - $(64,8): \binom{64}{8} \approx 4.4\times10^{9}$
-    - $(256,8): \binom{256}{8} \approx 4.1\times10^{14}$
+    - $(8,2)$：$\binom{8}{2} = 28$
+    - $(64,8)$：$\binom{64}{8} \approx 4.4\times10^{9}$
+    - $(256,8)$：$\binom{256}{8} \approx 4.1\times10^{14}$
 
-    每個 token 選擇一種組合，因此更多、更精細的 experts 呈指數級增長
+    每個 token 都在挑一種組合，所以 expert 數越多、越細粒度，可能的「expert 混合」數量呈指數級增長——這正是細粒度 expert（DeepSeekMoE）的論點：在**相同的 active $k$** 下換來遠大得多的組合空間，計算量卻不變。
 
-    **相同活性 $k$**上更專業的「混合」—細粒度 expert 參數 (DeepSeekMoE)。組合能力，恆定計算。
+??? Success "2 — 為什麼 expert-choice 會破壞 autoregressive decode"
+    expert-choice 讓每個 expert 從整個 batch 裡挑出自己的 top-$C$ token——這假設所有 token 同時存在（training/prefill 確實如此）。但在 **autoregressive decode** 裡，你一次只生成一個 token；expert 不可能在還不存在的未來 token 之中挑出 top-$C$，「整批」這個概念本身就不成立。token-choice 則是每個新 token 獨立決定自己的路徑，所以它才是 inference 時自然的方案。
 
-??? Success "2 — 為什麼 expert-選擇會破壞自回歸 decode"
-    Expert-選擇讓每個 expert 從整批中挑選其頂級 $C$ tokens** — 假設所有 tokens 都同時存在（training/prefill 中為真）。在 自回歸**decode\*\*你一次產生一個 token；expert 不能 在尚不存在的未來 tokens 和頂級 $C$ 中“選擇” 一批是沒有意義的。 Token-選擇每個新 token 獨立的路線， 所以這是自然的 inference 時間方案。
+??? Success "3 — shared expert 對穩定性的影響"
+    把 shared expert 加進玩具 MoE，比較兩次跑的結果。預期：**loss 變異數降低**（更少尖峰），最終 loss 持平或更好，因為 shared 路徑每一步都提供密集的梯度，早期的 routing 失誤不會讓模型完全沒有訊號可學。這個效果在 training 早期（冷啟動）最明顯，隨著路由 expert 逐漸分化會縮小。
 
-??? Success "3 — 共享 expert 對穩定性的影響"
-    將共享 expert 加入玩具 MoE 並比較運行。預期：**損失降低 方差**（更少的尖峰）和等於或更好的最終損失，因為共享 路徑每一步都提供密集的梯度，因此早期的 routing 錯誤不會 使模型缺乏訊號。 Training 早期效果最大（冷 開始）並隨著路由 experts 的區分而縮小。
+??? Success "4 — $E$ 增加會讓 all-to-all 訊息變小"
+    固定總參數量下，expert 數變多 ⇒ 每個 expert 變小 ⇒ 每個 token 送到某個 expert-GPU 的 payload 不變，但 token 被分散到**更多目的地**，所以每筆 all-to-all 訊息會變得*更小、數量更多*。大量微小訊息會傷害網路效率（變成 latency/開銷限制，連結利用率變差）。**node-limited routing** 限制一個 token 的 expert 能跨多少個節點，讓訊息保持夠大，繼續是頻寬限制而不是 latency 限制。
 
-??? Success "4 - 成長的 $E$ 縮小了 all-to-all 訊息"
-    在固定的總參數下，更多的 experts ⇒ 每個 expert 更小 ⇒ 每個 token 給定 expert-GPU 的有效負載不變，但 tokens**分佈在更多 目的地**，因此每個 all-to-all 訊息都會變得*更小，數量更多*。 許多微小的訊息會損害網路效率（latency-和開銷限制，較差 連結利用率）。**節點限制 routing**限制 token 的節點數量 experts 跨度，保持訊息足夠大以保持頻寬限制 比 latency 綁定。
+## 訓練穩定性 { #training-stability }
 
-## Training 穩定性
+??? Success "1 — z-loss 如何縮小 $\|x\|$、讓 softmax 遠離 one-hot"
+    $\mathcal{L}_z = \beta(\log\sum_e e^{x_e})^2$。log-sum-exp 會隨 logit 的大小增長，懲罰它的平方會把 logit 拉向較小值 → $\|x\|$ 縮小。logit 變小 ⇒ softmax 更接近均勻分佈 ⇒ **routing 熵更高**、機率遠離 one-hot（0/1）。具體來說，這讓 gate 維持**可塑性**：接近飽和的 softmax 梯度會消失、一旦分配錯誤就逃不出來；z-loss 能防止這種凍結狀態。
 
-??? Success "1 — $\mathcal{L}_z$ 縮小了 $\|x\|$ 並將 softmax 限制為 one-hot"
-    $\mathcal{L}_z = \beta(\log\sum_e e^{x_e})^2$。 Log-sum-exp 隨 logits 的大小，因此懲罰其平方會將 logits 拉向較小的值 → $\|x\|$ 縮小。較小的 logits ⇒ softmax 更接近均勻 ⇒**更高 routing 熵**和機率遠離 one-hot (0/1)。具體來說 它使門保持**可塑性**：接近飽和的 softmax 具有消失梯度 且無法逃避糟糕的任務； z 損失可以防止凍結狀態。
+??? Success "2 — BF16 會翻轉 argmax，FP32 不會"
+    BF16 有 8 個尾數位 → 1.0 附近的 ULP 是 $2^{-7}\approx0.0078$。取 logit $x_1 = 1.0000,\ x_2 = 1.0039$（真實 argmax 應該是 2）。兩個值在 BF16 下都會四捨五入成**同一個**值 $1.0$，所以 BF16 的 argmax/top-k 平局是任意決定的（而且會跟 data parallel 裡的 rank 相關）；FP32（23 個尾數位）則能保留兩者的差異，正確選出 expert 2。這就是一種「無聲錯誤」：不同 replica 在 routing 上的決定會不一致，破壞共享的負載平衡計數。
 
-??? Success "2 — BF16 翻轉 argmax，FP32 不翻轉"
-    BF16 有 8 個尾數位 → 1.0 附近的 ULP 是 $2^{-7}\approx0.0078$。取邏輯值 $x_1 = 1.0000,\ x_2 = 1.0039$（真實 argmax = 2）。兩者都四捨五入到**相同** BF16 值 $1.0$，因此 BF16 argmax/topk 平局是任意的（並且 資料並行性下的秩相關），而 FP32（23 尾數位）則保持 它們截然不同，並選擇 expert 2。這是「無聲錯誤」：複製品不同意 在 routing 上並破壞共享平衡計數。
+??? Success "3 — router 用大初始化 scale，搭配/不搭配 z-loss"
+    在玩具 MoE 上，故意用較大的 scale 初始化 router，分別訓練兩個版本。預期：**沒有 z-loss** 時，logit 很快就會爆炸 → 頻繁的 loss 尖峰/NaN，還會出現幾個**dead expert**（gate 飽和、routing 被鎖死）。**加上 z-loss** 後，logit 維持在有界範圍內 → 尖峰很少、dead expert 數量接近零、loss 曲線更平滑。這讓 z-loss 的作用變得具體：它是對抗 logit 膨脹的廉價保險。
 
-??? Success "3 — 大型 router 初始化，帶/不帶 z 損失"
-    在玩具 MoE 上，用故意大的比例初始化 router， 雙向訓練。預期：**沒有 z 損失**，logits 會提前爆炸 → 頻繁 損失尖峰/NaN 和幾個**死 experts**（飽和門鎖 routing）。 **使用 z 損失**，logits 保持有界 → 峰值很少，死亡 expert 計數接近 零，更平滑的損失。這使得 z-loss 的作用變得具體：它是便宜的保險 反對邏輯膨脹。
+??? Success "4 — 為什麼 shared expert 能簡化冷啟動"
+    在第 0 步，所有路由 expert 幾乎完全相同（還沒分化），所以路由梯度帶雜訊、近乎對稱——沒有任何明確的訊號可以專業化。shared expert 在 top-$k$ 選擇之**外**，所以 $\partial \mathcal{L}/\partial\,\text{shared}$ 從第 0 步就是對**每個** token 都密集的梯度，給模型一條可靠的學習路徑，讓 routing 慢慢自行收斂。追蹤一下：$y = \text{shared}(h)+\sum g_e e(h)$ → $\nabla_{\text{shared}}$ 完全不依賴（一開始是隨機的）routing 決策。
 
-??? Success "4 — 為什麼共享 expert 可以簡化冷啟動"
-    在步驟 0 中，路由的 experts 幾乎相同（無差異），因此 路由梯度有雜訊並且幾乎對稱 —— 沒有什麼需要專門研究的訊號。 共享的 expert 位於頂部 $k$ 選擇的**外部**，因此 $\partial \mathcal{L}/\partial\,\text{shared}$ 是**每個**上的全密集梯度 token 從第 0 步開始，為模型提供可靠的學習路徑，而 routing 自行解決。追蹤：$y = \text{shared}(h)+\sum g_e e(h)$ → $\nabla_{\text{shared}}$ 從不依賴（隨機）routing 的決定。
+## 系統與 expert parallelism
 
-## 系統和 expert 並行性
+??? Success "1 — all-to-all 位元組數與 expert GEMM 時間（$T{=}4096/\text{GPU}, d{=}4096$）"
+    對 all-to-all 來說，每個 GPU 要傳輸 ≈ 自己的 tokens × $d$ × 2 B $= 4096\times4096\times2 \approx 3.4\times10^{7}$ B = 34 MB；每層有**兩次**（dispatch + combine）→ ~67 MB/GPU/層。乘上 60 層 ≈ **4 GB/GPU** 的流量。走 NVLink（節點內 ~300 GB/s）約 13 ms；跨節點走 IB（~50 GB/s）約 80 ms。expert GEMM 時間：每 token $2\cdot k\cdot 8d^2$ FLOP；$k=2$、$T=4096$ 時約 $4096\cdot2\cdot8\cdot4096^2 \approx 1.1\times10^{12}$ FLOP/層 → 在 H100（~990 TFLOP/s）上約 1.1 ms/層，60 層約 66 ms。所以**跨節點 EP 是通訊受限的**（80 ms 通訊 vs 66 ms 計算），除非 all-to-all 能重疊或限制在節點內；節點內則大致平衡——這正是通訊重疊與 node-limited routing 重要的原因。
 
-??? Success "1 — all-to-all 位元組與 expert GEMM 時間 ($T{=}4096/\text{GPU}, d{=}4096$)"
-    根據 all-to-all，每個 GPU 移動 ≈ 其 tokens × $d$ × 2 B $= 4096\times4096\times2 \approx 3.4\times10^{7}$ B = 34 MB；每層**兩個**（調度+組合）→ ~67 MB/GPU/層。超過 60 層 ≈**4 GB/GPU**流量。在 NVLink 上（~300 GB/s 節點內）約 13 毫秒；跨節點 IB (~50 GB/s) ~80 ms。 Expert GEMM 時間：每 token $2\cdot k\cdot 8d^2$ FLOPs；在$k=2$， $T=4096$，就是$\approx 4096\cdot2\cdot8\cdot4096^2 \approx 1.1\times10^{12}$ FLOPs/層 → 在 H100 (~990 TFLOP/s) 上~1.1 ms/層，超過 60 層~66 ms。 因此，**跨節點 EP 是受通訊限制的**（80 毫秒通訊 vs 66 毫秒計算），除非 all-to-all 是重疊/節點限制的；節點內大致平衡 - 這正是重疊和節點限制 routing 很重要的原因。
+??? Success "2 — node-limited routing 如何限制跨節點流量"
+    如果一個 token 的 $k$ 個 expert 可能落在 $k$ 個不同節點上，跨節點頻寬成本最多會到單節點的 $k$ 倍。把每個 token 的 expert 限制在 $\le M$ 個節點內，就能把每個 token 最壞情況下的跨節點訊息數量固定在 $M$（DeepSeek-V3 用 $M=4$、$k=8$）。**代價：**如果全域最好的 $k$ 個 expert 散落在超過 $M$ 個節點上，router 就不能再選它們——用一點品質損失換取頻寬上限。
 
-??? Success "2 — 節點限制 routing 限制跨節點流量"
-    如果每個 token 的$k$ experts 可能登陸$k$不同節點你支付跨節點 每個 token 的頻寬高達 $k$ 倍。將 experts 限制為 $\le M$ 節點邊界 $M$ 處每個 token 最壞情況的跨節點訊息（DeepSeek-V3 使用 $M=4$ $k=8$）。**成本：**router 無法再選擇全球最好的 $k$ experts 如果它們分散在 $>M$ 節點上 —— 一個小的質量打擊會換來一個嚴重的打擊 頻寬上限。
+??? Success "3 — padding 浪費（batched GEMM，cf=2.0）與 grouped GEMM（CV=0.5）"
+    capacity factor 2.0 的 batched GEMM 會把**每個** expert 都 pad 到 $2\times$ 平均負載，所以就連完美平衡的 expert 也會浪費約 50% 的 slot；而且 pad 出來的 tensor 大小是針對最壞情況 → 浪費大量 FLOP。grouped GEMM 只跑每個 expert 實際的 token 數（不 pad），所以不管 CV 是多少，浪費都 $\approx 0$。在 CV = 0.5 時，batched 形式浪費的比例大致等於 capacity 與實際負載的差距（百分之幾十）；grouped 的優勢非常明顯——這正是現代 MoE kernel 都採用 grouped/可變長度 GEMM 的原因。
 
-??? Success "3 - 填充浪費（批量，cf 2.0）與分組 GEMM（CV 0.5）"
-    批量 GEMM 容量因子 2.0 焊盤**每個**expert 至 $2\times$ 均值 負載，因此即使是完美平衡的 expert 也會浪費約 50% 的插槽；和 實際負載填充張量的大小是針對最壞情況 → 大量浪費的 FLOP。 分組 GEMM 恰好在其 token 計數上運行每個 expert（無填充），因此 無論 CV 為何，都會浪費 $\approx 0$。對於 CV = 0.5，批量表單浪費 大致容量與實際的差距（百分之幾十）；分組獲勝明顯－ 現代 MoE kernels 使用分組/可變長度 GEMM 的原因。
-
-??? Success "4 — 分塊計劃與共享 expert 計算重疊調度"
-    將 token 批次拆分為區塊；當區塊 $i$ 的調度 all-to-all 處於 飛行，計算塊 $i-1$ 的**共享 expert**（和/或 attention）， 不需要 routing。請參閱轉換後的管道圖 [Systems & EP](../moe/systems-ep.md)。**重疊受到**以下較小者的限制 （通訊時間，獨立計算時間）：如果共享 expert/attention 工作是 比 all-to-all 短，通訊暴露；也透過分塊開銷和 並發 kernels 的可用 SM/佇列。
+??? Success "4 — 用分塊排程讓 shared expert 計算與 dispatch 重疊"
+    把 token batch 切成幾個 chunk；當 chunk $i$ 的 dispatch all-to-all 正在飛行時，去算 chunk $i-1$ 不需要 routing 結果的**shared expert**（和/或 attention）計算。對應的 pipeline 圖見 [系統與 expert parallelism](../moe/systems-ep.md)。**重疊量受限於**（通訊時間，可獨立計算的時間）兩者中較小的那個：如果 shared expert/attention 的工作量比 all-to-all 短，通訊就會暴露出來；分塊本身的開銷與並發 kernel 能拿到的 SM/queue 資源也會限制重疊效果。
 
 ## MoE kernels
 
-??? Success "1 — Triton 聚集 + 逆排列，融合到尾聲"
-    沿著前向排列 `perm[i]`（排序位置 → 原始），發出 `inv_perm[perm[i]] = i` 與 kernel 相同（一次分散寫入）。然後 grouped-GEMM**epilogue**可以將每個 expert 的輸出行直接分散到 他們原來的 token 位置使用`inv_perm`，避免了單獨的 透過 HBM 進行分散讀取 — 一次融合寫入，而不是計算然後排列。
+??? Success "1 — Triton gather + unpermute 融合進 epilogue"
+    在算正向 permute `perm[i]`（排序後位置 → 原始位置）的同一個 kernel 裡，順手用一次 scatter 寫出 `inv_perm[perm[i]] = i`。這樣 grouped GEMM 的 **epilogue** 就能用 `inv_perm` 把每個 expert 輸出的那一列直接 scatter 回原始 token 位置，省掉一次額外經過 HBM 的 gather/scatter——一次融合寫入，而不是先算完再額外做一次 permute。
 
-??? Success "2 — 波前不可知的 CUDA `gather_rows`；塊大小掃描"
-    將任何硬編碼的 32 替換為 `warpSize`（NVIDIA 上為 32，CDNA 上為 64） 扭曲內邏輯，並對區塊大小進行參數化。基準測試 128/256/512： throughput 上升然後穩定/下降 — 小塊未充分利用 SM（低 佔用，更多的啟動開銷），非常大的區塊達到暫存器/SMEM 限制 並減少居民街區。峰值是佔用率使記憶體飽和的地方 不溢出的頻寬 — 對於受記憶體限制的收集，通常為 256。
+??? Success "2 — wavefront-agnostic 的 CUDA `gather_rows`；block size 掃描"
+    把所有硬編碼的 32 換成 `warpSize`（NVIDIA 上是 32，CDNA 上是 64），用在 warp 內部的邏輯，並把 block size 參數化。對 128/256/512 做 benchmark：throughput 先上升、再持平/下降——block 太小無法餵滿 SM（occupancy 低、啟動開銷占比更高），block 太大則撞上 register/SMEM 上限、降低常駐 block 數。峰值出現在 occupancy 剛好把記憶體頻寬餵飽、但還沒溢位的那一點——對 memory-bound 的 gather 來說通常是 256。
 
-??? Success "3 — 填充批次與分組 GEMM：時間與容量因子"
-    對照 cf 繪製牆上時間。**批量**時間大致**與 cf 線性增長** （你從字面上計算填充零）。**分組**是〜平坦的（獨立於 cf — 它只處理真實的 tokens）。它們在 cf ≈ 1 + 一個小常數附近交叉； 在交叉下方，更簡單的批量 kernel 可以在啟動簡單性方面獲勝， 在它上面分組占主導地位。真實 MoE 運行於 cf ≥ 1.25，因此分組為 標準選擇。
+??? Success "3 — padded batched GEMM 與 grouped GEMM：時間 vs capacity factor"
+    把 wall-clock 時間對 cf 畫出來。**batched** 的時間大致**隨 cf 線性增長**（你確實在對 pad 出來的零做計算）。**grouped** 幾乎是平的（跟 cf 無關——它只處理真正的 token）。兩條線大約在 cf ≈ 1 加一個小常數附近交叉；在交叉點以下，較簡單的 batched kernel 可能因為實現簡單而略勝；超過交叉點之後 grouped 全面領先。實際的 MoE 通常跑在 cf ≥ 1.25，所以 grouped 是標準選擇。
 
-??? Success "4 — 設定檔融合與未融合調度（HBM 位元組）"
-    融合聚集 →GEMM 避免了 HBM 中排列的 token 張量的具體化。 在分析器的記憶體計數器（例如 `dram__bytes` / 等效項）中，融合 路徑應顯示**較低的 HBM 讀+寫位元組**，大致為該大小 中（$T\times d\times 2$ B），確認獲勝是*流量*，而不是 FLOPs — 正是你根據排列的記憶體限制性質所預測的。
+??? Success "4 — profile fused 與 unfused dispatch（HBM 位元組）"
+    融合 gather → GEMM 可以避免把排列後的 token tensor 具現化到 HBM 上。在 profiler 的記憶體計數器（例如 `dram__bytes` 或等效項）裡，fused 路徑應該會顯示**更低的 HBM 讀+寫位元組**，差距大致是那個 tensor 的大小（$T\times d\times 2$ B），這證實省下來的是*流量*而不是 FLOP——正符合 permute 本身是 memory-bound 的預期。
 
-## Inference 和 serving
+## 推論與 serving { #inference-serving }
 
-??? Success "1 — DeepSeek-V3 權重的 HBM：BF16 / FP8 / int4"
-    671B 參數：**BF16** $= 671\times2 = 1342$ GB; **FP8** $= 671$ GB; **int4** $\approx 336$ GB。在 80 GB GPU 上（僅權重，KV 之前）：BF16 → $\lceil 1342/80\rceil = 17$; FP8 → 9; int4 → 5。量化直接買給你更少 GPU —— MoE serving 嚴重依賴低精度的主要原因。
+??? Success "1 — DeepSeek-V3 權重的 HBM 占用：BF16 / FP8 / int4"
+    671B 參數：**BF16** $= 671\times2 = 1342$ GB；**FP8** $= 671$ GB；**int4** $\approx 336$ GB。用 80 GB 的 GPU（只算權重，還沒算 KV）：BF16 需要 $\lceil 1342/80\rceil = 17$ 張；FP8 需要 9 張；int4 需要 5 張。量化直接幫你省下 GPU 數量——這正是 MoE serving 高度依賴低精度的主要原因。
 
-??? Success "2 — 隱藏 expert 流的條件"
-    當 expert 的**GEMM 時間 ≥ 傳輸時間**時，串流媒體將被隱藏：
+??? Success "2 — expert weight streaming 被藏起來的條件"
+    當 expert 的**GEMM 時間 ≥ 傳輸時間**時，weight streaming 就能被藏起來：
 
     $$ \frac{2\,n_e\,(8d^2)}{\text{FLOP/s}} \;\ge\; \frac{8d^2 \cdot \text{bytes}}{\text{PCIe BW}}, $$
 
-    其中 $n_e$ = tokens 路由到 expert。 $8d^2$ 取消，給出
+    其中 $n_e$ = 路由到該 expert 的 token 數。約掉 $8d^2$ 之後得到 **tokens-per-expert** 的門檻：$n_e \ge \tfrac{1}{2}\cdot \tfrac{\text{FLOP/s}}{\text{PCIe BW/byte}}$。大 batch（每個 expert 的 token 數多）能把傳輸藏起來；batch-1 的 decode 永遠做不到——所以 expert offload 對高 throughput serving 有幫助，但救不了低 batch 的 latency。
 
-    **tokens-per-expert**的閾值：$n_e \ge \tfrac{1}{2}\cdot \tfrac{\text{FLOP/s}}{\text{PCIe BW/byte}}$。大批量（很多 tokens/expert） 隱藏轉帳；批次 1 decode 從來不會這樣做 - 所以卸載有助於 throughput serving，不是低階 latency 單碼串流。
+??? Success "3 — 一個 batch 會碰到多少不同的 expert（batch 256，$E{=}256, k{=}8$）"
+    $E=256$ 個 expert 總共要分配 $256\times8 = 2048$ 次。用 balls-into-bins 估計被碰到的不同 expert 數：$E(1-(1-1/E)^{2048}) = 256(1-(255/256)^{2048}) \approx 256(1-e^{-8}) \approx 256\times0.99966 \approx \mathbf{256}$——也就是**幾乎所有 expert 都會被用到**。換算下來每個 expert 平均 tokens/expert $= 2048/256 = 8$，呈 Poisson 分佈（std ≈ √8 ≈ 2.8）。意義在於：在 serving 的 batch size 下，你幾乎無法避免載入大部分 expert，所以常駐權重的策略會贏過 cache。
 
-??? Success "3 — 接觸過的不同 experts（第 256 批，$E{=}256, k{=}8$）"
-    透過 $E=256$ experts 分配 $= 256\times8 = 2048$。預期明顯 experts（球箱）：$E(1-(1-1/E)^{2048}) = 256(1-(255/256)^{2048}) \approx 256(1-e^{-8}) \approx 256\times0.99966 \approx \mathbf{256}$ — 即 **基本上所有 experts**都被觸及。意思是 tokens/expert $= 2048/256 = 8$， 泊松分佈（std ≈ √8 ≈ 2.8）。意義：在 serving 批量大小下，你 無法避免載入大多數 experts，因此常駐權重策略擊敗了快取。
-
-??? Success "4 — expert-快取依受歡迎程度逐出；故障模式"
-    使用基於觀察到的 routing 頻率的 LFU/LRU：在 HBM 中保持熱 experts， 流冷的。**故障模式：** 如果 routing 分佈**轉變為 運行時**（例如請求流中的域更改），快取現在 充滿了以前熱、現在冷的 experts → 高失誤率和 latency 當天氣重新變暖時懸崖。透過自適應視窗/衰減來緩解如此受歡迎 追蹤最近的交通，並始終駐留 experts 的樓層。
+??? Success "4 — 依熱度做 expert cache eviction；失效模式"
+    用觀測到的 routing 頻率做 LFU/LRU：熱的 expert 留在 HBM，冷的就 stream。**失效模式：**如果 routing 分佈在執行期間**漂移**（例如請求流的領域變了），cache 裡塞滿的會是以前熱、現在冷的 expert → miss rate 與 latency 都會在新領域重新變熱時飆高。緩解方式是用自適應視窗/衰減去追蹤最近的流量，並設定一個常駐 expert 的下限。
 
 ## 案例研究
 
-??? Success "1 — 每個模型的 $\binom{E}{k}$ 和細粒度參數"
-    計算每個研究模型的 $\binom{E}{k}$（例如 Mixtral $\binom{8}{2}=28$； DeepSeek-V3 $\binom{256}{8}\approx4\times10^{14}$ 用於路由 experts）。 更多/更精細的 experts ⇒ 天文數字上更多的 token 特定混合物 活躍的$k$ —— 「細粒度 experts」聲明的定量核心和 $E$ 在各代車型中不斷發展的原因。
+??? Success "1 — 每個模型的 $\binom{E}{k}$ 與細粒度參數"
+    計算每個案例研究模型的 $\binom{E}{k}$（例如 Mixtral $\binom{8}{2}=28$；DeepSeek-V3 的路由 expert 是 $\binom{256}{8}\approx4\times10^{14}$）。expert 數越多、越細粒度 ⇒ 在相同 active $k$ 下，每個 token 能組出的「expert 混合」數量天文數字般增加——這正是「細粒度 expert」這個論點的量化核心，也是各代模型的 $E$ 持續演進的原因。
 
 ??? Success "2 — 每 1k tokens 的 KV 快取：MLA、GQA 與 MHA"
-    每個 token、每層：**MHA** 快取 $2\,n_h d_h$；**GQA** $2\,n_{kv}d_h$（$n_{kv}\ll n_h$）； **MLA** 只存 latent $d_c$。對 $n_h=128$、$d_h=128$、$n_{kv}=8$、$d_c\approx 512$ 的模型： MHA $=2\cdot128\cdot128=32768$ B；GQA $=2\cdot8\cdot128=2048$ B；MLA 每 token 每層 $\approx512\cdot2=1024$ B。 乘以 $L$ 和 1000 tokens。 MLA 比 GQA 節省約 2 倍，比 MHA 節省約 30 倍 — 使長上下文 DeepSeek serving 價格實惠的槓桿。
+    每個 token、每層：**MHA** 快取 $2\,n_h d_h$；**GQA** 快取 $2\,n_{kv}d_h$（$n_{kv}\ll n_h$）；**MLA** 只存一個 latent 向量 $d_c$。對 $n_h=128$、$d_h=128$、$n_{kv}=8$、$d_c\approx 512$ 的模型：MHA $=2\cdot128\cdot128=32768$ B；GQA $=2\cdot8\cdot128=2048$ B；MLA 每 token 每層約 $512\cdot2=1024$ B。乘上 $L$ 和 1000 個 token 即可得到總量。MLA 比 GQA 省約 2 倍，比 MHA 省約 30 倍——這正是讓長上下文的 DeepSeek serving 划算的關鍵槓桿。
 
-??? Success "3 — DeepSeek-V3 與 Mixtral：活躍/總計和 serving 交易"
-    V3 ≈ 5.5% 活性 (671B/37B)，混合 ≈ 28% (47B/13B)。 V3 激活率低 比率意味著**每個 token 擁有更多內存，但計算量更少**— 有利於 高 throughput，記憶體豐富的 serving（很多 GPU，大批量）。混合的 比率越高，記憶體佔用越少，對較小的部署更友好，並且 第 1 批 latency。有效/總比率是介於 記憶體成本和計算成本。
+??? Success "3 — DeepSeek-V3 與 Mixtral：active/total 比例與 serving 取捨"
+    V3 的 active 比例 ≈ 5.5%（37B/671B），Mixtral ≈ 28%（13B/47B）。V3 較低的 active 比例意味著**每個 token 背後的記憶體更多，但計算量更少**——對高 throughput、記憶體充裕的 serving（很多 GPU、大 batch）更有利。Mixtral 的比例較高，記憶體佔用較小，更適合較小規模的部署與 batch-1 latency。active/total 比例本質上就是在記憶體成本與計算成本之間做取捨。
 
-??? Success "4 — 將一個模型映射回MoE 篇分頁面"
-    例如**DeepSeek-V3**：S 形門 + 偏移控制器 → [負載平衡](../moe/load-balancing.md)；細粒度+共享 experts → [routing variants](../moe/routing-variants.md)； z 損失/FP32 router → [training stability](../moe/training-stability.md)；節點限制 routing + DualPipe → [系統與 EP](../moe/systems-ep.md)；MLA → [attention efficiency](../foundations/attention-efficiency.md)； FP8 → [numerics](../foundations/numerics-precision.md)。每一項生產技巧都能在 trace 上留下痕跡 到一頁 —— 這就是手冊的主題。
+??? Success "4 — 把一個模型對應回 MoE 篇各頁"
+    例如**DeepSeek-V3**：sigmoid gate + bias controller → [負載平衡](../moe/load-balancing.md)；細粒度＋shared expert → [Routing 變體](../moe/routing-variants.md)；z-loss / FP32 router → [訓練穩定性](../moe/training-stability.md)；node-limited routing + DualPipe → [系統與 expert parallelism](../moe/systems-ep.md)；MLA → [Attention 效率](../foundations/attention-efficiency.md)；FP8 → [數值與精度](../foundations/numerics-precision.md)。每一項生產技巧都能對應回某一頁——這正是這本手冊想呈現的主題。
 
 ## MoE decode 剖析
 
-??? Success "1 — 完全重疊 12% 階段的最大加速"
-    如果舞台的 kernels**完全重疊**另一個串流，則它們 _不在 關鍵路徑_—掛鐘不包括它們。讓他們無限 快速保存端對端 latency 的**~0%**（你只需保存該部分，如果有的話， 這並沒有被隱藏）。這就是 Track A 與 Track B 的差別：12% 是 Track-A（kernel-效率）編號，但其*latency*貢獻已經 由 Track B（並發）支付。你不能將同一時間存入銀行兩次 —— 只能 暴露（非重疊）kernel 時間在縮小時轉換為 latency。
+??? Success "1 — 完全重疊的 12% 階段，最大加速是多少"
+    如果某個 stage 的 kernel 完全被**另一個 stream 重疊掉**，它就不在 _critical path_ 上——wall-clock 不會把它算進去。即使把它變成無限快，省下的端對端 latency 也是**~0%**（你只能省下沒被藏住的那一小部分，如果還有的話）。這正是 Track A 與 Track B 的差別：12% 是 Track A（kernel 效率）的數字，但它對 *latency* 的貢獻早就被 Track B（並發）抵銷掉了。同一段時間不能被省兩次——只有**暴露（未被重疊）**的 kernel 時間，縮小後才會直接轉換成 latency 的節省。
 
-??? Success "2 — 將 GEMM1 (15%, ×60) 或 LM 頭減半 (1%, ×1)？"
-    將路由的 GEMM1 減半，保存 decode 的$\sim 0.5\times15\% = 7.5\%$； 將 LM 頭減半可節省 $\sim 0.5\times1\% = 0.5\%$。**GEMM1 以 ~15× 獲勝。** 教訓：最佳化**總**（= 呼叫 × 每次呼叫）成本，而不是每次呼叫成本。 每次調用便宜的 kernel 會觸發每一層，而每次調用昂貴的 kernel 則占主導地位 一次觸發－呼叫次數是你絕對不能放棄的乘數。
+??? Success "2 — 把 GEMM1（15%, ×60）或 LM head（1%, ×1）速度提升一倍？"
+    把路由 expert 的 GEMM1 速度提升一倍，可以省下 decode 總時間的 $\sim 0.5\times15\% = 7.5\%$；把 LM head 速度提升一倍只省 $\sim 0.5\times1\% = 0.5\%$。**GEMM1 贏了約 15 倍。**教訓：要優化的是**總成本**（= 每次呼叫成本 × 呼叫次數），不是單次呼叫成本。每次呼叫便宜但每層都會觸發的 kernel，加起來可能比每次呼叫昂貴但只觸發一次的 kernel 更重要——呼叫次數是你不能忽略的乘數。
 
-??? Success "3 — 共享 experts 融合何時獲利？"
-    讓融合去除$n$冗餘的 kernels（單獨共享 GEMM，激活， Quant,殘差-每個 ×$L$層）保存$S = L\sum_i t_i^{\text{removed}}$， 同時將 $A$ 新增到路由路徑（更大的排序 + 稍大的分組 來自附加共用 tokens 的 GEMM）。當融合是有利可圖的
+??? Success "3 — shared-expert fusion 何時划算？"
+    fusion 去掉了 $n$ 個原本獨立的 kernel（shared GEMM、activation、quant、residual——每層各一次），省下 $S = L\sum_i t_i^{\text{removed}}$，同時在路由路徑上多花 $A$（sort 變大 + grouped GEMM 因為多了 shared token 而稍微變大）。fusion 划算的條件是
 
     $$ S > A \quad\Longleftrightarrow\quad L\sum_i t_i^{\text{removed}} \;>\; \Delta t_{\text{sort}} + \Delta t_{\text{GEMM}}. $$
 
-    在decode的測量跡線$S \approx 19.8\%$和$A \approx 0.7\%$中，所以 淨$\approx 18\%$。這是值得的，因為刪除的工作是*每層並且 冗餘*，而增加的工作對 GEMM 來說只是「小幅邊際」增加， 已經運作了 —— 這裡的不平等非常緩和。
+    在實測的 decode trace 裡，$S \approx 19.8\%$、$A \approx 0.7\%$，淨收益約 18%。這很划算，因為被去掉的工作是*每層都重複、而且冗餘*的，而多出來的工作只是讓本來就在跑的 GEMM 稍微變大一點——這個不等式因此非常寬鬆。
 
-??? Success "4 — 自拍 111% vs 掛鐘 96%"
-    **自拍時間**獨立地匯總每個 kernel 的持續時間。如果兩台 kernels 運行 **同時**（不同的流），它們的持續時間都重要，但它們共享 掛鐘，因此自拍時間可以**超過**掛鐘 - 111% 意味著實質性 重疊（時間隱藏 = self − busy 為正）。值**低於 100%** (96%) 表示 kernels 是 ~串列 _且_ 有**空閒間隙**：掛鐘 = busy +idle，且串列時 busy ≈ self，因此 self/wall < 100% 意味著 缺失 ~4% 處於空閒狀態（啟動 latency，同步停止），GPU 不運作任何內容。
+??? Success "4 — self-time 111% vs wall-clock 96%"
+    **self-time** 是把每個 kernel 的時間獨立加總。如果兩個 kernel 在**不同 stream 上同時跑**，它們各自的時間都會被計入，但兩者共用同一段 wall-clock，所以 self-time 總和可以**超過** wall-clock——111% 代表確實有重疊（被藏起來的時間 = self − busy，是正數）。數值**低於 100%**（96%）則代表 kernel 大致是**串行**執行、而且中間有**空閒間隙**：wall-clock = busy + idle，串行時 busy ≈ self，所以 self/wall < 100% 意味著有 ~4% 的時間 GPU 完全閒著、什麼都沒在跑（啟動 latency、同步等待）。
 
-??? Success "5 — 對於每層 GEMM 來說 split-K 值得嗎？"
-    Split-K 將 1 個 GEMM 變成（計算 kernel + 減少 kernel）= **2 次發射**。 對於 $L=60$ 層的每層 GEMM，每層**+60 次減少發射** decode；僅在每個 decode LM 頭上執行一次，成本為**+1**。 Split-K 購買 並行性（更多的區塊在 K 維度上忙碌）在單一 GEMM 時會有所幫助 無法填充設備 - 但在**batch-1 decode**中，GEMM 已經 受記憶體限制且較小，因此額外的 60 個減少 kernels（每個 HBM 部分的往返）主要是開銷。**kernel 中的 K 累積為 通常對於每層 decode GEMM 更好**；為大型預留 split-K， 每步一次的投影（LM head），其中並行性實際上是值得的。
+??? Success "5 — 每層 GEMM 用 split-K 值得嗎？"
+    split-K 把 1 個 GEMM 變成（計算 kernel + reduce kernel）= **2 次 launch**。對 $L=60$ 層、每層都做的 GEMM 來說，每個 decode 步驟就多了**+60 次 reduce launch**；如果只用在每個 decode 步驟跑一次的 LM head 上，成本只是 **+1**。split-K 換來的並行性（更多 block 同時忙在 K 維度上）能在單一 GEMM 太小、無法餵滿整個裝置時有幫助——但在**batch-1 decode**裡，GEMM 本來就已經是 memory-bound、規模又小，額外的 60 個 reduce kernel（每個都要往返一次 HBM 的部分結果）大多只是開銷。**in-kernel 的 K 累積通常對每層的 decode GEMM 更好**；split-K 該留給規模較大、每步只做一次的投影（例如 LM head），那裡的並行性才真正划算。

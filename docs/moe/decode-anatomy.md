@@ -74,7 +74,7 @@ $$
 + \underbrace{H\,I\cdot 0.5}_{W_{2}=0.92\,\text{MB}} \approx 2.75\ \text{MB}.
 $$
 
-Stage-1 的 arithmetic intensity 在每個 expert 處理 $m$ 列時是 $I_{\text{AI}} = 4m$ FLOP/byte（推導見 [kernels](kernels.md)）。decode 平均每 expert 的列數 $= \dfrac{\text{batch}\times k}{E}$，batch 1 時 $\ll 1$，所以 $I_{\text{AI}}\approx 4$， 遠低於 ridge point ⇒ 徹底 memory-bound。這就是為什麼用 [quantization](../performance/quantization.md) 把權重縮小（FP4 對 BF16 是 $1/4$ 位元組 ⇒ 最高 $4\times$ 權重頻寬）是讓這一步划算的關鍵。
+Stage-1 的算術強度在每個 expert 處理 $m$ 列時是 $I_{\text{AI}} = 4m$ FLOP/byte（推導見 [kernels](kernels.md)）。decode 平均每 expert 的列數 $= \dfrac{\text{batch}\times k}{E}$，batch 1 時 $\ll 1$，所以 $I_{\text{AI}}\approx 4$， 遠低於脊點 ⇒ 徹底 memory-bound。這就是為什麼用 [quantization](../performance/quantization.md) 把權重縮小（FP4 對 BF16 是 $1/4$ 位元組 ⇒ 最高 $4\times$ 權重頻寬）是讓這一步划算的關鍵。
 
 **Communication 是頭等的 line item。** 每層兩次 TP all-reduce（約 120 次呼叫）的總成本 大約等於單一最貴的 GEMM —— 這是每層都要繳的 [collective](../performance/distributed-training.md) 稅。對 decode 的小訊息（$\approx b\,H\,c$ 位元組）它是 latency-bound，不隨 batch 攤平。
 
@@ -110,7 +110,7 @@ flowchart TB
 
 ## 第 2 課 — fusion 決定 kernel 數量
 
-兩個堆疊算的是**完全相同的數學**，但**打包成不同數量的 kernel**。每一次 fusion 都省掉 一次 kernel launch 與一趟中間結果的 HBM 來回（[operator fusion](../foundations/flashattention.md) 的勝利，套用到 MoE pipeline）。trace 顯示 fusion 是一場*整體*的拉鋸 —— 每個堆疊各自融合 不同的東西 —— 但有一項 fusion 影響最大：
+兩個堆疊算的是**完全相同的數學**，但**打包成不同數量的 kernel**。每一次 fusion 都省掉 一次 kernel launch 與一趟中間結果的 HBM 往返（[operator fusion](../foundations/flashattention.md) 的勝利，套用到 MoE pipeline）。trace 顯示 fusion 是一場*整體*的拉鋸 —— 每個堆疊各自融合 不同的東西 —— 但有一項 fusion 影響最大：
 
 | 運算 | Stack A | Stack B | 誰融合得多 |
 | --- | --- | --- | --- |

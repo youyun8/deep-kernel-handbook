@@ -5,120 +5,122 @@
   <span class="chip"><strong>用法：</strong> 先自己試，再對照</span>
 </div>
 
-解答[效能工程篇](../performance/index.md)的練習。kernel 練習是開放式的（「運行它，對其進行基準測試」）；我們給出了預期的結果 以及推理，以便你可以檢查你的數字。
+解答[效能工程篇](../performance/index.md)的練習。kernel 練習大多是開放式的（「跑起來，幫它 benchmark」）；我們給出預期結果與推理過程，方便你核對自己算出來的數字。
 
 ## GPU 程式設計模型
 
-??? Success "1 — 為什麼 32 通道減少在 CDNA 上是錯誤的"
-    使用 `offset = 16,8,4,2,1` 和 32 頻道遮罩硬編碼減少扭曲 假設 32 寬扭曲 (NVIDIA)。 AMD CDNA 波前是**64 通道**，因此 32 通道隨機播放僅減少波前的「一半」 —— 上面的 32 通道是 被忽略，給出錯誤的（部分）總和。修復：開始隨機播放循環 `warpSize/2` 並且在各處使用 `warpSize` 而非文字 32，因此 相同的代碼可以正確減少 32 或 64 個 lane。
+??? Success "1 — 為什麼 32-lane reduction 在 CDNA 上是錯的"
+    用 `offset = 16,8,4,2,1` 硬編碼的 warp shuffle reduction，等於假設 32-lane 的 warp（NVIDIA）。AMD CDNA 的 wavefront 是 **64 個 lane**，所以 32-lane 的 shuffle 只 reduce 了 wavefront 的「一半」——上半的 32 個 lane 被忽略，得到錯誤的（部分）總和。修法：把 shuffle 迴圈從 `warpSize/2` 開始，並全部用 `warpSize` 取代寫死的 32，這樣同一份程式碼在 32 或 64 個 lane 上都能正確 reduce。
 
-??? Success "2 — 佔用限制器（64 個暫存器/線程，48 KB SMEM/區塊）"
-    每個 SM：64K 暫存器，100 KB SMEM。取一個 256 線程塊。
+??? Success "2 — occupancy limiter（每個 thread 64 個 register，每個 block 48 KB SMEM）"
+    每個 SM：64K 個 register，100 KB SMEM。取一個 256-thread 的 block。
 
-    - **暫存器：**$64\times256 = 16384$ 暫存器/區塊 → $65536/16384 = 4$ 區塊。
-    - **SMEM：**$100/48 = 2.08$ → **2 區塊**。
+    - **register：**$64\times256 = 16384$ register/block → $65536/16384 = 4$ 個 block。
+    - **SMEM：**$100/48 = 2.08$ → **2 個 block**。
 
-    SMEM 是更嚴格的約束 → 2 個常駐區塊（512 個執行緒）。**共享 記憶體是佔用限制器**；按區塊（或區塊大小）切割 SMEM 會提高占用率。
+    SMEM 是更緊的限制 → 2 個常駐 block（512 個 thread）。**shared memory 是 occupancy limiter**；把每個 block 用的 SMEM 切小（或調整 block size）能提高 occupancy。
 
-??? Success "3 — 合併用於行優先，而不是其轉置"
-    對於行主 $[M,N]$ 張量，扭曲中的執行緒由**列**索引 讀取 `A[row, col0+lane]` — 連續位址 → 一個合併事務。 讀取**轉置**（線程沿著列走）給出 stride-$N$ 位址 → $N$ 單獨事務，約 32 倍記憶體流量。這是 正是 MoE**聚集**：分散的 token 指數打破合併，即 為什麼聚集 kernel 受記憶體限制並且值得融合。
+??? Success "3 — coalescing 適用於 row-major，轉置後就不行"
+    對 row-major 的 $[M,N]$ tensor，warp 裡的 thread 用 **column** 索引讀取 `A[row, col0+lane]`——位址連續 → 合併成一筆 transaction。讀**轉置**版本（thread 沿著 row 走）會得到 stride-$N$ 的位址 → 變成 $N$ 筆獨立 transaction，記憶體流量大約多 32 倍。這正是 MoE 的 **gather** 在發生的事：散落的 token index 破壞了 coalescing，這也是為什麼 gather kernel 是 memory-bound、值得拿去融合。
 
-??? Success "4 — 當降低佔用率時會上升 throughput"
-    大量暫存器的 matmul 區塊將更多的工作集保留在**暫存器**中 （最快的記憶體），減少 SMEM/HBM 流量和指令數 輸出。這提高了套準壓力 → 更少的常駐扭曲 → 更低 佔用率，但**更高的 throughput**因為每個扭曲確實更有用 工作，並且 kernel 受計算限制，不受 latency 限制。最大占用率只會有幫助 當你需要很多扭曲來隱藏記憶體 latency；鋪得好的 GEMM 則不然。
+??? Success "4 — 為什麼降低 occupancy 反而能提升 throughput"
+    用大量 register 的 matmul block 會把更多工作集留在**register**裡（最快的記憶體），減少 SMEM/HBM 流量和輸出的指令數。這會提高 register pressure → 常駐 warp 變少 → occupancy 變低，但**throughput 反而更高**，因為每個 warp 做的都是真正有用的工作，而且這個 kernel 是 compute-bound、不是 latency-bound。最大化 occupancy 只在你需要大量 warp 來藏住記憶體 latency 時才有幫助；tile 排得好的 GEMM 不需要。
 
 ## Triton 路線
 
-??? Success "1 — 向量加法與 softmax 與 PyTorch"
-    兩個 Triton kernels 都應將 `torch` 輸出與 BF16/FP32 容差相符。 向量相加受記憶體限制 → 預計 throughput 接近 HBM 頻寬，與 本機操作。 Fused Softmax 應該**擊敗**簡單的三通道火炬 Softmax 頻寬（一次讀 + 一次寫 vs 三次）並且大致平局 `torch.softmax`（本身已熔斷）。
+??? Success "1 — 比對 vector add 與 softmax 對 PyTorch"
+    兩個 Triton kernel 的輸出都應該在 BF16/FP32 誤差範圍內對上 `torch` 的結果。vector add 是 memory-bound → throughput 應該接近 HBM 頻寬，和 native 操作差不多。fused softmax 應該**贏過**單純的三段式 torch softmax（一次讀 + 一次寫，相對三次），大致打平 `torch.softmax`（本身也已經是 fused 的）。
 
-??? Success "2 — 面向 AMD 的自動調整配置"
-    加入不同 `num_warps` (4/8) 和 `BLOCK` 的配置，其中**wavefront-64** 請注意 - 在 CDNA 上，`num_warps=4` 已經意味著 256 個通道/區塊，因此 最佳點塊大小與 NVIDIA 的 32 通道扭曲不同。最好的配置是 GPU 特定；教訓是，在一個供應商上自動調整的配置很少 另一方面是最佳的 —— 總是根據目標重新自動調整。
-??? Success "3 — Softmax，用於比 1 `BLOCK` 寬的行"
-    循環遍歷 `BLOCK` 大小的圖塊中的行，保持運行最大值 $m$ 和總和 $\ell$ 通過**online-softmax 組合器**（與 FlashAttention 相同） 例如 1)：對於每個圖塊 $m' = \max(m, \max_{\text{tile}})$，將 $\ell$ 重新縮放 $e^{m-m'}$，增加圖塊的貢獻。第二遍（或緩存的分子） 正常化。這消除了“行必須適合一個塊”的限制。
+??? Success "2 — 為 AMD 寫的 autotune config"
+    加入不同 `num_warps`（4/8）和 `BLOCK` 的組合，要注意**wavefront 是 64**這件事——在 CDNA 上 `num_warps=4` 已經等於每個 block 256 個 lane，所以最佳 block size 跟 NVIDIA 的 32-lane warp 不一樣。最佳設定是因 GPU 而異的；教訓是：在一個廠商上 autotune 出來的設定，幾乎不會是另一個廠商上的最佳解——換目標一定要重新 autotune。
 
-??? Success "4 — 融合 vs 三聲道 softmax 位元組"
-    三次讀取行**3×**（最大值、exp-sum、歸一化）並寫入一次。 Fused 讀一次，寫一次。對於 $[R,C]$ 張量，位元組比率為 ≈ $(3+1)/(1+1) = 2\times$ 減少了融合 kernel 的流量 — 並且因為 softmax 受記憶體限制，這相當於 2 倍加速，你的基準測試應該如此 確認。
+??? Success "3 — softmax：當一行寬度超過 1 個 `BLOCK`"
+    把每一行切成 `BLOCK` 大小的 tile 逐個迭代，用**online softmax 的合併運算**（和 FlashAttention 練習 1 一樣）維護 running max $m$ 與分母 $\ell$：每個 tile 算 $m' = \max(m, \max_{\text{tile}})$，把 $\ell$ 用 $e^{m-m'}$ 重新縮放，再加上這個 tile 的貢獻。第二輪（或快取下來的分子）再做 normalize。這樣就消除了「一行必須塞進一個 block」的限制。
 
-## CUDA / HIP 軌道
+??? Success "4 — fused vs 三段式 softmax 的位元組數"
+    三段式版本要把每一行讀**三次**（max、exp-sum、normalize）再寫一次。fused 版本只讀一次、寫一次。對 $[R,C]$ 的 tensor，位元組比率約 $(3+1)/(1+1) = 2\times$——fused kernel 的流量少了一半，而因為 softmax 是 memory-bound，這就直接對應到 2 倍加速，你的 benchmark 應該能驗證這一點。
 
-??? Success "1 — 埠平鋪 matmul 到 HIP"
-    `hipify`或手口：`__shared__`撐、`cudaMalloc→hipMalloc`、 `<<<>>>` 啟動與 `hipcc` 下的語法相同。使用 `hipcc` 建置（或透過 ROCm 上的 PyTorch）並根據 cuBLAS/hipBLAS 驗證 fp 容差。要點： HIP 是來源相容的 —— 相同的 kernel 在兩個供應商上運行，是唯一真正的 可移植性錯誤是波前寬度（下一個練習）。
+## CUDA / HIP 路線
 
-??? Success "2 — 32 lane 的 reduction 在 64 寬 wavefront 上會失敗"
-    做一個只用 `offset = 16…1` shuffle 的 reduction。在 CDNA 上，64 通道 wavefront 意味著 lane 32–63 從不參與 → 結果只加總了下半部 的一半。用一個長度 64 的全 1 向量做 reduction 來示範：你會得到 32，而不是 64。用 `for (offset = warpSize/2; offset>0; offset>>=1)` 修復。
+??? Success "1 — 把 tiled matmul 移植到 HIP"
+    用 `hipify` 自動轉換，或手動移植：`__shared__` 維持原樣，`cudaMalloc→hipMalloc`，`<<<>>>` 的 launch 語法在 `hipcc` 下完全相同。用 `hipcc` 編譯（或透過 ROCm 上的 PyTorch），再對 cuBLAS/hipBLAS 驗證浮點誤差範圍。重點：HIP 是原始碼相容的——同一份 kernel 在兩個廠商上都能跑，唯一真正會出錯的可移植性陷阱是 wavefront 寬度（見下一題）。
+
+??? Success "2 — 32-lane 的 reduction 在 64 寬 wavefront 上會失敗"
+    做一個只用 `offset = 16…1` shuffle 的 reduction。在 CDNA 上，64-lane 的 wavefront 代表 lane 32–63 完全沒被用到 → 結果只加總了下半部一半的值。示範方法：對一個長度 64、全部是 1 的向量做 reduction，你會得到 32 而不是 64。修法是用 `for (offset = warpSize/2; offset>0; offset>>=1)`。
 
 ??? Success "3 — `TILE` ∈ {8,16,32} 掃描"
-    更大的圖塊 → 每個全域負載從 SMEM 重複使用更多的資料（更高的算術 強度），但每個區塊有更多 SMEM/寄存器 → 佔用率較低。通常 `TILE=16` 或 `32` 獲勝：8 太小（重複使用性差，受記憶體限制），32 可能溢出 或減少較小 GPU 的佔用。將最佳值與扭曲/波前連結起來 你的特定卡上的區塊和 SMEM 預算。
+    tile 越大 → 每筆從 global memory 載入的資料在 SMEM 裡被重複使用的次數越多（算術強度更高），但每個 block 用的 SMEM/register 也更多 → occupancy 較低。通常 `TILE=16` 或 `32` 會贏：8 太小（重複使用率差、memory-bound），32 在較小的 GPU 上可能會撞到 register/SMEM 上限、壓低 occupancy。把最佳值跟你那張卡的 warp/wavefront 大小與 SMEM 預算對起來看。
 
-??? Success "4 — 以矩陣核心取代內部積 (`wmma`/rocWMMA)"
-    將標量內循環交換為張量核心/矩陣核心 MMA 片段給出 大幅加速（通常為 4-10 倍），因為矩陣核心每執行一次完整的 tile-MMA 指令的 FLOP/s 比標量 FMA 路徑高很多。要點： 片段需要特定的圖塊形狀/dtypes（例如 16×16×16 BF16）並小心 SMEM 佈局 — 測量相對於標量基線的正確性和加速比。
+??? Success "4 — 用 Tensor Core/Matrix Core 取代內積迴圈（`wmma`/rocWMMA）"
+    把標量的內積迴圈換成 Tensor Core/Matrix Core 的 MMA fragment，通常能拿到 4–10 倍的大幅加速，因為 Matrix Core 執行一次完整 tile-MMA 指令的 FLOP/s 遠高於標量 FMA 路徑。重點：fragment 需要特定的 tile 形狀/dtype（例如 16×16×16 BF16），SMEM 佈局也要小心對齊——記得對照標量版本量測正確性與加速比。
 
 ## 分散式 training { #distributed-training }
 
-??? Success "1 — all-reduce = 減少-分散 + 全聚集；ZeRO-2 體積"
-    **恆等式：**減少分散總和，並為每個排名留下一個結果分片； all-gather 然後分配所有碎片 → 每個等級都有完整的減少 張量 = all-reduce。每一步的環成本 ≈ $S(G{-}1)/G$ 位元組/rank，所以 兩者合計 ≈ $2S(G{-}1)/G$ = all-reduce 成本。 **ZeRO-2**對梯度進行分片，因此而不是完整梯度的 all-reduce 它執行**reduce-scatter**（每個排名保留其 grad 碎片，更新其 優化器分片）和**所有參數的集合**— 總體積與 DDP 的 all-reduce ($\approx 2S$)，但它從未實現完整的漸變 或優化器狀態，在同等通訊下節省記憶體。
-??? Success "2 — 每 GPU 內存，70B BF16 + Adam，8 個 GPU"
-    每個參數的混合精度 Adam 狀態：2 B (BF16 權重) + 2 B (grad) + 4 B (FP32 主) + 4 + 4 B (FP32 m, v) = **16 B/參數**。對於 70B 來說是 $70\text{B}\times16 = 1120$ GB 總計。
+??? Success "1 — all-reduce = reduce-scatter + all-gather；ZeRO-2 的流量"
+    **恆等式：**reduce-scatter 把總和算出來，每個 rank 留下一份結果分片；再 all-gather 把所有分片發給所有人 → 每個 rank 都拿到完整的 reduce 結果張量 = all-reduce。每一步的 ring 成本 ≈ $S(G{-}1)/G$ 位元組/rank，兩步合計 ≈ $2S(G{-}1)/G$ = all-reduce 的成本。**ZeRO-2** 把梯度分片，所以它對完整梯度做的不是 all-reduce，而是 **reduce-scatter**（每個 rank 只留自己的 grad 分片、更新自己的 optimizer 分片）加上**對所有參數的 all-gather**——總流量跟 DDP 的 all-reduce（$\approx 2S$）相當，但它從未具現化完整的梯度或 optimizer 狀態，用相同的通訊量換到記憶體節省。
 
-    - **DDP：**每個 GPU 儲存所有 16 B/param →**~1120 GB/GPU**（在 80 GB 上不可能 - 需要分片）。
-    - **ZeRO-1**（分片優化器，16 B 中的 12）：2+2 + 12/8 = 4 + 1.5 = **~5.5 B/param × 70B ≈ 385 GB**…仍然分裂？每個 GPU：未分片 4 B/參數（權重+梯度，280 GB）+ 分片 12/8 = 1.5 B (105 GB) ≈**385 GB/GPU**。
-    - **ZeRO-2**（也是分片等級）：重量 2 B (140 GB) + (2+12)/8 = 1.75 B (122 GB) ≈**262 GB/GPU**。
-    - **ZeRO-3**（對所有內容進行分片）：16/8 = 2 B/param × 70B ≈**140 GB/GPU**。
+??? Success "2 — 每 GPU 記憶體，70B BF16 + Adam，8 個 GPU"
+    每個參數的混合精度 Adam 狀態：2 B（BF16 權重）+ 2 B（grad）+ 4 B（FP32 master）+ 4 + 4 B（FP32 的一階、二階動量）= **16 B/參數**。70B 模型總計 $70\text{B}\times16 = 1120$ GB。
 
-    趨勢就是重點：ZeRO-3 削減每個 GPU 狀態 ~$G\times$ 與 DDP，轉變為 不可能的模型變成了一個合適的模型（具有更多的全聚集流量）。
+    - **DDP：**每個 GPU 都存全部 16 B/param →**~1120 GB/GPU**（80 GB 顯卡上不可能——必須分片）。
+    - **ZeRO-1**（只分片 optimizer 狀態，16 B 裡的 12 B）：每個 GPU 未分片的部分是權重+梯度 4 B/param（280 GB），分片的 12/8 = 1.5 B/param（105 GB）≈ **385 GB/GPU**。
+    - **ZeRO-2**（也分片梯度）：權重 2 B（140 GB）+ (2+12)/8 = 1.75 B（122 GB）≈ **262 GB/GPU**。
+    - **ZeRO-3**（全部分片）：16/8 = 2 B/param × 70B ≈ **140 GB/GPU**。
 
-??? Success "3 — 管道氣泡分數"
-    對於 $P$ 階段和 $m$ 微批次，氣泡分數為
+    重點是這個趨勢：ZeRO-3 把每 GPU 的狀態量砍到約 DDP 的 $1/G$，把原本塞不進去的模型變成裝得進去的模型（代價是更多 all-gather 流量）。
+
+??? Success "3 — pipeline bubble 比例"
+    對 $P$ 個 stage、$m$ 個 microbatch，bubble 比例為
 
     $$ \text{bubble} = \frac{P-1}{m + P - 1}. $$
 
-    保留$<10\%$：$\frac{P-1}{m+P-1} < 0.1 \Rightarrow m > 9(P-1)$。所以對於 $P=8$ 你需要 $m > 63$ 微批次；適用於 $P=4$、$m>27$。更多階段⇒許多 需要更多的微批次來攤提填充/排出 —— 核心 PP 張力。
+    要讓它 $<10\%$：$\frac{P-1}{m+P-1} < 0.1 \Rightarrow m > 9(P-1)$。所以 $P=8$ 時你需要 $m > 63$ 個 microbatch；$P=4$ 時需要 $m>27$。stage 越多 ⇒ 需要越多 microbatch 才能把填充/排空的時間攤掉——這正是 pipeline parallelism 的核心張力。
 
-??? Success 《4－為什麼 TP 可以節點內，EP 可以跨節點》
-    **TP**在每層**內執行 all-reduce（兩次：fwd + bwd） 啟動 — 每步都有巨大的、latency 敏感的體積 → 它必須騎在 最快的連結（節點內 NVLink/Infinity Fabric）。**EP**有兩台 all-to-all 每個 MoE 層，但每個 token 有效負載較小，最重要的是，**重疊 具有計算**並且可以是**節點限制\*\*；它可以容忍較慢的跨節點 頻寬。把最多話的 collective（TP）對映到最快的連結，把 可重疊的（EP）放到較慢的網路上。
+??? Success "4 — 為什麼 TP 適合節點內、EP 適合跨節點"
+    **TP** 在每一層**內部**做 all-reduce（forward 一次、backward 一次），每一步都要傳很大、對 latency 很敏感的流量 → 必須走最快的連結（節點內的 NVLink/Infinity Fabric）。**EP** 每個 MoE 層只有兩次 all-to-all，但每個 token 的 payload 較小，最重要的是它能**和計算重疊**、也可以做成**node-limited**；它能容忍較慢的跨節點頻寬。把話最多的 collective（TP）放到最快的連結上，把可以重疊的（EP）放到較慢的網路上。
 
-## 量化和壓縮 { #quantization-compression }
+## 量化與壓縮 { #quantization-compression }
 
-??? Success "1 — int8 仿射量化/反量化和最大誤差"
-    仿射：$q = \text{round}(x/s) + z$、$\hat x = s(q - z)$，附 $s = (\max-\min)/255$ 為 int8。每個元素的最大誤差是**半步**， $s/2$。**每個張量**對整個張量使用一個 $s$，因此有一個離群值通道 膨脹 $\max$ → 大 $s$ → 所有*小*通道上的大誤差。 **每個通道**為每個通道提供自己的 $s$，因此異常值較大的 $s$ 不污染其他 → 誤差要低很多。這就是為什麼每個通道（和 AWQ）存在。
+??? Success "1 — int8 affine quantize/dequantize 與最大誤差"
+    affine：$q = \text{round}(x/s) + z$，$\hat x = s(q - z)$，int8 的 $s = (\max-\min)/255$。每個元素最大誤差是**半個 step**，即 $s/2$。**per-tensor** 對整個 tensor 用同一個 $s$，所以只要有一個 outlier channel 撐大了 $\max$ → $s$ 變大 → 所有*小*的 channel 上誤差都跟著變大。**per-channel** 讓每個 channel 有自己的 $s$，outlier 那個 channel 的大 $s$ 不會污染其他 channel → 誤差低很多。這就是 per-channel（以及 AWQ）存在的理由。
 
-??? Success "2 — AWQ 顯著頻道縮放"
-    AWQ 擴大了**顯著**（高激活幅度）權重通道 在量化之前透過縮放相應的激活進行補償 下降，因此重要通道實際上獲得更多位元。在一台上實施 線性層：透過啟動統計資料識別顯著通道，應用 每通道縮放、量化為 int4、反量化、測量困惑度。期待 **同時明顯低於簡單的每通道 int4**的困惑度 位寬。
+??? Success "2 — AWQ 的 salient channel scaling"
+    AWQ 在量化前先放大**salient**（activation 幅度大）的權重 channel，並把對應的 activation 縮小回去補償，這樣重要的 channel 實質上拿到更多有效位元。在一個 linear 層上實作：用 activation 統計找出 salient channel，套用 per-channel scale，量化成 int4，再 dequantize、量測 perplexity。預期在**相同位寬**下，perplexity 會明顯低於單純的 per-channel int4。
 
-??? Success "3 — decode-latency 在 13B 型號上從 W4 獲得增益"
-    Decode 是**記憶體限制**：latency ≈ 權重位元組 / HBM-BW。 BF16 權重 = $13\text{B}\times2 = 26$ GB；int4 ≈ $13\text{B}\times0.5 = 6.5$ GB。位元組數下降 ~4×，因此每個 token decode latency 下降到**~4×**（減 去量化和非量化活化/KV）。勝利純粹來自於移動 每個 token 的權重位元組更少 — [memory-bound](../foundations/attention-efficiency.md) 論證是定量的。
+??? Success "3 — 13B 模型 decode latency 從 W4 得到的增益"
+    decode 是**memory-bound** 的：latency ≈ 權重位元組數 / HBM 頻寬。BF16 權重 = $13\text{B}\times2 = 26$ GB；int4 ≈ $13\text{B}\times0.5 = 6.5$ GB。位元組數降到約 1/4，所以每個 token 的 decode latency 也降到**約 1/4**（還要扣掉沒被量化的 activation/KV 那部分）。這個收益純粹來自每個 token 要搬的權重位元組變少——這正是 [memory-bound](../foundations/attention-efficiency.md) 論證的量化版本。
 
-??? Success "4 — 為什麼路由 experts 比 router/attention 更好地容忍 int4"
-    路由的 experts 是**冗餘和平均**— 每個 token 只能看到 $k$ 許多 experts，並且許多 experts 的量化噪音在 加權總和。**router**對**小 logit 做出離散決策 差異**（精度至關重要 - 請參閱 MoE 穩定性）和**attention** 向 KV 快取提供數據，其中錯誤**在序列上複合**。如此咄咄逼人 int4 繼續 experts（大多數參數，最寬容），而 router 和 attention 保持更高的精度 — 標準 MoE serving 配方。
+??? Success "4 — 為什麼路由 expert 比 router/attention 更耐得住 int4"
+    路由 expert 本身就是**冗餘且會被平均**的——每個 token 只看 $k$ 個 expert，許多 expert 的量化噪音會在加權和裡互相抵消。**router** 是根據**很小的 logit 差異做離散決策**（精度至關重要，見訓練穩定性篇），**attention** 則把資料寫進 KV cache，誤差會**在序列上累積放大**。所以可以放心對 expert 用激進的 int4（佔大多數參數、也最能容錯），而 router 與 attention 維持較高精度——這正是標準的 MoE serving 配方。
 
-## Inference 最佳化
+## Inference 優化
 
-??? Success "1 — 推測 decoding 加速"
-    根據草案接受率 $\alpha$ 和提案長度 $\gamma$，預期 每個驗證步驟接受的 tokens 數量為
+??? Success "1 — speculative decoding 的加速"
+    給定 draft 的 acceptance rate $\alpha$ 與提案長度 $\gamma$，每次驗證步驟預期能接受的 token 數是
 
     $$ \mathbb{E}[\text{tokens}] = \frac{1-\alpha^{\gamma+1}}{1-\alpha}. $$
 
-    加速比 ≈ 除以每步成本比（一個大模型驗證 + $\gamma$ 便宜草稿）。高 $\alpha$ 和適度的 $\gamma$ 提供最好的 返回；作為 $\alpha\to1$，你每次驗證都會接近 $\gamma+1$ tokens。驗收 主導的是頻寬速率，不是裸頻寬。
+    加速比 ≈ 這個期望值除以每步成本比（一次 target 模型驗證 + $\gamma$ 次便宜的 draft）。高 $\alpha$ 配上適中的 $\gamma$ 回報最好；當 $\alpha\to1$ 時，每次驗證能接受接近 $\gamma+1$ 個 token。acceptance rate 主導的是有效加速，而不是 draft 本身的裸算力。
 
 ??? Success "2 — continuous batching vs 靜態 batching，長度在 [64,1024] 均勻"
-    靜態批次將每個請求填入**批次中最長的**並等待 對於完成速度最慢的，因此短請求會浪費計算/插槽；有長度 在 [64,1024] 中均勻，平均長度 ≈ 544，但批次運行速度為 ≈ 1024 → ~40–50% 浪費了。**連續批次**驅逐已完成的序列並接納新的序列 每一步，保持批次滿 → throughput 增益的順序 填充廢物分數（對於這種傳播，大約**1.5–2×**，越高越好 方差）。
+    static batching 會把每個請求 pad 到**這個 batch 裡最長的那個**，並等最慢完成的那個跑完，所以短請求會浪費計算/slot；長度在 [64,1024] 均勻分布時，平均長度 ≈ 544，但整個 batch 會跑到 ≈ 1024 長度 → 浪費約 40–50%。**continuous batching** 每一步都把跑完的序列換掉、塞進新序列，讓 batch 一直保持滿載 → throughput 提升的量級大致等於這個 padding 浪費的比例（對這種長度分布大約是 **1.5–2×**，分布的變異數越大，提升越多）。
 
-??? Success "3 — 前綴快取 KV 已儲存，100 個請求，2k 共用提示"
-    不共享時，每個請求都會儲存 2k-token 系統提示的 KV 單獨 → $100\times$ 副本。使用前綴緩存，共享前綴是 儲存**一次**並重複使用，儲存 $99\times$ 前綴 KV。如果一層 token KV 的大小為$b$字節，有$L$層，儲存$= 99\times2000\times L\times b$ — 通常為幾 GB。使用通用系統為任何工作負載帶來純粹的勝利 提示。
+??? Success "3 — prefix caching 省下的 KV，100 個請求、2k 共用 prompt"
+    不共享的話，每個請求都會各自存一份 2k-token system prompt 的 KV → 重複 $100\times$。用了 **prefix caching**，共用的前綴只存**一次**並重複使用，省下 $99\times$ 份的前綴 KV。若每個 token 每層 KV 大小為 $b$ bytes、共 $L$ 層，省下的量 $= 99\times2000\times L\times b$——通常是好幾 GB。只要工作負載有共用 prompt，這就是純粹的免費收益。
 
-??? Success "4 — prefill/decode 分解：幫助與傷害"
-    分解將計算綁定**prefill**和記憶體綁定**decode**放在一起 單獨的池，每個池都調整到其瓶頸（prefill：大批量，高 MFU； decode：高記憶體頻寬）。當兩個階段發生時它**有幫助** 否則競爭（突發長提示飢餓 decode）。當 **池之間的 KV 快取傳輸**（prefill→decode 切換）成本超過 它避免的爭用－即短提示/小 KV，或慢 互連。關於 KV 位元組、鏈路頻寬、爭用的原因已保存。
+??? Success "4 — prefill/decode disaggregation：什麼時候有幫助，什麼時候有害"
+    disaggregation 把 compute-bound 的 **prefill** 和 memory-bound 的 **decode** 拆到各自的 GPU 池，各自針對自己的瓶頸調校（prefill：大 batch、高 MFU；decode：高記憶體頻寬）。當兩個階段原本會互相搶資源時（例如長 prompt 的尖峰會讓 decode 餓著），disaggregation **有幫助**。但當**池之間搬 KV cache**（prefill→decode 切換）的成本超過它省下的爭用時——也就是 prompt 短/KV 小，或是互連速度慢——disaggregation 反而**有害**。判斷依據是：KV 位元組數、連結頻寬、原本能省下多少爭用。
 
-## 分析和方法
+## Profiling 與方法論
 
-??? Success "1 — 對 Triton softmax 進行基準測試錯誤，然後正確"
-    **錯誤：**在沒有預熱且沒有 `torch.cuda.synchronize()` 的情況下對第一次呼叫進行計時 - 你測量 kernel-啟動+編譯（JIT）latency 和 CPU 端非同步返回， 不是 GPU 時間，通常會減少 10-100 倍。**右：**預熱幾次迭代 （觸發自動調諧/編譯），然後使用 `synchronize()` 進行多次迭代 將循環括起來。修正後的數字是真實的每次呼叫 GPU 時間； 量化差距。
+??? Success "1 — 先用錯誤方式 benchmark Triton softmax，再修正"
+    **錯誤做法：**沒有 warmup、也沒呼叫 `torch.cuda.synchronize()` 就直接幫第一次呼叫計時——你量到的是 kernel 啟動 + JIT 編譯的 latency，加上 CPU 端非同步提前返回的時間，不是真正的 GPU 時間，通常會比真實值小 10–100 倍。**正確做法：**先跑幾次 warmup 迭代（觸發 autotune/編譯），再用 `synchronize()` 包住一段多次迭代的迴圈計時。修正後的數字才是真實的每次呼叫 GPU 時間；記得量化兩者的差距。
 
-??? Success "2 — 分析 decode 步驟：誰占主導地位？"
-    簡介一 decode 小型 Transformer 的一步。**第 1 批**decode，預計 **啟動開銷和記憶體限制的 attention/FFN**占主導地位 - 許多微小的 kernels，每次從 HBM 讀取權重/KV，GPU 未充分利用。 常見修復：**CUDA 圖表**（消除啟動開銷）+ 批次（提高 算術強度）。如果 attention 占主導地位，KV 版面/Flash-decoding 會有所幫助； 如果是 FFN，權重量化會有所幫助。
+??? Success "2 — profile 一個 decode 步驟：誰主導？"
+    profile 一個小型 Transformer 的一個 decode 步驟。**batch-1** decode 的情況下，預期是**啟動開銷與 memory-bound 的 attention/FFN** 主導——很多微小的 kernel，每次都要從 HBM 重新讀權重/KV，GPU 沒被餵飽。常見修法：**CUDA Graph**（消除啟動開銷）+ batching（提高算術強度）。如果是 attention 主導，KV layout/Flash-decoding 有幫助；如果是 FFN 主導，權重量化有幫助。
 
-??? Success "3 — 計算 MFU；診斷 15%"
-    $\text{MFU} = \frac{6P \cdot \text{tokens/s}}{\text{GPU peak FLOP/s}}$（training， $6P$ FLOP/token）。15% 代表你只用到約六分之一的數學單元。 依序診斷：**輸入管道停頓**（GPU 匱乏）、**小批量/ 低佔用率**、**通訊不重疊**（DP/TP/EP 暴露）、**記憶體限制 ops**（未融合的規範/激活），**重新計算**開銷。尋找個人資料 然後修復最大貢獻者 — MFU 是最好的 training-health 數量。
+??? Success "3 — 算 MFU；診斷為什麼只有 15%"
+    $\text{MFU} = \frac{6P \cdot \text{tokens/s}}{\text{GPU peak FLOP/s}}$（training 時每 token 約 $6P$ FLOP）。15% 代表你大概只用到了六分之一的數學單元算力。依序排查：**data pipeline 停頓**（GPU 餓著沒東西做）、**batch 太小/occupancy 太低**、**通訊沒有重疊**（DP/TP/EP 的通訊暴露在外）、**memory-bound 的 op**（沒融合的 norm/activation）、**重算（recompute）**的額外開銷。先 profile 再修最大的那一項——MFU 是最好的 training 健康度指標。
 
-??? Success "4 — 死代碼消除隱藏了 kernel"
-    如果基準測試計算程式從未讀取的結果，則編譯器可能會 **完全消除**kernel → 你「測量」約 0 次。構造它通過 丟棄輸出，觀察到荒謬的速度，然後透過消耗來修復 輸出\*\*（例如累積成你列印/傳回的值，或新增數據 依賴性）。始終使結果可觀察，這樣工作就無法優化 遠離－一個經典的微基準陷阱。
+??? Success "4 — dead code elimination 把 kernel 藏起來了"
+    如果你 benchmark 的程式算出的結果從來沒被讀取，編譯器可能會直接**把這個 kernel 整個消除**→ 你「量到」的時間約等於 0。先重現這個現象（丟掉輸出、觀察到離譜的速度），再透過消費這個輸出來修正（例如累加進你會印出來或回傳的值，或者加一個資料依賴）。永遠讓結果是可觀察的，這樣編譯器就無法把整個工作優化掉——這是個經典的 micro-benchmark 陷阱。

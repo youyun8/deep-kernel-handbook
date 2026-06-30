@@ -133,7 +133,7 @@ $$ S = \frac{1}{(1-p) + p/s}, $$
 !!! Example "數值例子：局部 3 倍不等於整體 3 倍"
     若 routing 佔 decode wall-clock 的 12%，把它加速 $3\times$ 後，整體加速是 $1/(0.88+0.12/3)\approx1.09\times$。如果某個 GEMM 佔 35%，同樣 $3\times$ 則是 $1/(0.65+0.35/3)\approx1.30\times$。這就是 profile 要先看佔比的原因。
 
-### Little 定律：serving 的在飛請求數
+### Little's law：serving 的在飛請求數
 
 對於穩態的推論服務，平均在飛（in-flight）請求數等於 throughput 乘以 latency：
 
