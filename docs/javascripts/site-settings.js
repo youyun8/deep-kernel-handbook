@@ -1,7 +1,7 @@
 (function () {
   const storageKey = "deep-kernel-handbook-settings";
-  const defaultSidebarWidth = 256;
-  const sidebarLayoutVersion = 4;
+  const defaultSidebarWidth = 300;
+  const sidebarLayoutVersion = 5;
   const defaults = {
     textSize: "standard", // small | standard | large
     width: "standard", // standard | wide

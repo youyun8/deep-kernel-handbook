@@ -23,7 +23,7 @@
     "Inter", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
     system-ui, -apple-system, "Segoe UI", sans-serif;
   --ml-sidebar-font: var(--md-text-font-family, "Inter", system-ui, sans-serif);
-  --ml-sidebar-width: 256px;
+  --ml-sidebar-width: 300px;
   --ml-sidebar-rail-width: 2.45rem;
   /* Comfortable reading width for the content column. The sidebar stays
      docked to the left edge; on wide screens the content is centred in the
