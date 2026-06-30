@@ -120,7 +120,7 @@ nav:
       - 低秩矩陣與矩陣分解: math/low-rank.md
       - 機率、Softmax 與 Entropy: math/probability.md
       - 梯度、反向傳播與自動微分: math/calculus.md
-  - 基礎:
+  - 系統基礎:
       - foundations/index.md
       - 從零實作 Transformer: foundations/transformer-from-scratch.md
       - 作為系統的 Transformer: foundations/transformer-systems.md
