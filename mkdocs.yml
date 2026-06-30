@@ -114,6 +114,12 @@ plugins:
 nav:
   - 首頁: index.md
   - 閱讀路線: reading-path.md
+  - 數學基礎:
+      - math/index.md
+      - 向量、矩陣與線性映射: math/linear-algebra.md
+      - 低秩矩陣與矩陣分解: math/low-rank.md
+      - 機率、Softmax 與 Entropy: math/probability.md
+      - 梯度、反向傳播與自動微分: math/calculus.md
   - 基礎:
       - foundations/index.md
       - 從零實作 Transformer: foundations/transformer-from-scratch.md
